@@ -63,6 +63,89 @@ const Dashboard = () => {
   const { getAuthHeaders } = useAuth();
   const { notifications } = useNotification();
 
+  const normalizeString = useCallback((value) => (
+    value ? value.toString().trim().toLowerCase() : ''
+  ), []);
+
+  const isLikelyNonHumanAccount = useCallback((user) => {
+    const username = normalizeString(user.sAMAccountName);
+    const display = normalizeString(user.cn || user.displayName);
+    const hasEmail = Boolean(user.mail && user.mail.includes('@'));
+
+    if (hasEmail) return false;
+    if (username.endsWith('$')) return true;
+    if (/^(com|pc|nb|srv|server|ws)\d+/i.test(display)) return true;
+    if (/^(com|pc|nb|srv|server|ws)\d+/i.test(username)) return true;
+    return false;
+  }, [normalizeString]);
+
+  const deriveUniqueUsers = useCallback((userList) => {
+    const seenKeys = new Map();
+
+    const scoreUser = (user) => {
+      let score = 0;
+      if (user.mail) score += 2;
+      if (user.department) score += 1;
+      if (user.company) score += 1;
+      if (user.telephoneNumber || user.mobile) score += 1;
+      if (user.description) score += 0.5;
+      if (user.isEnabled) score += 0.5;
+      return score;
+    };
+
+    userList.forEach(user => {
+      const nameKey = normalizeString(user.cn || user.displayName);
+      const usernameKey = normalizeString(user.sAMAccountName);
+      const key = nameKey || usernameKey || user.dn || `temp-${Math.random()}`;
+
+      const currentScore = scoreUser(user);
+      const existing = seenKeys.get(key);
+      if (!existing || currentScore > existing.score) {
+        seenKeys.set(key, { user, score: currentScore });
+      }
+    });
+
+    return Array.from(seenKeys.values()).map(entry => entry.user);
+  }, [normalizeString]);
+
+  const fetchAllUsers = useCallback(async () => {
+    const PAGE_SIZE = 1000;
+    const allUsers = [];
+    let currentPage = 1;
+    let keepFetching = true;
+
+    while (keepFetching) {
+      const response = await axios.get(`${config.apiUrl}/api/users/`, {
+        headers: getAuthHeaders(),
+        params: { page: currentPage, page_size: PAGE_SIZE }
+      });
+
+      const pageData = response.data || [];
+      allUsers.push(...pageData);
+
+      if (pageData.length < PAGE_SIZE) {
+        keepFetching = false;
+      } else {
+        currentPage += 1;
+      }
+    }
+
+    return allUsers;
+  }, [getAuthHeaders]);
+
+  const processUsers = useCallback((rawUsers) => {
+    const humanUsers = rawUsers.filter(user => !isLikelyNonHumanAccount(user));
+    const uniqueUsers = deriveUniqueUsers(humanUsers);
+
+    return {
+      rawUsers,
+      humanUsers,
+      uniqueUsers,
+      filteredOutSystemCount: rawUsers.length - humanUsers.length,
+      duplicatesRemovedCount: humanUsers.length - uniqueUsers.length
+    };
+  }, [deriveUniqueUsers, isLikelyNonHumanAccount]);
+
   const fetchStats = async () => {
     try {
       const [usersResponse, groupsResponse, ousResponse, departmentsResponse, activitiesResponse] = await Promise.all([

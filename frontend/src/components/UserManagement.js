@@ -19,6 +19,7 @@ import {
   Tooltip,
   Drawer,
   Divider,
+  Grid,
   Pagination,
   Dropdown,
   Menu,
@@ -75,6 +76,7 @@ const { Search } = Input;
 const { TabPane } = Tabs;
 const { Option } = Select;
 const { Step } = Steps;
+const { useBreakpoint } = Grid;
 
 const UserManagement = () => {
   // ==================== STATES ====================
@@ -103,6 +105,7 @@ const UserManagement = () => {
   const [currentStep, setCurrentStep] = useState(0); // 0 = Step 1, 1 = Step 2, 2 = Step 3 (Review)
   const [step1Valid, setStep1Valid] = useState(false);
   const [step2Valid, setStep2Valid] = useState(true); // Groups are optional
+  const screens = useBreakpoint();
   
   // Group membership management states
   const [isManageGroupsModalVisible, setIsManageGroupsModalVisible] = useState(false);
@@ -151,10 +154,10 @@ const UserManagement = () => {
   
   const updateTableScrollY = useCallback(() => {
     if (typeof window === 'undefined') return;
-    const HEADER_HEIGHT = 340;
+    const HEADER_HEIGHT = screens.md || screens.lg || screens.xl ? 260 : 320;
     const available = window.innerHeight - HEADER_HEIGHT;
-    setTableScrollY(Math.max(260, available));
-  }, []);
+    setTableScrollY(Math.max(600, available));
+  }, [screens]);
 
   useEffect(() => {
     updateTableScrollY();
@@ -1217,6 +1220,7 @@ const UserManagement = () => {
     if (!user) return 0;
     let score = 0;
     if (user.mail) score += 4;
+    if (user.title) score += 2;
     if (user.department) score += 2;
     if (user.company) score += 1.5;
     if (user.telephoneNumber || user.mobile) score += 1;
@@ -1254,6 +1258,12 @@ const UserManagement = () => {
     });
     return Array.from(map.values()).map(entry => entry.user);
   }, [getUserDedupKey, scoreUserRecord]);
+
+  const getResponsiveWidth = useCallback((desktopWidth, tabletWidth, mobileWidth = '100%') => {
+    if (screens.xl || screens.lg) return desktopWidth;
+    if (screens.md || screens.sm) return tabletWidth ?? desktopWidth;
+    return mobileWidth;
+  }, [screens]);
 
   const filteredUsers = useMemo(() => deduplicateUsers(users).filter(user => {
     if (statusFilter === 'enabled') return user.isEnabled;
@@ -1449,7 +1459,7 @@ const UserManagement = () => {
     {
       title: 'Display Name',
       key: 'user',
-      fixed: 'left',
+      fixed: (screens.md || screens.lg || screens.xl) ? 'left' : undefined,
       width: 260,
       render: renderDisplayName
     },
@@ -1457,7 +1467,7 @@ const UserManagement = () => {
       title: 'Username',
       dataIndex: 'sAMAccountName',
       key: 'sAMAccountName',
-      fixed: 'left',
+      fixed: (screens.md || screens.lg || screens.xl) ? 'left' : undefined,
       width: 200,
       render: renderUsernameCell
     },
@@ -1534,14 +1544,25 @@ const UserManagement = () => {
     {
       title: 'Actions',
       key: 'actions',
-      fixed: 'right',
+      fixed: (screens.md || screens.lg || screens.xl) ? 'right' : undefined,
       width: 140,
       render: renderActionsCell
     }
-  ], [renderDisplayName, renderUsernameCell, renderEmailCell, renderTextCell, renderDepartmentTag, renderDescriptionCell, renderEmployeeIdCell, renderStatusCell, renderActionsCell]);
+  ], [renderDisplayName, renderUsernameCell, renderEmailCell, renderTextCell, renderDepartmentTag, renderDescriptionCell, renderEmployeeIdCell, renderStatusCell, renderActionsCell, screens.md, screens.lg, screens.xl]);
 
   // ⚡ Filter columns based on visibility settings
   const columns = allColumns.filter(col => {
+    const isMobile = !screens.md;
+    const isTablet = screens.md && !screens.lg;
+
+    if (isMobile && !['user', 'sAMAccountName', 'mail', 'actions'].includes(col.key)) {
+      return false;
+    }
+
+    if (isTablet && ['description', 'employeeID', 'telephoneNumber', 'mobile'].includes(col.dataIndex || col.key)) {
+      return false;
+    }
+
     // Always show User and Actions columns
     if (col.key === 'user' || col.key === 'actions') return true;
     
@@ -1571,12 +1592,12 @@ const UserManagement = () => {
         bodyStyle={{ padding: 0 }}
       >
         <div className="user-management-card-header">
-          <Row justify="space-between" align="middle">
-            <Col>
-              <Space size="middle" align="center">
+          <Row gutter={[16, 16]} align="middle">
+            <Col xs={24} lg={16}>
+              <Space size="middle" align="center" className="header-title-group" wrap>
                 <UserOutlined style={{ fontSize: 24, color: '#1890ff' }} />
                 <div>
-                  <Space size="middle" align="center">
+                  <Space size="middle" align="center" wrap>
                     <div style={{ 
                       color: '#262626', 
                       margin: 0, 
@@ -1585,7 +1606,7 @@ const UserManagement = () => {
                     }}>
                       User Management
                     </div>
-                    <Space size={8}>
+                    <Space size={8} wrap>
                       <Tag style={{
                         background: '#fafafa',
                         border: '1px solid #d9d9d9',
@@ -1637,8 +1658,8 @@ const UserManagement = () => {
                 </div>
               </Space>
             </Col>
-            <Col>
-              <Space>
+            <Col xs={24} lg={8} style={{ display: 'flex', justifyContent: 'flex-end' }}>
+              <Space className="header-actions" size={[12, 12]} wrap>
                 <Button
                   icon={<ReloadOutlined />}
                   onClick={() => {
@@ -1753,7 +1774,7 @@ const UserManagement = () => {
           setIsCreateModalVisible(false);
           setCurrentStep(0);
         }}
-        width={900}
+        width={getResponsiveWidth(720, 560, '95%')}
         footer={
           <div style={{ display: 'flex', justifyContent: 'space-between', padding: '12px 0' }}>
             <Button
@@ -1823,13 +1844,6 @@ const UserManagement = () => {
           >
             {/* Step 1: Essential Information */}
             <div style={{ display: currentStep === 0 ? 'block' : 'none' }}>
-              <Alert
-                message="Step 1: Account Information"
-                description="Fill in the essential information to create a new user account"
-                type="info"
-                showIcon
-                style={{ marginBottom: 24 }}
-              />
                 <Row gutter={16}>
                   <Col span={12}>
                     <Form.Item
@@ -2387,7 +2401,7 @@ const UserManagement = () => {
           setIsEditModalVisible(false);
           setEditingUser(null);
         }}
-        width={800}
+        width={getResponsiveWidth(800, 600, '95%')}
         okText="Update User"
         cancelText="Cancel"
         okButtonProps={{
@@ -2575,7 +2589,7 @@ const UserManagement = () => {
         open={isPasswordModalVisible}
         onOk={handlePasswordModalOk}
         onCancel={() => setIsPasswordModalVisible(false)}
-        width={500}
+        width={getResponsiveWidth(500, 420, '90%')}
         okText="Reset Password"
         cancelText="Cancel"
         okButtonProps={{
@@ -2677,7 +2691,7 @@ const UserManagement = () => {
         placement="right"
         onClose={() => setIsDetailsDrawerVisible(false)}
         open={isDetailsDrawerVisible}
-        width={700}
+        width={getResponsiveWidth(700, 560, '100%')}
         headerStyle={{
           background: 'linear-gradient(to right, #f8fafc, #ffffff)',
           borderBottom: 'none',
@@ -3642,7 +3656,7 @@ const UserManagement = () => {
         open={isManageGroupsModalVisible}
         onOk={handleSaveGroupChanges}
         onCancel={() => setIsManageGroupsModalVisible(false)}
-        width={900}
+        width={getResponsiveWidth(900, 700, '100%')}
         okText="Save Changes"
         cancelText="Cancel"
         okButtonProps={{
@@ -3910,7 +3924,7 @@ const UserManagement = () => {
         open={isColumnSettingsVisible}
         onOk={() => setIsColumnSettingsVisible(false)}
         onCancel={() => setIsColumnSettingsVisible(false)}
-        width={600}
+        width={getResponsiveWidth(600, 480, '95%')}
         okText="Apply"
         cancelText="Cancel"
         okButtonProps={{

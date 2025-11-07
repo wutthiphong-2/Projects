@@ -238,6 +238,14 @@
   width: 100%;
 }
 
+.header-actions {
+  justify-content: flex-end;
+}
+
+.header-actions .ant-btn {
+  min-width: 120px;
+}
+
 .user-management-card-header {
   padding: 12px 24px 8px;
 }
@@ -444,6 +452,11 @@
   .user-management-container .ant-table {
     font-size: 13px;
   }
+
+  .header-actions {
+    width: 100%;
+    justify-content: flex-start;
+  }
 }
 
 @media (max-width: 768px) {
@@ -459,6 +472,23 @@
   .user-management-container .ant-table-tbody > tr > td {
     padding: 8px 10px !important;
   }
+
+  .header-title-group {
+    justify-content: flex-start;
+  }
+
+  .header-actions {
+    width: 100%;
+  }
+
+  .header-actions .ant-btn {
+    width: 100%;
+  }
+
+  .header-search-row .ant-pagination {
+    justify-content: center;
+    padding-top: 8px;
+  }
 }
 
 @media (max-width: 576px) {
@@ -473,6 +503,14 @@
   .user-management-container .ant-table-thead > tr > th,
   .user-management-container .ant-table-tbody > tr > td {
     padding: 6px 8px !important;
+  }
+
+  .header-actions .ant-btn {
+    min-width: auto;
+  }
+
+  .header-search-row .ant-pagination {
+    justify-content: center;
   }
 }
 
