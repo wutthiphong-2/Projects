@@ -1,0 +1,378 @@
+{
+  "description": "Default groups configuration for each department/OU",
+  "generated_date": "2025-10-29",
+  "min_percentage_threshold": 30.0,
+  "departments": {
+    "ACC-K1AC00": {
+      "total_users_analyzed": 7,
+      "default_groups": [
+        "PSO-OU-90Days",
+        "AL_account",
+        "AllowAll",
+        "ACF",
+        "VPNusers",
+        "AL_tbkkaccount",
+        "InternetUsers",
+        "tbkk-mst-moldrepair-r",
+        "Scheduling",
+        "PM"
+      ]
+    },
+    "APQP-K1PJ00": {
+      "total_users_analyzed": 3,
+      "default_groups": [
+        "PSO-OU-90Days",
+        "AL_APQP",
+        "AllowAll",
+        "GDC-R",
+        "QA-R",
+        "APQP",
+        "VPNusers",
+        "RD-R",
+        "BP",
+        "PCL",
+        "AL_dnc_phase10_incharge",
+        "CE-R",
+        "PE-R",
+        "AL_dnc_phase8_mgr",
+        "AL_dnc_phase10_mgr",
+        "AL_thmanagers",
+        "Managers",
+        "SM",
+        "InternetUsers",
+        "QA",
+        "PCL-R",
+        "MA-R",
+        "TPM_Guest",
+        "QC-R"
+      ]
+    },
+    "BOD-K1EX00": {
+      "total_users_analyzed": 6,
+      "default_groups": [
+        "PSO-OU-90Days",
+        "AL_gm",
+        "AllowAll",
+        "GM",
+        "Scheduling",
+        "VPNusers",
+        "AL_thmanagers",
+        "APQP",
+        "Managers",
+        "InternetUsers",
+        "Proposal-R",
+        "AC-AssetCard-R",
+        "PE",
+        "PCL",
+        "ACF",
+        "AL_jpmanagers",
+        "BOD",
+        "AL_energy",
+        "TBKT",
+        "MA"
+      ]
+    },
+    "BP-K1BM00": {
+      "total_users_analyzed": 4,
+      "default_groups": [
+        "PSO-OU-90Days",
+        "PM",
+        "VPNusers",
+        "AllowAll",
+        "ACF",
+        "BP",
+        "CR",
+        "PR-Online"
+      ]
+    },
+    "CE-K1CE00": {
+      "total_users_analyzed": 3,
+      "default_groups": [
+        "AllowAll",
+        "CE",
+        "PSO-OU-90Days",
+        "AL_ce",
+        "AL_pe_p10",
+        "tbkk-mst-newmarking-r",
+        "tbkk-mst-sm",
+        "tbkk-mst-ce",
+        "VPNusers",
+        "GDC",
+        "AL_dnc_phase10_incharge",
+        "tbkk-mst-moldrepair-r",
+        "00 - SECURE",
+        "APQP",
+        "tbkk-mst-ma"
+      ]
+    },
+    "EEE-K1EE00": {
+      "total_users_analyzed": 7,
+      "default_groups": [
+        "AllowAll",
+        "PSO-OU-90Days",
+        "AL_EEE",
+        "GA",
+        "VPNusers"
+      ]
+    },
+    "IT-K1IT00": {
+      "total_users_analyzed": 7,
+      "default_groups": [
+        "IT",
+        "AllowAll",
+        "VPNusers",
+        "PSO-OU-90Days",
+        "Domain Admins",
+        "Domain Users",
+        "AL_it-NAME AD",
+        "Proposal-R"
+      ]
+    },
+    "MA-K1MA01": {
+      "total_users_analyzed": 5,
+      "default_groups": [
+        "PSO-OU-90Days",
+        "AllowAll",
+        "VPNusers",
+        "AL_thmanagers",
+        "CR",
+        "Managers",
+        "AL_gm",
+        "Scheduling",
+        "InternetUsers",
+        "CE",
+        "GM",
+        "GM-Meeting",
+        "BH-PE",
+        "PR-Online",
+        "APQP",
+        "BH-PD6",
+        "AL_dnc_phase8_mgr",
+        "AL_dnc_phase10_mgr",
+        "QCD Daily-RW",
+        "QC",
+        "QA"
+      ]
+    },
+    "MN-K1MN00": {
+      "total_users_analyzed": 11,
+      "default_groups": [
+        "AllowAll",
+        "PSO-OU-90Days",
+        "VPNusers",
+        "MN"
+      ]
+    },
+    "PCL-K1SC00": {
+      "total_users_analyzed": 9,
+      "default_groups": [
+        "AllowAll",
+        "PCL",
+        "VPNusers",
+        "PSO-OU-90Days",
+        "AL_import-export",
+        "AL_dnc_phase10_incharge",
+        "AL_planner",
+        "AL_thmanagers",
+        "Scheduling",
+        "Managers",
+        "InternetUsers",
+        "AL_eTaxInvoice"
+      ]
+    },
+    "PD1-K1PD01": {
+      "total_users_analyzed": 8,
+      "default_groups": [
+        "AllowAll",
+        "PSO-OU-90Days",
+        "VPNusers",
+        "AL_msl_pd1",
+        "AL_dnc_phase10_incharge",
+        "PD3",
+        "AL_pd3",
+        "MA",
+        "PR-Online"
+      ]
+    },
+    "PD2-K1PD02": {
+      "total_users_analyzed": 5,
+      "default_groups": [
+        "AllowAll",
+        "PSO-OU-90Days",
+        "PD2",
+        "VPNusers",
+        "AL_msl_pd2",
+        "AL_dnc_phase10_incharge",
+        "PR-Online",
+        "CR",
+        "AL_pe_p10",
+        "PE",
+        "QC-R"
+      ]
+    },
+    "PD3-K1PD03": {
+      "total_users_analyzed": 5,
+      "default_groups": [
+        "AllowAll",
+        "PSO-OU-90Days",
+        "AL_msl_pd3",
+        "AL_dnc_phase10_incharge",
+        "VPNusers",
+        "CR",
+        "MA",
+        "QC-R",
+        "InternetUsers"
+      ]
+    },
+    "PD4-K1PD04": {
+      "total_users_analyzed": 5,
+      "default_groups": [
+        "AllowAll",
+        "PD4",
+        "CE",
+        "PSO-OU-90Days",
+        "AL_msl_pd4-adc",
+        "VPNusers"
+      ]
+    },
+    "PD5-K1PD05": {
+      "total_users_analyzed": 3,
+      "default_groups": [
+        "AL_msl_pd5",
+        "QC-41-All-Group",
+        "AllowAll",
+        "PD5",
+        "PSO-OU-90Days",
+        "CR",
+        "MA",
+        "AL_dnc_phase8_mgr",
+        "AL_dnc_phase10_mgr",
+        "AL_thmanagers",
+        "QCD Daily-RW",
+        "MN-R",
+        "PR-Online",
+        "Scheduling",
+        "Managers",
+        "VPNusers"
+      ]
+    },
+    "PD7-K1PD07": {
+      "total_users_analyzed": 6,
+      "default_groups": [
+        "AllowAll",
+        "PSO-OU-90Days",
+        "MA",
+        "AL_msl_pd7",
+        "CR",
+        "VPNusers"
+      ]
+    },
+    "PE-K1PE00": {
+      "total_users_analyzed": 9,
+      "default_groups": [
+        "AllowAll",
+        "PE",
+        "VPNusers",
+        "PSO-OU-90Days",
+        "AL_pe",
+        "AL_dnc_phase10_incharge",
+        "AL_pe_p10",
+        "InternetUsers",
+        "PR-Online",
+        "BH-PE"
+      ]
+    },
+    "PU-K1PU00": {
+      "total_users_analyzed": 3,
+      "default_groups": [
+        "AllowAll",
+        "PU",
+        "PSO-OU-90Days",
+        "VPNusers",
+        "AL_purchase_office",
+        "AL_purchase",
+        "Proposal-R",
+        "tbkk-mst-moldrepair-r",
+        "InternetUsers",
+        "AL_msl_qc",
+        "AL_sqc",
+        "AL_dnc_phase10_incharge",
+        "QualityMeeting",
+        "CR",
+        "APQP-R",
+        "QC"
+      ]
+    },
+    "QA-K1QA00": {
+      "total_users_analyzed": 5,
+      "default_groups": [
+        "AllowAll",
+        "QA",
+        "PSO-OU-90Days",
+        "AL_QA",
+        "VPNusers",
+        "QualityMeeting",
+        "Managers"
+      ]
+    },
+    "QC-K1QC00": {
+      "total_users_analyzed": 15,
+      "default_groups": [
+        "AllowAll",
+        "QC",
+        "PSO-OU-90Days",
+        "AL_msl_qc"
+      ]
+    },
+    "RD-K1RD00": {
+      "total_users_analyzed": 5,
+      "default_groups": [
+        "AllowAll",
+        "RD",
+        "PSO-OU-90Days",
+        "AL_R&D",
+        "VPNusers",
+        "PR-Online",
+        "Managers",
+        "InternetUsers"
+      ]
+    },
+    "SM-K1SM00": {
+      "total_users_analyzed": 4,
+      "default_groups": [
+        "PSO-OU-90Days",
+        "AL_sm",
+        "AllowAll",
+        "VPNusers",
+        "CR",
+        "AL_dnc_phase10_incharge",
+        "APQP",
+        "Scheduling",
+        "InternetUsers",
+        "Domain Users",
+        "SM"
+      ]
+    },
+    "SYS-K1SS00": {
+      "total_users_analyzed": 4,
+      "default_groups": [
+        "AL_sys",
+        "AllowAll",
+        "VPNusers",
+        "PCL",
+        "EXPJ"
+      ]
+    },
+    "Tooling-K1TL00": {
+      "total_users_analyzed": 6,
+      "default_groups": [
+        "PSO-OU-90Days",
+        "AllowAll",
+        "PE",
+        "Tooling",
+        "VPNusers",
+        "PR-Online"
+      ]
+    }
+  }
+}

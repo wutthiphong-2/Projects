@@ -1,0 +1,118 @@
+/* Activity Log Styles */
+.activity-log-container {
+  min-height: 100vh;
+  padding: 16px 24px 24px 24px;
+  background: linear-gradient(135deg, #f5f7fa 0%, #c3cfe2 100%);
+}
+
+.activity-log-container .ant-card {
+  border-radius: 12px;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.08);
+  transition: all 0.3s ease;
+}
+
+.activity-log-container .ant-card:hover {
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.12);
+}
+
+.activity-log-container .ant-table {
+  border-radius: 8px;
+}
+
+.activity-log-container .ant-table-thead > tr > th {
+  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+  color: #ffffff !important;
+  font-weight: 700;
+  border-bottom: none !important;
+  text-transform: uppercase;
+  font-size: 12px;
+  letter-spacing: 0.5px;
+}
+
+.activity-log-container .ant-table-thead > tr > th::before {
+  display: none !important;
+}
+
+.activity-log-container .ant-table-tbody > tr {
+  transition: all 0.2s ease;
+}
+
+.activity-log-container .ant-table-tbody > tr:hover {
+  background: rgba(102, 126, 234, 0.05) !important;
+  transform: translateY(-1px);
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.06);
+}
+
+.activity-log-container .ant-table-tbody > tr > td {
+  border-bottom: 1px solid #f0f0f0;
+}
+
+.activity-log-container .ant-tag {
+  border-radius: 6px;
+  font-weight: 600;
+}
+
+.activity-log-container .ant-btn {
+  border-radius: 6px;
+  font-weight: 600;
+  transition: all 0.3s ease;
+}
+
+.activity-log-container .ant-btn-primary {
+  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+  border: none;
+  box-shadow: 0 4px 12px rgba(102, 126, 234, 0.3);
+}
+
+.activity-log-container .ant-btn-primary:hover {
+  background: linear-gradient(135deg, #764ba2 0%, #667eea 100%);
+  box-shadow: 0 6px 16px rgba(102, 126, 234, 0.4);
+  transform: translateY(-2px);
+}
+
+.activity-log-container .ant-input,
+.activity-log-container .ant-select-selector {
+  border-radius: 6px;
+  transition: all 0.3s ease;
+}
+
+.activity-log-container .ant-input:focus,
+.activity-log-container .ant-select-focused .ant-select-selector {
+  border-color: #667eea;
+  box-shadow: 0 0 0 2px rgba(102, 126, 234, 0.1);
+}
+
+.activity-log-container .ant-statistic-title {
+  font-size: 12px;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+.activity-log-container .ant-statistic-content {
+  font-weight: 700;
+}
+
+/* Hide Quick Jumper - Force Hide */
+.activity-log-container .ant-pagination-options-quick-jumper,
+.activity-log-container .ant-pagination .ant-pagination-options-quick-jumper,
+.ant-pagination-options-quick-jumper {
+  display: none !important;
+  visibility: hidden !important;
+  opacity: 0 !important;
+  width: 0 !important;
+  height: 0 !important;
+  overflow: hidden !important;
+}
+
+/* Responsive */
+@media (max-width: 768px) {
+  .activity-log-container {
+    padding: 16px;
+  }
+  
+  .activity-log-container .ant-table {
+    font-size: 12px;
+  }
+}
+
+

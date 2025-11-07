@@ -1,0 +1,1580 @@
+{
+  "K1QC00": {
+    "total_users": 31,
+    "top_groups": [
+      {
+        "name": "AllowAll",
+        "count": 30,
+        "percentage": 96.8
+      },
+      {
+        "name": "QC",
+        "count": 28,
+        "percentage": 90.3
+      },
+      {
+        "name": "MA",
+        "count": 2,
+        "percentage": 6.5
+      },
+      {
+        "name": "AL_msl_qc",
+        "count": 1,
+        "percentage": 3.2
+      },
+      {
+        "name": "QC-41-All-Group",
+        "count": 1,
+        "percentage": 3.2
+      },
+      {
+        "name": "PR-Online",
+        "count": 1,
+        "percentage": 3.2
+      }
+    ],
+    "recommended_defaults": [
+      "AllowAll",
+      "QC"
+    ]
+  },
+  "INFORMATION TECHNOLOGY": {
+    "total_users": 21,
+    "top_groups": [
+      {
+        "name": "PSO-OU-90Days",
+        "count": 21,
+        "percentage": 100.0
+      },
+      {
+        "name": "VPNusers",
+        "count": 21,
+        "percentage": 100.0
+      },
+      {
+        "name": "AL_sys",
+        "count": 14,
+        "percentage": 66.7
+      },
+      {
+        "name": "AllowAll",
+        "count": 13,
+        "percentage": 61.9
+      },
+      {
+        "name": "EXPJ",
+        "count": 10,
+        "percentage": 47.6
+      },
+      {
+        "name": "Domain Admins",
+        "count": 8,
+        "percentage": 38.1
+      },
+      {
+        "name": "AL_it-NAME AD",
+        "count": 7,
+        "percentage": 33.3
+      },
+      {
+        "name": "IT",
+        "count": 7,
+        "percentage": 33.3
+      },
+      {
+        "name": "USBAllow",
+        "count": 6,
+        "percentage": 28.6
+      },
+      {
+        "name": "PCL",
+        "count": 5,
+        "percentage": 23.8
+      },
+      {
+        "name": "Enterprise Admins",
+        "count": 4,
+        "percentage": 19.0
+      },
+      {
+        "name": "AL_line",
+        "count": 3,
+        "percentage": 14.3
+      },
+      {
+        "name": "Remote Desktop Users",
+        "count": 2,
+        "percentage": 9.5
+      },
+      {
+        "name": "PR-Online",
+        "count": 2,
+        "percentage": 9.5
+      },
+      {
+        "name": "AL_thmanagers",
+        "count": 2,
+        "percentage": 9.5
+      }
+    ],
+    "recommended_defaults": [
+      "PSO-OU-90Days",
+      "VPNusers",
+      "AL_sys",
+      "AllowAll"
+    ]
+  },
+  "PRODUCTION ENGINEERING": {
+    "total_users": 20,
+    "top_groups": [
+      {
+        "name": "PSO-OU-90Days",
+        "count": 19,
+        "percentage": 95.0
+      },
+      {
+        "name": "AllowAll",
+        "count": 19,
+        "percentage": 95.0
+      },
+      {
+        "name": "PE",
+        "count": 16,
+        "percentage": 80.0
+      },
+      {
+        "name": "VPNusers",
+        "count": 16,
+        "percentage": 80.0
+      },
+      {
+        "name": "AL_pe_p10",
+        "count": 14,
+        "percentage": 70.0
+      },
+      {
+        "name": "AL_pe",
+        "count": 11,
+        "percentage": 55.0
+      },
+      {
+        "name": "BH-PE",
+        "count": 8,
+        "percentage": 40.0
+      },
+      {
+        "name": "PR-Online",
+        "count": 7,
+        "percentage": 35.0
+      },
+      {
+        "name": "AL_dnc_phase10_incharge",
+        "count": 7,
+        "percentage": 35.0
+      },
+      {
+        "name": "GDC",
+        "count": 5,
+        "percentage": 25.0
+      },
+      {
+        "name": "InternetUsers",
+        "count": 5,
+        "percentage": 25.0
+      },
+      {
+        "name": "CE",
+        "count": 5,
+        "percentage": 25.0
+      },
+      {
+        "name": "QC-R",
+        "count": 4,
+        "percentage": 20.0
+      },
+      {
+        "name": "CR",
+        "count": 4,
+        "percentage": 20.0
+      },
+      {
+        "name": "QC-41-All-Group",
+        "count": 4,
+        "percentage": 20.0
+      }
+    ],
+    "recommended_defaults": [
+      "PSO-OU-90Days",
+      "AllowAll",
+      "PE",
+      "VPNusers",
+      "AL_pe_p10",
+      "AL_pe"
+    ]
+  },
+  "QUALITY CONTROL": {
+    "total_users": 18,
+    "top_groups": [
+      {
+        "name": "PSO-OU-90Days",
+        "count": 16,
+        "percentage": 88.9
+      },
+      {
+        "name": "AllowAll",
+        "count": 16,
+        "percentage": 88.9
+      },
+      {
+        "name": "QC",
+        "count": 15,
+        "percentage": 83.3
+      },
+      {
+        "name": "AL_msl_qc",
+        "count": 7,
+        "percentage": 38.9
+      },
+      {
+        "name": "AL_dnc_phase10_incharge",
+        "count": 6,
+        "percentage": 33.3
+      },
+      {
+        "name": "VPNusers",
+        "count": 6,
+        "percentage": 33.3
+      },
+      {
+        "name": "QualityMeeting",
+        "count": 3,
+        "percentage": 16.7
+      },
+      {
+        "name": "QA",
+        "count": 3,
+        "percentage": 16.7
+      },
+      {
+        "name": "BH-QC",
+        "count": 3,
+        "percentage": 16.7
+      },
+      {
+        "name": "QCD Daily-RW",
+        "count": 3,
+        "percentage": 16.7
+      },
+      {
+        "name": "InternetUsers",
+        "count": 2,
+        "percentage": 11.1
+      },
+      {
+        "name": "BH-QA",
+        "count": 2,
+        "percentage": 11.1
+      },
+      {
+        "name": "AL_jpmanagers",
+        "count": 1,
+        "percentage": 5.6
+      },
+      {
+        "name": "AL_gm",
+        "count": 1,
+        "percentage": 5.6
+      },
+      {
+        "name": "GM",
+        "count": 1,
+        "percentage": 5.6
+      }
+    ],
+    "recommended_defaults": [
+      "PSO-OU-90Days",
+      "AllowAll",
+      "QC"
+    ]
+  },
+  "SUPPLY CHAIN MANAGEMENT": {
+    "total_users": 18,
+    "top_groups": [
+      {
+        "name": "AllowAll",
+        "count": 17,
+        "percentage": 94.4
+      },
+      {
+        "name": "PSO-OU-90Days",
+        "count": 16,
+        "percentage": 88.9
+      },
+      {
+        "name": "PCL",
+        "count": 16,
+        "percentage": 88.9
+      },
+      {
+        "name": "VPNusers",
+        "count": 15,
+        "percentage": 83.3
+      },
+      {
+        "name": "AL_planner",
+        "count": 7,
+        "percentage": 38.9
+      },
+      {
+        "name": "AL_import-export",
+        "count": 6,
+        "percentage": 33.3
+      },
+      {
+        "name": "AL_dnc_phase10_incharge",
+        "count": 6,
+        "percentage": 33.3
+      },
+      {
+        "name": "AL_Telemetic",
+        "count": 4,
+        "percentage": 22.2
+      },
+      {
+        "name": "PR-Online",
+        "count": 4,
+        "percentage": 22.2
+      },
+      {
+        "name": "BH-PCL",
+        "count": 4,
+        "percentage": 22.2
+      },
+      {
+        "name": "AL_eTaxInvoice",
+        "count": 4,
+        "percentage": 22.2
+      },
+      {
+        "name": "InternetUsers",
+        "count": 4,
+        "percentage": 22.2
+      },
+      {
+        "name": "APQP-R",
+        "count": 3,
+        "percentage": 16.7
+      },
+      {
+        "name": "QCD Daily-RW",
+        "count": 3,
+        "percentage": 16.7
+      },
+      {
+        "name": "AL_thmanagers",
+        "count": 3,
+        "percentage": 16.7
+      }
+    ],
+    "recommended_defaults": [
+      "AllowAll",
+      "PSO-OU-90Days",
+      "PCL",
+      "VPNusers"
+    ]
+  },
+  "EMPLOYEE EXPERIENCE ENGAGEMENT": {
+    "total_users": 15,
+    "top_groups": [
+      {
+        "name": "AllowAll",
+        "count": 15,
+        "percentage": 100.0
+      },
+      {
+        "name": "VPNusers",
+        "count": 15,
+        "percentage": 100.0
+      },
+      {
+        "name": "GA",
+        "count": 13,
+        "percentage": 86.7
+      },
+      {
+        "name": "PSO-OU-90Days",
+        "count": 11,
+        "percentage": 73.3
+      },
+      {
+        "name": "AL_EEE",
+        "count": 11,
+        "percentage": 73.3
+      },
+      {
+        "name": "tbkk-mst-payment",
+        "count": 7,
+        "percentage": 46.7
+      },
+      {
+        "name": "tbkk-mst-ga",
+        "count": 6,
+        "percentage": 40.0
+      },
+      {
+        "name": "AL_hrd",
+        "count": 5,
+        "percentage": 33.3
+      },
+      {
+        "name": "AL_hrm",
+        "count": 3,
+        "percentage": 20.0
+      },
+      {
+        "name": "Managers",
+        "count": 3,
+        "percentage": 20.0
+      },
+      {
+        "name": "MST",
+        "count": 3,
+        "percentage": 20.0
+      },
+      {
+        "name": "USBAllow",
+        "count": 2,
+        "percentage": 13.3
+      },
+      {
+        "name": "AL_thmanagers",
+        "count": 2,
+        "percentage": 13.3
+      },
+      {
+        "name": "BH-GA",
+        "count": 1,
+        "percentage": 6.7
+      },
+      {
+        "name": "BH-MA",
+        "count": 1,
+        "percentage": 6.7
+      }
+    ],
+    "recommended_defaults": [
+      "AllowAll",
+      "VPNusers",
+      "GA",
+      "PSO-OU-90Days",
+      "AL_EEE"
+    ]
+  },
+  "PRODUCTION 7": {
+    "total_users": 12,
+    "top_groups": [
+      {
+        "name": "PSO-OU-90Days",
+        "count": 12,
+        "percentage": 100.0
+      },
+      {
+        "name": "AllowAll",
+        "count": 12,
+        "percentage": 100.0
+      },
+      {
+        "name": "MA",
+        "count": 10,
+        "percentage": 83.3
+      },
+      {
+        "name": "AL_msl_pd7",
+        "count": 2,
+        "percentage": 16.7
+      },
+      {
+        "name": "CR",
+        "count": 2,
+        "percentage": 16.7
+      },
+      {
+        "name": "VPNusers",
+        "count": 2,
+        "percentage": 16.7
+      },
+      {
+        "name": "QCD Daily-RW",
+        "count": 1,
+        "percentage": 8.3
+      },
+      {
+        "name": "PD5",
+        "count": 1,
+        "percentage": 8.3
+      },
+      {
+        "name": "Managers",
+        "count": 1,
+        "percentage": 8.3
+      },
+      {
+        "name": "AL_pe_p10",
+        "count": 1,
+        "percentage": 8.3
+      },
+      {
+        "name": "AL_dnc_phase10_incharge",
+        "count": 1,
+        "percentage": 8.3
+      },
+      {
+        "name": "PE",
+        "count": 1,
+        "percentage": 8.3
+      }
+    ],
+    "recommended_defaults": [
+      "PSO-OU-90Days",
+      "AllowAll",
+      "MA"
+    ]
+  },
+  "PURCHASING": {
+    "total_users": 11,
+    "top_groups": [
+      {
+        "name": "VPNusers",
+        "count": 11,
+        "percentage": 100.0
+      },
+      {
+        "name": "AllowAll",
+        "count": 10,
+        "percentage": 90.9
+      },
+      {
+        "name": "PSO-OU-90Days",
+        "count": 9,
+        "percentage": 81.8
+      },
+      {
+        "name": "PU",
+        "count": 8,
+        "percentage": 72.7
+      },
+      {
+        "name": "InternetUsers",
+        "count": 7,
+        "percentage": 63.6
+      },
+      {
+        "name": "CR",
+        "count": 7,
+        "percentage": 63.6
+      },
+      {
+        "name": "APQP-R",
+        "count": 6,
+        "percentage": 54.5
+      },
+      {
+        "name": "QC",
+        "count": 5,
+        "percentage": 45.5
+      },
+      {
+        "name": "AL_purchase_rm",
+        "count": 5,
+        "percentage": 45.5
+      },
+      {
+        "name": "APQP",
+        "count": 5,
+        "percentage": 45.5
+      },
+      {
+        "name": "AL_sqc",
+        "count": 4,
+        "percentage": 36.4
+      },
+      {
+        "name": "AL_purchase_office",
+        "count": 2,
+        "percentage": 18.2
+      },
+      {
+        "name": "tbkk-mst-moldrepair-r",
+        "count": 2,
+        "percentage": 18.2
+      },
+      {
+        "name": "AL_purchase",
+        "count": 1,
+        "percentage": 9.1
+      },
+      {
+        "name": "Proposal-R",
+        "count": 1,
+        "percentage": 9.1
+      }
+    ],
+    "recommended_defaults": [
+      "VPNusers",
+      "AllowAll",
+      "PSO-OU-90Days",
+      "PU",
+      "InternetUsers",
+      "CR",
+      "APQP-R"
+    ]
+  },
+  "RESEARCH&DEVELOPMENT": {
+    "total_users": 11,
+    "top_groups": [
+      {
+        "name": "VPNusers",
+        "count": 10,
+        "percentage": 90.9
+      },
+      {
+        "name": "PSO-OU-90Days",
+        "count": 9,
+        "percentage": 81.8
+      },
+      {
+        "name": "AllowAll",
+        "count": 9,
+        "percentage": 81.8
+      },
+      {
+        "name": "RD",
+        "count": 8,
+        "percentage": 72.7
+      },
+      {
+        "name": "AL_R&D",
+        "count": 7,
+        "percentage": 63.6
+      },
+      {
+        "name": "PR-Online",
+        "count": 4,
+        "percentage": 36.4
+      },
+      {
+        "name": "Managers",
+        "count": 4,
+        "percentage": 36.4
+      },
+      {
+        "name": "InternetUsers",
+        "count": 3,
+        "percentage": 27.3
+      },
+      {
+        "name": "AL_dnc_phase10_incharge",
+        "count": 3,
+        "percentage": 27.3
+      },
+      {
+        "name": "AL_dnc_phase8_incharge",
+        "count": 2,
+        "percentage": 18.2
+      },
+      {
+        "name": "AL_thmanagers",
+        "count": 2,
+        "percentage": 18.2
+      },
+      {
+        "name": "GM",
+        "count": 2,
+        "percentage": 18.2
+      },
+      {
+        "name": "MA-R",
+        "count": 2,
+        "percentage": 18.2
+      },
+      {
+        "name": "Scheduling",
+        "count": 2,
+        "percentage": 18.2
+      },
+      {
+        "name": "tbkk-mst-pm",
+        "count": 2,
+        "percentage": 18.2
+      }
+    ],
+    "recommended_defaults": [
+      "VPNusers",
+      "PSO-OU-90Days",
+      "AllowAll",
+      "RD",
+      "AL_R&D"
+    ]
+  },
+  "MAINTENANCE": {
+    "total_users": 10,
+    "top_groups": [
+      {
+        "name": "PSO-OU-90Days",
+        "count": 10,
+        "percentage": 100.0
+      },
+      {
+        "name": "AllowAll",
+        "count": 8,
+        "percentage": 80.0
+      },
+      {
+        "name": "MN",
+        "count": 8,
+        "percentage": 80.0
+      },
+      {
+        "name": "VPNusers",
+        "count": 6,
+        "percentage": 60.0
+      },
+      {
+        "name": "CR",
+        "count": 1,
+        "percentage": 10.0
+      }
+    ],
+    "recommended_defaults": [
+      "PSO-OU-90Days",
+      "AllowAll",
+      "MN",
+      "VPNusers"
+    ]
+  },
+  "K1IT00": {
+    "total_users": 10,
+    "top_groups": [
+      {
+        "name": "AllowAll",
+        "count": 6,
+        "percentage": 60.0
+      },
+      {
+        "name": "IT",
+        "count": 6,
+        "percentage": 60.0
+      },
+      {
+        "name": "VPNusers",
+        "count": 3,
+        "percentage": 30.0
+      },
+      {
+        "name": "Enterprise Admins",
+        "count": 3,
+        "percentage": 30.0
+      },
+      {
+        "name": "Domain Admins",
+        "count": 3,
+        "percentage": 30.0
+      },
+      {
+        "name": "VDI",
+        "count": 2,
+        "percentage": 20.0
+      },
+      {
+        "name": "MST",
+        "count": 2,
+        "percentage": 20.0
+      },
+      {
+        "name": "auth_my_radius",
+        "count": 2,
+        "percentage": 20.0
+      },
+      {
+        "name": "AL_it-NAME AD",
+        "count": 2,
+        "percentage": 20.0
+      },
+      {
+        "name": "USBAllow",
+        "count": 1,
+        "percentage": 10.0
+      },
+      {
+        "name": "InternetUsers",
+        "count": 1,
+        "percentage": 10.0
+      },
+      {
+        "name": "Remote Desktop Users",
+        "count": 1,
+        "percentage": 10.0
+      },
+      {
+        "name": "Backup Operators",
+        "count": 1,
+        "percentage": 10.0
+      },
+      {
+        "name": "Group Policy Creator Owners",
+        "count": 1,
+        "percentage": 10.0
+      },
+      {
+        "name": "Schema Admins",
+        "count": 1,
+        "percentage": 10.0
+      }
+    ],
+    "recommended_defaults": [
+      "AllowAll",
+      "IT"
+    ]
+  },
+  "QUALITY ASSURANCE": {
+    "total_users": 10,
+    "top_groups": [
+      {
+        "name": "AllowAll",
+        "count": 10,
+        "percentage": 100.0
+      },
+      {
+        "name": "VPNusers",
+        "count": 10,
+        "percentage": 100.0
+      },
+      {
+        "name": "PSO-OU-90Days",
+        "count": 9,
+        "percentage": 90.0
+      },
+      {
+        "name": "QA",
+        "count": 8,
+        "percentage": 80.0
+      },
+      {
+        "name": "AL_QA",
+        "count": 7,
+        "percentage": 70.0
+      },
+      {
+        "name": "AL_dnc_phase10_incharge",
+        "count": 4,
+        "percentage": 40.0
+      },
+      {
+        "name": "AL_dnc_phase8_incharge",
+        "count": 3,
+        "percentage": 30.0
+      },
+      {
+        "name": "CR",
+        "count": 3,
+        "percentage": 30.0
+      },
+      {
+        "name": "BH-QC",
+        "count": 3,
+        "percentage": 30.0
+      },
+      {
+        "name": "BH-QA",
+        "count": 3,
+        "percentage": 30.0
+      },
+      {
+        "name": "QC",
+        "count": 3,
+        "percentage": 30.0
+      },
+      {
+        "name": "QualityMeeting",
+        "count": 3,
+        "percentage": 30.0
+      },
+      {
+        "name": "BH-MA",
+        "count": 3,
+        "percentage": 30.0
+      },
+      {
+        "name": "Managers",
+        "count": 3,
+        "percentage": 30.0
+      },
+      {
+        "name": "CE-R",
+        "count": 3,
+        "percentage": 30.0
+      }
+    ],
+    "recommended_defaults": [
+      "AllowAll",
+      "VPNusers",
+      "PSO-OU-90Days",
+      "QA",
+      "AL_QA"
+    ]
+  },
+  "ACCOUNT & FINANCIAL": {
+    "total_users": 9,
+    "top_groups": [
+      {
+        "name": "AllowAll",
+        "count": 9,
+        "percentage": 100.0
+      },
+      {
+        "name": "ACF",
+        "count": 9,
+        "percentage": 100.0
+      },
+      {
+        "name": "PSO-OU-90Days",
+        "count": 8,
+        "percentage": 88.9
+      },
+      {
+        "name": "AL_account",
+        "count": 8,
+        "percentage": 88.9
+      },
+      {
+        "name": "VPNusers",
+        "count": 8,
+        "percentage": 88.9
+      },
+      {
+        "name": "AL_tbkkaccount",
+        "count": 5,
+        "percentage": 55.6
+      },
+      {
+        "name": "InternetUsers",
+        "count": 5,
+        "percentage": 55.6
+      },
+      {
+        "name": "tbkk-mst-moldrepair-r",
+        "count": 3,
+        "percentage": 33.3
+      },
+      {
+        "name": "Scheduling",
+        "count": 3,
+        "percentage": 33.3
+      },
+      {
+        "name": "PM",
+        "count": 3,
+        "percentage": 33.3
+      },
+      {
+        "name": "AL_eTaxInvoice",
+        "count": 2,
+        "percentage": 22.2
+      },
+      {
+        "name": "CR",
+        "count": 2,
+        "percentage": 22.2
+      },
+      {
+        "name": "USBAllow",
+        "count": 2,
+        "percentage": 22.2
+      },
+      {
+        "name": "TBKT",
+        "count": 2,
+        "percentage": 22.2
+      },
+      {
+        "name": "VDI",
+        "count": 2,
+        "percentage": 22.2
+      }
+    ],
+    "recommended_defaults": [
+      "AllowAll",
+      "ACF",
+      "PSO-OU-90Days",
+      "AL_account",
+      "VPNusers",
+      "AL_tbkkaccount",
+      "InternetUsers"
+    ]
+  },
+  "SALES & MARKETING": {
+    "total_users": 9,
+    "top_groups": [
+      {
+        "name": "PSO-OU-90Days",
+        "count": 9,
+        "percentage": 100.0
+      },
+      {
+        "name": "AL_sm",
+        "count": 9,
+        "percentage": 100.0
+      },
+      {
+        "name": "AllowAll",
+        "count": 9,
+        "percentage": 100.0
+      },
+      {
+        "name": "VPNusers",
+        "count": 9,
+        "percentage": 100.0
+      },
+      {
+        "name": "CR",
+        "count": 6,
+        "percentage": 66.7
+      },
+      {
+        "name": "APQP",
+        "count": 6,
+        "percentage": 66.7
+      },
+      {
+        "name": "Scheduling",
+        "count": 6,
+        "percentage": 66.7
+      },
+      {
+        "name": "AL_dnc_phase10_incharge",
+        "count": 5,
+        "percentage": 55.6
+      },
+      {
+        "name": "SM",
+        "count": 5,
+        "percentage": 55.6
+      },
+      {
+        "name": "InternetUsers",
+        "count": 4,
+        "percentage": 44.4
+      },
+      {
+        "name": "Domain Users",
+        "count": 4,
+        "percentage": 44.4
+      },
+      {
+        "name": "GM-Meeting",
+        "count": 3,
+        "percentage": 33.3
+      },
+      {
+        "name": "PCL",
+        "count": 3,
+        "percentage": 33.3
+      },
+      {
+        "name": "Managers",
+        "count": 3,
+        "percentage": 33.3
+      },
+      {
+        "name": "PR-Online",
+        "count": 2,
+        "percentage": 22.2
+      }
+    ],
+    "recommended_defaults": [
+      "PSO-OU-90Days",
+      "AL_sm",
+      "AllowAll",
+      "VPNusers",
+      "CR",
+      "APQP",
+      "Scheduling",
+      "AL_dnc_phase10_incharge",
+      "SM"
+    ]
+  },
+  "PRODUCTION 6": {
+    "total_users": 7,
+    "top_groups": [
+      {
+        "name": "AllowAll",
+        "count": 7,
+        "percentage": 100.0
+      },
+      {
+        "name": "BH-PD6",
+        "count": 4,
+        "percentage": 57.1
+      },
+      {
+        "name": "AL_dnc_phase10_incharge",
+        "count": 4,
+        "percentage": 57.1
+      },
+      {
+        "name": "PSO-OU-90Days",
+        "count": 4,
+        "percentage": 57.1
+      },
+      {
+        "name": "InternetUsers",
+        "count": 3,
+        "percentage": 42.9
+      },
+      {
+        "name": "BH-MA",
+        "count": 2,
+        "percentage": 28.6
+      },
+      {
+        "name": "VPNusers",
+        "count": 2,
+        "percentage": 28.6
+      },
+      {
+        "name": "AL_dnc_phase8_incharge",
+        "count": 2,
+        "percentage": 28.6
+      },
+      {
+        "name": "BH-PE",
+        "count": 2,
+        "percentage": 28.6
+      },
+      {
+        "name": "AL_dnc_phase8_mgr",
+        "count": 1,
+        "percentage": 14.3
+      },
+      {
+        "name": "AL_dnc_phase10_mgr",
+        "count": 1,
+        "percentage": 14.3
+      },
+      {
+        "name": "BH-MN",
+        "count": 1,
+        "percentage": 14.3
+      },
+      {
+        "name": "MN",
+        "count": 1,
+        "percentage": 14.3
+      },
+      {
+        "name": "BH-PE-R",
+        "count": 1,
+        "percentage": 14.3
+      },
+      {
+        "name": "QC-R",
+        "count": 1,
+        "percentage": 14.3
+      }
+    ],
+    "recommended_defaults": [
+      "AllowAll",
+      "BH-PD6",
+      "AL_dnc_phase10_incharge",
+      "PSO-OU-90Days"
+    ]
+  },
+  "PRODUCTION 1": {
+    "total_users": 7,
+    "top_groups": [
+      {
+        "name": "PSO-OU-90Days",
+        "count": 7,
+        "percentage": 100.0
+      },
+      {
+        "name": "AllowAll",
+        "count": 7,
+        "percentage": 100.0
+      },
+      {
+        "name": "VPNusers",
+        "count": 5,
+        "percentage": 71.4
+      },
+      {
+        "name": "AL_dnc_phase10_incharge",
+        "count": 4,
+        "percentage": 57.1
+      },
+      {
+        "name": "PD3",
+        "count": 3,
+        "percentage": 42.9
+      },
+      {
+        "name": "AL_msl_pd1",
+        "count": 3,
+        "percentage": 42.9
+      },
+      {
+        "name": "AL_pd3",
+        "count": 3,
+        "percentage": 42.9
+      },
+      {
+        "name": "PR-Online",
+        "count": 3,
+        "percentage": 42.9
+      },
+      {
+        "name": "AL_thmanagers",
+        "count": 2,
+        "percentage": 28.6
+      },
+      {
+        "name": "QCD Daily-RW",
+        "count": 2,
+        "percentage": 28.6
+      },
+      {
+        "name": "CR",
+        "count": 2,
+        "percentage": 28.6
+      },
+      {
+        "name": "MA",
+        "count": 2,
+        "percentage": 28.6
+      },
+      {
+        "name": "AL_pe_p10",
+        "count": 2,
+        "percentage": 28.6
+      },
+      {
+        "name": "PE",
+        "count": 2,
+        "percentage": 28.6
+      },
+      {
+        "name": "Managers",
+        "count": 1,
+        "percentage": 14.3
+      }
+    ],
+    "recommended_defaults": [
+      "PSO-OU-90Days",
+      "AllowAll",
+      "VPNusers",
+      "AL_dnc_phase10_incharge"
+    ]
+  },
+  "M1RD00": {
+    "total_users": 7,
+    "top_groups": [
+      {
+        "name": "MST",
+        "count": 7,
+        "percentage": 100.0
+      },
+      {
+        "name": "VPNusers",
+        "count": 3,
+        "percentage": 42.9
+      },
+      {
+        "name": "tbkk-mst-newmarking",
+        "count": 2,
+        "percentage": 28.6
+      },
+      {
+        "name": "tbkk-mst-pm",
+        "count": 1,
+        "percentage": 14.3
+      },
+      {
+        "name": "tbkk-mst-pm-r",
+        "count": 1,
+        "percentage": 14.3
+      }
+    ],
+    "recommended_defaults": [
+      "MST"
+    ]
+  },
+  "EXECUTIVE": {
+    "total_users": 7,
+    "top_groups": [
+      {
+        "name": "PSO-OU-90Days",
+        "count": 7,
+        "percentage": 100.0
+      },
+      {
+        "name": "AL_gm",
+        "count": 7,
+        "percentage": 100.0
+      },
+      {
+        "name": "AllowAll",
+        "count": 7,
+        "percentage": 100.0
+      },
+      {
+        "name": "GM",
+        "count": 6,
+        "percentage": 85.7
+      },
+      {
+        "name": "Scheduling",
+        "count": 6,
+        "percentage": 85.7
+      },
+      {
+        "name": "VPNusers",
+        "count": 6,
+        "percentage": 85.7
+      },
+      {
+        "name": "AL_thmanagers",
+        "count": 4,
+        "percentage": 57.1
+      },
+      {
+        "name": "APQP",
+        "count": 4,
+        "percentage": 57.1
+      },
+      {
+        "name": "InternetUsers",
+        "count": 4,
+        "percentage": 57.1
+      },
+      {
+        "name": "Managers",
+        "count": 3,
+        "percentage": 42.9
+      },
+      {
+        "name": "PE",
+        "count": 3,
+        "percentage": 42.9
+      },
+      {
+        "name": "PCL",
+        "count": 3,
+        "percentage": 42.9
+      },
+      {
+        "name": "MA",
+        "count": 3,
+        "percentage": 42.9
+      },
+      {
+        "name": "BOD",
+        "count": 3,
+        "percentage": 42.9
+      },
+      {
+        "name": "AL_jpmanagers",
+        "count": 3,
+        "percentage": 42.9
+      }
+    ],
+    "recommended_defaults": [
+      "PSO-OU-90Days",
+      "AL_gm",
+      "AllowAll",
+      "GM",
+      "Scheduling",
+      "VPNusers",
+      "AL_thmanagers",
+      "APQP",
+      "InternetUsers"
+    ]
+  },
+  "CASTING ENGINEER": {
+    "total_users": 7,
+    "top_groups": [
+      {
+        "name": "PSO-OU-90Days",
+        "count": 6,
+        "percentage": 85.7
+      },
+      {
+        "name": "VPNusers",
+        "count": 6,
+        "percentage": 85.7
+      },
+      {
+        "name": "AL_ce",
+        "count": 5,
+        "percentage": 71.4
+      },
+      {
+        "name": "AllowAll",
+        "count": 5,
+        "percentage": 71.4
+      },
+      {
+        "name": "tbkk-mst-newmarking-r",
+        "count": 5,
+        "percentage": 71.4
+      },
+      {
+        "name": "AL_pe_p10",
+        "count": 4,
+        "percentage": 57.1
+      },
+      {
+        "name": "CE",
+        "count": 4,
+        "percentage": 57.1
+      },
+      {
+        "name": "PE",
+        "count": 3,
+        "percentage": 42.9
+      },
+      {
+        "name": "tbkk-mst-sm",
+        "count": 2,
+        "percentage": 28.6
+      },
+      {
+        "name": "tbkk-mst-ce",
+        "count": 2,
+        "percentage": 28.6
+      },
+      {
+        "name": "GM",
+        "count": 2,
+        "percentage": 28.6
+      },
+      {
+        "name": "GDC",
+        "count": 2,
+        "percentage": 28.6
+      },
+      {
+        "name": "AL_dnc_phase10_incharge",
+        "count": 1,
+        "percentage": 14.3
+      },
+      {
+        "name": "tbkk-mst-moldrepair-r",
+        "count": 1,
+        "percentage": 14.3
+      },
+      {
+        "name": "00 - SECURE",
+        "count": 1,
+        "percentage": 14.3
+      }
+    ],
+    "recommended_defaults": [
+      "PSO-OU-90Days",
+      "VPNusers",
+      "AL_ce",
+      "AllowAll",
+      "tbkk-mst-newmarking-r",
+      "AL_pe_p10",
+      "CE"
+    ]
+  },
+  "PRODUCTION 3": {
+    "total_users": 6,
+    "top_groups": [
+      {
+        "name": "PSO-OU-90Days",
+        "count": 6,
+        "percentage": 100.0
+      },
+      {
+        "name": "AllowAll",
+        "count": 6,
+        "percentage": 100.0
+      },
+      {
+        "name": "AL_dnc_phase10_incharge",
+        "count": 4,
+        "percentage": 66.7
+      },
+      {
+        "name": "VPNusers",
+        "count": 4,
+        "percentage": 66.7
+      },
+      {
+        "name": "AL_msl_pd3",
+        "count": 3,
+        "percentage": 50.0
+      },
+      {
+        "name": "CR",
+        "count": 3,
+        "percentage": 50.0
+      },
+      {
+        "name": "MA",
+        "count": 3,
+        "percentage": 50.0
+      },
+      {
+        "name": "BH-PD6",
+        "count": 2,
+        "percentage": 33.3
+      },
+      {
+        "name": "QC-R",
+        "count": 2,
+        "percentage": 33.3
+      },
+      {
+        "name": "InternetUsers",
+        "count": 2,
+        "percentage": 33.3
+      },
+      {
+        "name": "RD-R",
+        "count": 1,
+        "percentage": 16.7
+      },
+      {
+        "name": "PD2",
+        "count": 1,
+        "percentage": 16.7
+      },
+      {
+        "name": "AL_energy",
+        "count": 1,
+        "percentage": 16.7
+      },
+      {
+        "name": "AL_thmanagers",
+        "count": 1,
+        "percentage": 16.7
+      },
+      {
+        "name": "QCD Daily-RW",
+        "count": 1,
+        "percentage": 16.7
+      }
+    ],
+    "recommended_defaults": [
+      "PSO-OU-90Days",
+      "AllowAll",
+      "AL_dnc_phase10_incharge",
+      "VPNusers",
+      "AL_msl_pd3",
+      "CR",
+      "MA"
+    ]
+  }
+}

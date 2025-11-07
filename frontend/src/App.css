@@ -1,0 +1,678 @@
+/* ============================================
+   MODERN PROFESSIONAL APP LAYOUT - Light Theme
+   Clean & Contemporary Design
+   ============================================ */
+
+/* Global Reset */
+* {
+  margin: 0;
+  padding: 0;
+  box-sizing: border-box;
+}
+
+body {
+  font-family: -apple-system, BlinkMacSystemFont, 'Inter', 'Segoe UI', Roboto, 
+    'Helvetica Neue', Arial, sans-serif;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  background: linear-gradient(to bottom, #f8fafc, #ffffff);
+  color: #1f2937;
+}
+
+/* App Layout */
+.app-layout {
+  min-height: 100vh;
+  background: linear-gradient(to bottom, #f8fafc, #ffffff);
+}
+
+.app-main-layout {
+  margin-left: 260px !important; /* Sidebar width when expanded */
+  transition: margin-left 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+  background: linear-gradient(to bottom, #f8fafc, #ffffff);
+  min-height: 100vh;
+  width: calc(100% - 260px) !important; /* Ensure content doesn't overflow */
+  overflow-x: hidden; /* Prevent horizontal scrolling */
+}
+
+/* Sidebar Collapsed State */
+body.sidebar-collapsed .app-main-layout {
+  margin-left: 72px !important; /* Sidebar collapsed width */
+  width: calc(100% - 72px) !important;
+}
+
+/* Responsive margin adjustments */
+@media (max-width: 768px) {
+  .app-main-layout {
+    margin-left: 0 !important;
+    width: 100% !important;
+  }
+  
+  body.sidebar-collapsed .app-main-layout {
+    margin-left: 0 !important;
+    width: 100% !important;
+  }
+}
+
+/* Loading State */
+.app-loading {
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  align-items: center;
+  min-height: 100vh;
+  background: linear-gradient(to bottom, #f8fafc, #ffffff);
+}
+
+.app-loading .ant-spin-dot-item {
+  background-color: #3b82f6;
+}
+
+.app-loading .ant-spin-text {
+  margin-top: 16px;
+  color: #6b7280;
+  font-weight: 500;
+  font-size: 14px;
+}
+
+/* Content Area */
+.app-content {
+  background: transparent;
+  min-height: 100vh;
+  padding: 0;
+  margin: 0;
+}
+
+.app-content-inner {
+  padding: 0;
+  max-width: 100%;
+  width: 100%;
+  margin: 0;
+}
+
+/* Content Body Animation */
+.app-content-body {
+  animation: fadeIn 0.4s ease-out;
+}
+
+@keyframes fadeIn {
+  from {
+    opacity: 0;
+    transform: translateY(12px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+/* ============================================
+   ANT DESIGN OVERRIDES - LIGHT THEME
+   ============================================ */
+
+/* Card */
+.ant-card {
+  border-radius: 12px;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.06);
+  border: 1px solid #e5e7eb;
+  background: #ffffff;
+  transition: all 0.2s ease;
+}
+
+.ant-card:hover {
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.1);
+  border-color: #cbd5e1;
+}
+
+.ant-card-head {
+  border-bottom: 2px solid #e5e7eb;
+  background: #f8fafc;
+  padding: 20px 24px;
+  min-height: auto;
+}
+
+.ant-card-head-title {
+  font-weight: 600;
+  color: #1f2937;
+  font-size: 16px;
+  letter-spacing: -0.3px;
+}
+
+.ant-card-body {
+  padding: 24px;
+  color: #374151;
+  background: #ffffff;
+}
+
+/* Table */
+.ant-table {
+  background: #ffffff;
+  border-radius: 12px;
+  font-size: 14px;
+}
+
+.ant-table-thead > tr > th {
+  background: #f8fafc;
+  font-weight: 600;
+  color: #6b7280;
+  border-bottom: 2px solid #e5e7eb;
+  font-size: 12px;
+  text-transform: uppercase;
+  letter-spacing: 0.8px;
+  padding: 14px 16px;
+}
+
+.ant-table-thead > tr > th::before {
+  display: none;
+}
+
+.ant-table-tbody > tr {
+  transition: all 0.2s ease;
+  border-bottom: 1px solid #f3f4f6;
+}
+
+.ant-table-tbody > tr:hover > td {
+  background: #f8fafc;
+}
+
+.ant-table-tbody > tr > td {
+  border-bottom: 1px solid #f3f4f6;
+  color: #374151;
+  padding: 14px 16px;
+}
+
+.ant-table-cell {
+  border-bottom-color: #f3f4f6 !important;
+}
+
+/* Button */
+.ant-btn {
+  border-radius: 8px;
+  font-weight: 500;
+  transition: all 0.2s ease;
+  box-shadow: none;
+  font-size: 14px;
+  height: 38px;
+  padding: 0 18px;
+  letter-spacing: -0.2px;
+}
+
+.ant-btn-primary {
+  background: linear-gradient(135deg, #3b82f6 0%, #2563eb 100%);
+  border: none;
+  color: #ffffff;
+}
+
+.ant-btn-primary:hover,
+.ant-btn-primary:focus {
+  background: linear-gradient(135deg, #2563eb 0%, #1e40af 100%);
+  box-shadow: 0 4px 12px rgba(59, 130, 246, 0.3);
+}
+
+.ant-btn-default {
+  background: #ffffff;
+  border: 2px solid #e5e7eb;
+  color: #1f2937;
+}
+
+.ant-btn-default:hover,
+.ant-btn-default:focus {
+  background: #f8fafc;
+  border-color: #3b82f6;
+  color: #1e40af;
+}
+
+.ant-btn-danger {
+  background: #ef4444;
+  border: none;
+  color: #ffffff;
+}
+
+.ant-btn-danger:hover,
+.ant-btn-danger:focus {
+  background: #dc2626;
+  box-shadow: 0 4px 12px rgba(239, 68, 68, 0.3);
+}
+
+.ant-btn-text {
+  color: #374151;
+}
+
+.ant-btn-text:hover {
+  background: #f3f4f6;
+  color: #1f2937;
+}
+
+/* Modal */
+.ant-modal-content {
+  background: #ffffff;
+  border-radius: 12px;
+  box-shadow: 0 20px 40px rgba(0, 0, 0, 0.15);
+  border: 1px solid #e5e7eb;
+}
+
+.ant-modal-header {
+  background: #f8fafc;
+  border-bottom: 2px solid #e5e7eb;
+  padding: 20px 24px;
+  border-radius: 12px 12px 0 0;
+}
+
+.ant-modal-title {
+  font-weight: 600;
+  color: #1f2937;
+  font-size: 18px;
+  letter-spacing: -0.3px;
+}
+
+.ant-modal-body {
+  padding: 24px;
+  color: #374151;
+  font-size: 14px;
+  background: #ffffff;
+}
+
+.ant-modal-footer {
+  border-top: 2px solid #e5e7eb;
+  padding: 16px 24px;
+  background: #f8fafc;
+  border-radius: 0 0 12px 12px;
+}
+
+.ant-modal-close {
+  color: #6b7280;
+}
+
+.ant-modal-close:hover {
+  color: #1f2937;
+}
+
+/* Drawer */
+.ant-drawer-content {
+  background: #ffffff;
+}
+
+.ant-drawer-header {
+  background: #f8fafc;
+  border-bottom: 2px solid #e5e7eb;
+  padding: 20px 24px;
+}
+
+.ant-drawer-title {
+  font-weight: 600;
+  color: #1f2937;
+  font-size: 18px;
+  letter-spacing: -0.3px;
+}
+
+.ant-drawer-body {
+  padding: 24px;
+  color: #374151;
+  background: #fafbfc;
+}
+
+.ant-drawer-close {
+  color: #6b7280;
+}
+
+.ant-drawer-close:hover {
+  color: #1f2937;
+}
+
+/* Form */
+.ant-form-item-label > label {
+  font-weight: 500;
+  color: #1f2937;
+  font-size: 13px;
+}
+
+.ant-form-item-label > label.ant-form-item-required::before {
+  color: #ef4444;
+}
+
+.ant-input,
+.ant-input-number,
+.ant-input-password,
+.ant-picker,
+.ant-select-selector,
+.ant-input-textarea {
+  background: #f8fafc;
+  border: 2px solid #e5e7eb;
+  color: #1f2937;
+  border-radius: 8px;
+  transition: all 0.2s ease;
+  font-size: 14px;
+}
+
+.ant-input::placeholder,
+.ant-input-number::placeholder,
+.ant-input-textarea::placeholder {
+  color: #9ca3af;
+}
+
+.ant-input:hover,
+.ant-input-number:hover,
+.ant-input-password:hover,
+.ant-picker:hover,
+.ant-select:hover .ant-select-selector {
+  border-color: #cbd5e1;
+  background: #ffffff;
+}
+
+.ant-input:focus,
+.ant-input-number:focus,
+.ant-input-password:focus,
+.ant-picker:focus,
+.ant-select-focused .ant-select-selector {
+  border-color: #3b82f6;
+  background: #ffffff;
+  box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.1);
+}
+
+.ant-select-selector {
+  border-radius: 8px !important;
+}
+
+/* Select Dropdown */
+.ant-select-dropdown {
+  background: #ffffff;
+  border-radius: 8px;
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.12);
+  border: 1px solid #e5e7eb;
+}
+
+.ant-select-item {
+  color: #374151;
+  padding: 10px 12px;
+  font-size: 14px;
+}
+
+.ant-select-item:hover {
+  background: #f8fafc;
+}
+
+.ant-select-item-option-selected {
+  background: #eff6ff;
+  font-weight: 600;
+  color: #1e40af;
+}
+
+/* Dropdown Menu */
+.ant-dropdown-menu {
+  background: #ffffff;
+  border-radius: 8px;
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.12);
+  border: 1px solid #e5e7eb;
+  padding: 6px;
+}
+
+.ant-dropdown-menu-item {
+  color: #374151;
+  padding: 8px 12px;
+  border-radius: 6px;
+  font-size: 14px;
+}
+
+.ant-dropdown-menu-item:hover {
+  background: #f8fafc;
+  color: #1f2937;
+}
+
+/* Tag */
+.ant-tag {
+  border-radius: 6px;
+  font-weight: 600;
+  font-size: 12px;
+  padding: 4px 12px;
+  border: none;
+}
+
+.ant-tag-success {
+  background: #d1fae5;
+  color: #065f46;
+}
+
+.ant-tag-error {
+  background: #fee2e2;
+  color: #991b1b;
+}
+
+.ant-tag-processing {
+  background: #dbeafe;
+  color: #1e40af;
+}
+
+.ant-tag-warning {
+  background: #fef3c7;
+  color: #92400e;
+}
+
+/* Badge */
+.ant-badge-count {
+  background: linear-gradient(135deg, #3b82f6 0%, #2563eb 100%);
+  font-weight: 600;
+  font-size: 11px;
+  box-shadow: 0 2px 8px rgba(59, 130, 246, 0.3);
+}
+
+/* Avatar */
+.ant-avatar {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-weight: 600;
+  border: 2px solid #e5e7eb;
+  background: linear-gradient(135deg, #3b82f6, #2563eb);
+}
+
+/* Typography */
+h1, h2, h3, h4, h5, h6 {
+  color: #1f2937;
+  font-weight: 600;
+  letter-spacing: -0.5px;
+}
+
+h1 { font-size: 36px; line-height: 1.2; }
+h2 { font-size: 28px; line-height: 1.3; }
+h3 { font-size: 22px; line-height: 1.3; }
+h4 { font-size: 18px; line-height: 1.4; }
+h5 { font-size: 16px; line-height: 1.4; }
+h6 { font-size: 14px; line-height: 1.5; }
+
+/* Progress */
+.ant-progress-bg {
+  background: linear-gradient(90deg, #3b82f6 0%, #2563eb 100%);
+  border-radius: 4px;
+}
+
+.ant-progress-inner {
+  background-color: #e5e7eb;
+  border-radius: 4px;
+}
+
+/* Empty State */
+.ant-empty {
+  margin: 60px 0;
+}
+
+.ant-empty-description {
+  color: #6b7280;
+  font-size: 14px;
+}
+
+/* Pagination */
+.ant-pagination {
+  display: flex;
+  justify-content: center;
+  padding: 20px 0;
+}
+
+.ant-pagination-item {
+  border-radius: 6px;
+  border: 2px solid #e5e7eb;
+  background: #ffffff;
+}
+
+.ant-pagination-item a {
+  color: #374151;
+}
+
+.ant-pagination-item:hover {
+  border-color: #3b82f6;
+  background: #eff6ff;
+}
+
+.ant-pagination-item:hover a {
+  color: #1e40af;
+}
+
+.ant-pagination-item-active {
+  background: #3b82f6;
+  border-color: #3b82f6;
+}
+
+.ant-pagination-item-active a {
+  color: #ffffff;
+}
+
+/* Scrollbar - Light Theme */
+::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+
+::-webkit-scrollbar-track {
+  background: #f3f4f6;
+}
+
+::-webkit-scrollbar-thumb {
+  background: #cbd5e1;
+  border-radius: 4px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: #94a3b8;
+}
+
+/* Tooltip */
+.ant-tooltip-inner {
+  background: #1f2937;
+  border: none;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+  border-radius: 6px;
+  padding: 6px 12px;
+  font-size: 12px;
+  font-weight: 500;
+}
+
+.ant-tooltip-arrow-content {
+  background: #1f2937;
+}
+
+/* Notification */
+.ant-notification-notice {
+  background: #ffffff;
+  border-radius: 12px;
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.12);
+  border: 1px solid #e5e7eb;
+}
+
+/* Message */
+.ant-message-notice-content {
+  background: #ffffff;
+  border-radius: 8px;
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.12);
+  border: 1px solid #e5e7eb;
+  padding: 12px 18px;
+}
+
+/* Divider */
+.ant-divider {
+  border-top-color: #e5e7eb;
+}
+
+/* Switch */
+.ant-switch-checked {
+  background: linear-gradient(135deg, #3b82f6 0%, #2563eb 100%);
+}
+
+/* Checkbox */
+.ant-checkbox-checked .ant-checkbox-inner {
+  background: linear-gradient(135deg, #3b82f6 0%, #2563eb 100%);
+  border-color: transparent;
+}
+
+/* Radio */
+.ant-radio-checked .ant-radio-inner {
+  border-color: #3b82f6;
+}
+
+.ant-radio-inner::after {
+  background: linear-gradient(135deg, #3b82f6 0%, #2563eb 100%);
+}
+
+/* Selection */
+::selection {
+  background: rgba(59, 130, 246, 0.2);
+  color: #1f2937;
+}
+
+::-moz-selection {
+  background: rgba(59, 130, 246, 0.2);
+  color: #1f2937;
+}
+
+/* Responsive */
+@media (max-width: 1400px) {
+  .app-content-inner {
+    padding: 0;
+  }
+}
+
+@media (max-width: 992px) {
+  .app-content-inner {
+    padding: 0;
+  }
+}
+
+@media (max-width: 768px) {
+  .app-content-inner {
+    padding: 0;
+  }
+
+  .ant-card-body {
+    padding: 20px;
+  }
+}
+
+@media (max-width: 576px) {
+  .app-content-inner {
+    padding: 0;
+  }
+
+  h1 { font-size: 28px; }
+  h2 { font-size: 22px; }
+  h3 { font-size: 18px; }
+}
+
+/* Print */
+@media print {
+  body {
+    background: #ffffff;
+    color: #000000;
+  }
+
+  .ant-layout-sider,
+  .app-breadcrumb {
+    display: none !important;
+  }
+
+  .app-main-layout {
+    margin-left: 0 !important;
+  }
+}
+
+/* Focus Visible */
+*:focus-visible {
+  outline: 2px solid #3b82f6;
+  outline-offset: 2px;
+}

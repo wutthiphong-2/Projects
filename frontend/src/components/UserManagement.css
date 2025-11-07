@@ -1,0 +1,481 @@
+/* ============================================
+   PREMIUM USER MANAGEMENT STYLES
+   Modern Active Directory User Interface
+   Enhanced Color Palette & Visual Effects
+   ============================================ */
+
+.user-management-container {
+  min-height: 100vh;
+  background: #fafafa;
+  max-width: 100%;
+  overflow-x: hidden;
+  box-sizing: border-box;
+  padding: 24px;
+}
+
+/* Minimalist Table Styles */
+.user-management-container .ant-table {
+  font-size: 14px;
+}
+
+.user-management-container .ant-table-wrapper {
+  overflow-x: auto;
+  max-width: 100%;
+}
+
+.user-management-container .ant-table-container {
+  overflow-x: auto;
+}
+
+/* Sticky header wrapper */
+.user-management-container .ant-table-container {
+  position: relative;
+}
+
+.user-management-container .ant-table-header {
+  position: sticky !important;
+  top: 0 !important;
+  z-index: 100 !important;
+}
+
+.user-management-container .ant-table-thead > tr > th {
+  position: sticky !important;
+  top: 0 !important;
+  z-index: 99 !important;
+  background: #ffffff !important;
+  color: #262626 !important;
+  font-weight: 600;
+  font-size: 14px;
+  border-bottom: 2px solid #e5e7eb !important;
+  padding: 12px 16px !important;
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.05) !important;
+}
+
+/* Fixed columns with sticky header */
+.user-management-container .ant-table-thead > tr > th.ant-table-cell-fix-left,
+.user-management-container .ant-table-tbody > tr > td.ant-table-cell-fix-left {
+  z-index: 101 !important;
+  background: #ffffff !important;
+}
+
+.user-management-container .ant-table-thead > tr > th.ant-table-cell-fix-right,
+.user-management-container .ant-table-tbody > tr > td.ant-table-cell-fix-right {
+  z-index: 101 !important;
+  background: #ffffff !important;
+}
+
+.user-management-container .ant-table-thead > tr > th::before {
+  display: none !important;
+}
+
+.user-management-container .ant-table-tbody > tr {
+  transition: background 0.2s;
+  background: #ffffff;
+}
+
+.user-management-container .ant-table-tbody > tr:nth-child(even) {
+  background: #fafafa;
+}
+
+.user-management-container .ant-table-tbody > tr:hover {
+  background: #f5f9ff !important;
+}
+
+.user-management-container .ant-table-tbody > tr.row-selected {
+  background: #eff6ff !important;
+  border-left: 3px solid #3b82f6;
+}
+
+.user-management-container .ant-table-tbody > tr.row-selected:hover {
+  background: #dbeafe !important;
+}
+
+.user-management-container .ant-table-tbody > tr > td {
+  padding: 12px 16px !important;
+  border-bottom: 1px solid #f0f0f0;
+}
+
+/* Minimalist Buttons */
+.user-management-container .ant-btn {
+  transition: all 0.2s;
+}
+
+.user-management-container .ant-btn-primary {
+  background: #1890ff;
+  border-color: #1890ff;
+}
+
+.user-management-container .ant-btn-primary:hover {
+  background: #40a9ff;
+  border-color: #40a9ff;
+}
+
+.user-management-container .ant-btn-default:hover {
+  color: #40a9ff;
+  border-color: #40a9ff;
+}
+
+.user-management-container .ant-btn-dangerous,
+.user-management-container .ant-btn-danger {
+  background: #ff4d4f;
+  border-color: #ff4d4f;
+}
+
+.user-management-container .ant-btn-dangerous:hover,
+.user-management-container .ant-btn-danger:hover {
+  background: #ff7875;
+  border-color: #ff7875;
+}
+
+/* Zebra striping */
+.table-row-light {
+  background: #ffffff;
+}
+
+.table-row-dark {
+  background: #fafafa;
+}
+
+/* Sticky table header */
+.user-management-container .ant-table-thead {
+  position: sticky !important;
+  top: 0 !important;
+  z-index: 100 !important;
+}
+
+/* Simple Tags */
+.user-management-container .ant-tag {
+  border-radius: 4px;
+}
+
+.user-management-container .ant-tag-success {
+  background: #f6ffed;
+  border-color: #b7eb8f;
+  color: #52c41a;
+}
+
+.user-management-container .ant-tag-error {
+  background: #fff1f0;
+  border-color: #ffccc7;
+  color: #ff4d4f;
+}
+
+/* Avatar Styles */
+.user-management-container .ant-avatar {
+  border: 2px solid #ffffff;
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.05);
+}
+
+/* Modal Styles */
+.user-management-container .ant-modal-content {
+  border-radius: 8px;
+}
+
+/* Form Styles */
+.user-management-container .ant-form-item-label > label {
+  font-weight: 600;
+  color: #262626;
+}
+
+/* Drawer Styles */
+.user-management-container .ant-drawer-header {
+  background: #1890ff;
+  border-bottom: none;
+}
+
+.user-management-container .ant-drawer-title {
+  color: #ffffff !important;
+}
+
+.user-management-container .ant-drawer-close {
+  color: #ffffff !important;
+}
+
+/* Tabs */
+.user-management-container .ant-tabs-tab.ant-tabs-tab-active .ant-tabs-tab-btn {
+  color: #1890ff;
+  font-weight: 600;
+}
+
+.user-management-container .ant-tabs-ink-bar {
+  background: #1890ff;
+}
+
+/* Descriptions */
+.user-management-container .ant-descriptions-item-label {
+  background: #fafafa;
+  color: #262626;
+  font-weight: 600;
+}
+
+.user-management-container .ant-descriptions-item-content {
+  background: #ffffff;
+  color: #595959;
+}
+
+/* List */
+.user-management-container .ant-list-item {
+  transition: background 0.2s;
+}
+
+.user-management-container .ant-list-item:hover {
+  background: #fafafa;
+}
+
+/* Empty State */
+.user-management-container .ant-empty-description {
+  color: #8c8c8c;
+}
+
+/* Pagination */
+.user-management-container .ant-pagination-item-active {
+  background: #1890ff;
+  border-color: #1890ff;
+}
+
+.user-management-container .ant-pagination-item-active a {
+  color: #ffffff;
+}
+
+/* Scrollbar */
+.user-management-container ::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+
+.user-management-container ::-webkit-scrollbar-track {
+  background: #f0f0f0;
+}
+
+.user-management-container ::-webkit-scrollbar-thumb {
+  background: #bfbfbf;
+  border-radius: 4px;
+}
+
+.user-management-container ::-webkit-scrollbar-thumb:hover {
+  background: #8c8c8c;
+}
+
+/* Loading */
+.user-management-container .ant-spin {
+  color: #1890ff;
+}
+
+/* Simplified styles - remove unnecessary customization */
+
+/* Switch */
+.user-management-container .ant-switch-checked {
+  background: #1890ff;
+}
+
+/* Density utilities */
+.user-management-container .ant-table-small .ant-table-tbody > tr > td,
+.user-management-container .ant-table-small .ant-table-thead > tr > th { padding: 8px 12px !important; }
+.user-management-container .ant-table-middle .ant-table-tbody > tr > td,
+.user-management-container .ant-table-middle .ant-table-thead > tr > th { padding: 10px 14px !important; }
+
+/* Responsive Design */
+@media (max-width: 1200px) {
+  .user-management-container {
+    padding: 20px;
+  }
+}
+
+@media (max-width: 992px) {
+  .user-management-container {
+    padding: 16px;
+  }
+  
+  .user-management-container .ant-table {
+    font-size: 13px;
+  }
+}
+
+@media (max-width: 768px) {
+  .user-management-container {
+    padding: 12px;
+  }
+  
+  .user-management-container .ant-table {
+    font-size: 12px;
+  }
+  
+  .user-management-container .ant-table-thead > tr > th,
+  .user-management-container .ant-table-tbody > tr > td {
+    padding: 8px 10px !important;
+  }
+}
+
+@media (max-width: 576px) {
+  .user-management-container {
+    padding: 8px;
+  }
+  
+  .user-management-container .ant-table {
+    font-size: 11px;
+  }
+  
+  .user-management-container .ant-table-thead > tr > th,
+  .user-management-container .ant-table-tbody > tr > td {
+    padding: 6px 8px !important;
+  }
+}
+
+/* Card grid hover */
+.user-management-container .ant-card-hoverable {
+  transition: box-shadow 0.2s, transform 0.1s;
+}
+.user-management-container .ant-card-hoverable:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 6px 18px rgba(0,0,0,0.08);
+}
+
+/* Status tags (pleasant colors) */
+.user-management-container .ant-tag-success {
+  background: #ecfdf5;
+  color: #047857;
+  border-color: #a7f3d0;
+}
+.user-management-container .ant-tag-error {
+  background: #f3f4f6;
+  color: #6b7280;
+  border-color: #e5e7eb;
+}
+
+/* Gradient search input focus */
+.gradient-search-input:focus,
+.gradient-search-input:hover {
+  box-shadow: 0 4px 12px rgba(96, 165, 250, 0.2) !important;
+}
+
+/* Custom search input - Remove double border */
+.custom-search-input.ant-input,
+.custom-search-input.ant-input-affix-wrapper {
+  border: 1px solid #e0e0e0 !important;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.08) !important;
+}
+
+.custom-search-input.ant-input-affix-wrapper:focus,
+.custom-search-input.ant-input-affix-wrapper-focused,
+.custom-search-input.ant-input:focus {
+  border-color: #8b5cf6 !important;
+  box-shadow: 0 0 0 3px rgba(139, 92, 246, 0.1), 0 2px 8px rgba(139, 92, 246, 0.15) !important;
+}
+
+.custom-search-input.ant-input-affix-wrapper:hover:not(.ant-input-affix-wrapper-focused):not(:focus),
+.custom-search-input.ant-input:hover:not(:focus) {
+  border-color: #a78bfa !important;
+  box-shadow: 0 2px 6px rgba(167, 139, 250, 0.15) !important;
+}
+
+/* ============================================
+   CREATE USER MODAL STEP ANIMATIONS
+   Smooth zoom in/out transitions between steps
+   ============================================ */
+
+/* Step Zoom In - When entering a new step */
+@keyframes stepZoomIn {
+  0% {
+    opacity: 0;
+    transform: scale(0.92) translateY(10px);
+  }
+  100% {
+    opacity: 1;
+    transform: scale(1) translateY(0);
+  }
+}
+
+/* Step Zoom Out - When leaving current step */
+@keyframes stepZoomOut {
+  0% {
+    opacity: 1;
+    transform: scale(1) translateY(0);
+  }
+  100% {
+    opacity: 0;
+    transform: scale(0.92) translateY(-10px);
+  }
+}
+
+/* Apply animation to step containers */
+.create-user-step {
+  animation: stepZoomIn 0.35s cubic-bezier(0.34, 1.56, 0.64, 1);
+  transform-origin: center;
+}
+
+.create-user-step-exit {
+  animation: stepZoomOut 0.25s ease-in-out;
+}
+
+/* Button Hover Effects */
+.animated-button {
+  transition: all 0.2s ease;
+}
+
+.animated-button:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 4px 12px rgba(59, 130, 246, 0.3) !important;
+}
+
+.animated-button:active {
+  transform: translateY(0);
+}
+
+/* Prevent animation conflicts */
+.create-user-step * {
+  animation-fill-mode: forwards;
+}
+
+/* Compact Form Items in Create User Modal */
+.create-user-step .ant-form-item {
+  margin-bottom: 16px;
+}
+
+.create-user-step .ant-form-item-label {
+  padding-bottom: 4px;
+}
+
+.create-user-step .ant-alert {
+  margin-bottom: 16px;
+}
+
+/* ============================================
+   RESIZABLE COLUMNS STYLES
+   Drag handles for column resizing
+   ============================================ */
+
+.react-resizable {
+  position: relative;
+}
+
+.react-resizable-handle {
+  position: absolute;
+  right: -5px;
+  bottom: 0;
+  z-index: 1;
+  width: 10px;
+  height: 100%;
+  cursor: col-resize;
+  background: transparent;
+}
+
+.react-resizable-handle:hover {
+  background: linear-gradient(90deg, transparent 40%, rgba(59, 130, 246, 0.3) 50%, transparent 60%);
+}
+
+.react-resizable-handle::after {
+  content: '';
+  position: absolute;
+  right: 4px;
+  top: 50%;
+  transform: translateY(-50%);
+  width: 2px;
+  height: 24px;
+  background: #d9d9d9;
+  transition: background 0.2s;
+}
+
+.react-resizable-handle:hover::after {
+  background: #3b82f6;
+}
+

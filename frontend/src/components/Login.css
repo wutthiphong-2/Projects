@@ -1,0 +1,332 @@
+/* ============================================
+   MODERN PROFESSIONAL LOGIN PAGE
+   Blue Gradient Theme - Matching System Style
+   ============================================ */
+
+.login-container {
+  min-height: 100vh;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: linear-gradient(135deg, #1e3a8a 0%, #1e40af 50%, #3b82f6 100%);
+  position: relative;
+  overflow: hidden;
+  padding: 20px;
+}
+
+/* Animated Background Effects */
+.login-container::before {
+  content: '';
+  position: absolute;
+  top: -50%;
+  left: -50%;
+  width: 200%;
+  height: 200%;
+  background: 
+    radial-gradient(circle at 20% 50%, rgba(255, 255, 255, 0.1) 0%, transparent 50%),
+    radial-gradient(circle at 80% 80%, rgba(255, 255, 255, 0.08) 0%, transparent 50%);
+  animation: rotate 20s linear infinite;
+  z-index: 0;
+  pointer-events: none;
+}
+
+@keyframes rotate {
+  0% {
+    transform: rotate(0deg);
+  }
+  100% {
+    transform: rotate(360deg);
+  }
+}
+
+/* Login Card */
+.login-card {
+  width: 100%;
+  max-width: 480px;
+  background: rgba(255, 255, 255, 0.98);
+  border: none;
+  border-radius: 16px;
+  box-shadow: 
+    0 20px 60px rgba(0, 0, 0, 0.3),
+    0 0 0 1px rgba(255, 255, 255, 0.1);
+  z-index: 2;
+  position: relative;
+  overflow: hidden;
+  backdrop-filter: blur(20px);
+}
+
+.login-card::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  height: 5px;
+  background: linear-gradient(90deg, #3b82f6 0%, #2563eb 50%, #1e40af 100%);
+}
+
+.ant-card-body {
+  padding: 56px 48px 48px;
+}
+
+/* Header */
+.login-header {
+  text-align: center;
+  margin-bottom: 48px;
+}
+
+.logo-icon {
+  width: 80px;
+  height: 80px;
+  margin: 0 auto 24px;
+  background: linear-gradient(135deg, #3b82f6 0%, #2563eb 100%);
+  border-radius: 20px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 42px;
+  color: #ffffff;
+  box-shadow: 
+    0 8px 32px rgba(59, 130, 246, 0.4),
+    0 0 0 4px rgba(255, 255, 255, 0.1);
+  animation: float 3s ease-in-out infinite;
+}
+
+@keyframes float {
+  0%, 100% {
+    transform: translateY(0px);
+  }
+  50% {
+    transform: translateY(-10px);
+  }
+}
+
+.login-title {
+  color: #1e3a8a !important;
+  font-size: 32px !important;
+  font-weight: 800 !important;
+  margin: 0 0 8px 0 !important;
+  letter-spacing: -0.5px;
+  line-height: 1.2;
+}
+
+.login-subtitle {
+  color: #64748b !important;
+  font-size: 16px !important;
+  font-weight: 500;
+  letter-spacing: 0.5px;
+  text-transform: uppercase;
+  display: block;
+}
+
+/* Form */
+.login-form {
+  margin-top: 40px;
+}
+
+.ant-form-item {
+  margin-bottom: 24px;
+}
+
+.ant-form-item-label > label {
+  color: #334155;
+  font-weight: 600;
+  font-size: 14px;
+}
+
+/* Input Fields */
+.ant-input,
+.ant-input-password {
+  height: 56px;
+  border-radius: 12px;
+  background: #f8fafc;
+  border: 2px solid #e2e8f0;
+  color: #1e293b;
+  font-size: 15px;
+  font-weight: 500;
+  transition: all 0.3s ease;
+  padding: 0 20px 0 48px;
+}
+
+.ant-input::placeholder,
+.ant-input-password input::placeholder {
+  color: #94a3b8;
+  font-weight: 400;
+}
+
+.ant-input:hover,
+.ant-input-password:hover {
+  border-color: #cbd5e1;
+  background: #ffffff;
+}
+
+.ant-input:focus,
+.ant-input-password:focus,
+.ant-input-password-focused {
+  border-color: #3b82f6;
+  background: #ffffff;
+  box-shadow: 0 0 0 4px rgba(59, 130, 246, 0.1);
+}
+
+/* Input Icons */
+.login-icon {
+  color: #64748b;
+  font-size: 20px;
+  margin-right: 4px;
+}
+
+.ant-input-prefix {
+  margin-right: 12px;
+}
+
+.ant-input-password-icon {
+  color: #94a3b8;
+  font-size: 18px;
+}
+
+.ant-input-password-icon:hover {
+  color: #3b82f6;
+}
+
+/* Login Button */
+.login-button {
+  width: 100%;
+  height: 56px;
+  border-radius: 12px;
+  font-size: 16px;
+  font-weight: 700;
+  letter-spacing: 0.5px;
+  text-transform: uppercase;
+  background: linear-gradient(135deg, #3b82f6 0%, #2563eb 100%);
+  border: none;
+  color: #ffffff;
+  margin-top: 8px;
+  box-shadow: 0 8px 24px rgba(59, 130, 246, 0.35);
+  transition: all 0.3s ease;
+}
+
+.login-button:hover,
+.login-button:focus {
+  background: linear-gradient(135deg, #2563eb 0%, #1e40af 100%);
+  transform: translateY(-2px);
+  box-shadow: 0 12px 32px rgba(59, 130, 246, 0.45);
+  color: #ffffff;
+}
+
+.login-button:active {
+  transform: translateY(0);
+}
+
+.login-button[disabled] {
+  background: #cbd5e1;
+  box-shadow: none;
+}
+
+/* Footer */
+.login-footer {
+  text-align: center;
+  margin-top: 40px;
+  padding-top: 32px;
+  border-top: 1px solid #e2e8f0;
+}
+
+.login-footer-text {
+  color: #64748b;
+  font-size: 13px;
+  line-height: 1.6;
+  font-weight: 500;
+}
+
+/* Loading State */
+.ant-spin-dot-item {
+  background-color: #ffffff;
+}
+
+/* Error State */
+.ant-form-item-explain-error {
+  color: #ef4444;
+  font-size: 13px;
+  font-weight: 600;
+  margin-top: 8px;
+}
+
+.ant-form-item-has-error .ant-input,
+.ant-form-item-has-error .ant-input-password {
+  border-color: #ef4444;
+  background: #fef2f2;
+}
+
+.ant-form-item-has-error .ant-input:focus,
+.ant-form-item-has-error .ant-input-password:focus {
+  box-shadow: 0 0 0 4px rgba(239, 68, 68, 0.1);
+}
+
+/* Message Styling */
+.ant-message-notice-content {
+  border-radius: 10px;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+}
+
+/* Responsive Design */
+@media (max-width: 576px) {
+  .ant-card-body {
+    padding: 40px 28px 32px;
+  }
+  
+  .login-title {
+    font-size: 28px !important;
+  }
+
+  .login-subtitle {
+    font-size: 14px !important;
+  }
+
+  .logo-icon {
+    width: 70px;
+    height: 70px;
+    font-size: 36px;
+  }
+  
+  .login-button,
+  .ant-input,
+  .ant-input-password {
+    height: 52px;
+  }
+}
+
+@media (max-width: 400px) {
+  .login-container {
+    padding: 16px;
+  }
+
+  .ant-card-body {
+    padding: 32px 20px 24px;
+  }
+
+  .login-title {
+    font-size: 24px !important;
+  }
+
+  .logo-icon {
+    width: 64px;
+    height: 64px;
+    font-size: 32px;
+  }
+}
+
+/* Focus Visible for Accessibility */
+*:focus-visible {
+  outline: 2px solid #3b82f6;
+  outline-offset: 2px;
+}
+
+/* Smooth Transitions */
+* {
+  transition-property: background-color, border-color, color, box-shadow, transform;
+  transition-duration: 0.2s;
+  transition-timing-function: ease-in-out;
+}
+
+button, input, .ant-card {
+  transition-duration: 0.3s;
+}
