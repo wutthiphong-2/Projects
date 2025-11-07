@@ -45,7 +45,9 @@
   background: #ffffff !important;
   color: #262626 !important;
   font-weight: 600;
-  font-size: 14px;
+  font-size: 12px;
+  text-transform: uppercase;
+  letter-spacing: 0.6px;
   border-bottom: 2px solid #e5e7eb !important;
   padding: 12px 16px !important;
   box-shadow: 0 2px 4px rgba(0, 0, 0, 0.05) !important;
@@ -93,6 +95,159 @@
 .user-management-container .ant-table-tbody > tr > td {
   padding: 12px 16px !important;
   border-bottom: 1px solid #f0f0f0;
+}
+
+.display-name-cell .ant-avatar {
+  border: none;
+  box-shadow: 0 3px 8px rgba(37, 99, 235, 0.15);
+}
+
+.display-name-text {
+  font-weight: 600;
+  font-size: 14px;
+  color: #111827;
+  margin-bottom: 2px;
+}
+
+.username-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 12px;
+  border-radius: 999px;
+  background: #eff6ff;
+  border: 1px solid #bfdbfe;
+  max-width: 240px;
+  white-space: nowrap;
+}
+
+.username-pill .copyable-text {
+  font-weight: 600;
+  color: #1f2937;
+}
+
+.copyable-text .ant-typography-copy {
+  color: #2563eb;
+  margin-left: 8px;
+}
+
+.department-tag {
+  background: #eff6ff !important;
+  border-color: #bfdbfe !important;
+  color: #1d4ed8 !important;
+  border-radius: 999px;
+  padding: 4px 12px;
+  font-size: 12px;
+  font-weight: 500;
+}
+
+.status-tag {
+  border-radius: 999px;
+  font-weight: 500;
+  border-width: 1px;
+}
+
+.status-tag.success {
+  background: #ecfdf5 !important;
+  color: #047857 !important;
+  border-color: #a7f3d0 !important;
+}
+
+.status-tag.inactive {
+  background: #f8fafc !important;
+  color: #6b7280 !important;
+  border-color: #e2e8f0 !important;
+}
+
+.actions-cell {
+  display: flex;
+  align-items: center;
+  justify-content: flex-start;
+}
+
+.action-dropdown-button {
+  display: inline-flex !important;
+  align-items: center;
+  gap: 6px;
+  height: 34px !important;
+  padding: 0 14px !important;
+  border-radius: 999px !important;
+  border: 1px solid #e2e8f0 !important;
+  background: #f8fafc !important;
+  color: #1f2937 !important;
+  font-weight: 500 !important;
+  box-shadow: none !important;
+  transition: all 0.2s ease;
+}
+
+.action-dropdown-button .anticon {
+  font-size: 16px;
+}
+
+.action-dropdown-button:hover,
+.action-dropdown-button:focus {
+  border-color: #2563eb !important;
+  color: #2563eb !important;
+  background: #eff6ff !important;
+}
+
+.actions-dropdown-menu .ant-dropdown-menu-item-icon {
+  font-size: 16px;
+}
+
+.actions-dropdown-menu .ant-dropdown-menu-item,
+.actions-dropdown-menu .ant-dropdown-menu-item-danger {
+  font-size: 13px;
+  padding: 6px 16px;
+}
+
+.actions-dropdown-menu .ant-dropdown-menu-item-danger {
+  color: #dc2626 !important;
+}
+
+.search-input-large {
+  border-radius: 999px !important;
+  padding: 0 18px !important;
+  height: 44px !important;
+  background: #ffffff;
+  border: 1px solid #e0e7ff !important;
+}
+
+.search-input-large .ant-input-prefix {
+  color: #94a3b8 !important;
+  margin-right: 8px;
+}
+
+.search-input-large input {
+  font-size: 14px;
+}
+
+.header-search-row {
+  margin-top: 16px;
+  margin-bottom: 6px;
+}
+
+.header-search-row .search-input-large {
+  width: 100%;
+}
+
+.header-search-row .ant-pagination {
+  display: inline-flex;
+  align-items: center;
+  justify-content: flex-end;
+  width: 100%;
+}
+
+.user-management-card-header {
+  padding: 12px 24px 8px;
+}
+
+.user-management-table-wrapper {
+  padding: 0 24px 24px;
+}
+
+.user-management-table-wrapper .ant-table {
+  margin-top: 0 !important;
 }
 
 /* Minimalist Buttons */

@@ -19,6 +19,9 @@ import {
   Tooltip,
   Drawer,
   Divider,
+  Pagination,
+  Dropdown,
+  Menu,
   Descriptions,
   List,
   Badge,
@@ -56,7 +59,8 @@ import {
   BankOutlined,
   QuestionCircleOutlined,
   InfoCircleOutlined,
-  TagOutlined
+  TagOutlined,
+  MoreOutlined
 } from '@ant-design/icons';
 import axios from 'axios';
 import config from '../config';
@@ -127,23 +131,40 @@ const UserManagement = () => {
   
   // Column visibility settings (⚡ Default: Show only essential for faster loading)
   const [visibleColumns, setVisibleColumns] = useState({
-    user: true,  // เพิ่มคอลัมน์ User (ชื่อผู้ใช้) - สำคัญที่สุด
+    user: true,
     sAMAccountName: true,
     mail: true,
-    givenName: false,
-    sn: false,
-    title: false,
+    title: true,
     department: true,
-    company: false,
+    company: true,
     employeeID: false,
     phone: false,
     mobile: false,
-    location: false,  // ซ่อน location (ไม่ค่อยใช้)
-    description: false,  // ซ่อน description (ไม่ค่อยใช้)
-    status: true
+    location: true,
+    description: true,
+    status: false
   });
   const [isColumnSettingsVisible, setIsColumnSettingsVisible] = useState(false);
+  const [currentPage, setCurrentPage] = useState(1);
+  const [pageSize, setPageSize] = useState(30);
+  const [tableScrollY, setTableScrollY] = useState(520);
   
+  const updateTableScrollY = useCallback(() => {
+    if (typeof window === 'undefined') return;
+    const HEADER_HEIGHT = 340;
+    const available = window.innerHeight - HEADER_HEIGHT;
+    setTableScrollY(Math.max(260, available));
+  }, []);
+
+  useEffect(() => {
+    updateTableScrollY();
+    if (typeof window === 'undefined') return undefined;
+    window.addEventListener('resize', updateTableScrollY);
+    return () => {
+      window.removeEventListener('resize', updateTableScrollY);
+    };
+  }, [updateTableScrollY]);
+
   // Handler for auto-refresh toggle
   const handleAutoRefreshToggle = (checked) => {
     setAutoRefreshEnabled(checked);
@@ -214,9 +235,9 @@ const UserManagement = () => {
     
     try {
       const params = {
-        page_size: 200, // ⚡ PERFORMANCE: โหลด 200 รายการ (เร็วมาก!)
+        page_size: 1000,
         page: 1,
-        _t: forceRefresh ? Date.now() : undefined // Cache busting
+        _t: forceRefresh ? Date.now() : undefined
       };
       
       // Only apply filters if not ignoring them
@@ -252,28 +273,24 @@ const UserManagement = () => {
         }
       }
       
-      const response = await axios.get(`${config.apiUrl}/api/users/`, {
+      // Load first page immediately for faster initial render
+      const firstPageResponse = await axios.get(`${config.apiUrl}/api/users/`, {
         headers: getAuthHeaders(),
-        params
+        params: { ...params, page: 1 }
       });
-      
-      const newCount = response.data.length;
-      
-      console.log('✅ Users fetched:', newCount);
-      console.log('📊 Sample user data:', response.data[0]);
-      console.log(`📊 Total users in response: ${newCount}`);
-      
-      // Store in cache
-      apiCache.set(cacheKey, response.data);
-      
-      setUsers(response.data);
+
+      const firstPageData = firstPageResponse.data || [];
+      setUsers(firstPageData);
       setLastRefreshTime(new Date());
+      setLoading(false);
+
+      console.log(`✅ Users fetched: ${firstPageData.length}`);
       
       if (forceRefresh) {
         console.log('🔄 Data refreshed successfully!');
       }
       
-      return { success: true, count: newCount };
+      return { success: true, count: firstPageData.length };
     } catch (error) {
       const detail = error?.response?.data?.detail || error?.message || 'ไม่ทราบสาเหตุ';
       message.error(`ไม่สามารถโหลดข้อมูลผู้ใช้ได้: ${detail}`);
@@ -1196,35 +1213,84 @@ const UserManagement = () => {
 
   // ==================== FILTERED DATA ====================
   
-  const filteredUsers = users.filter(user => {
+  const scoreUserRecord = useCallback((user) => {
+    if (!user) return 0;
+    let score = 0;
+    if (user.mail) score += 4;
+    if (user.department) score += 2;
+    if (user.company) score += 1.5;
+    if (user.telephoneNumber || user.mobile) score += 1;
+    if (user.description) score += 0.5;
+    if (user.isEnabled) score += 1;
+    const username = (user.sAMAccountName || '').toString().toLowerCase();
+    if (username) {
+      if (username.endsWith('$')) {
+        score -= 3;
+      } else {
+        score += 1;
+      }
+    }
+    return score;
+  }, []);
+
+  const getUserDedupKey = useCallback((user) => {
+    if (!user) return `unknown-${Math.random()}`;
+    const displayKey = (user.cn || user.displayName || '').toString().trim().toLowerCase();
+    if (displayKey) return displayKey;
+    const usernameKey = (user.sAMAccountName || user.userPrincipalName || '').toString().trim().toLowerCase();
+    if (usernameKey) return usernameKey;
+    return (user.dn || user.id || `unknown-${Math.random()}`).toString().trim().toLowerCase();
+  }, []);
+
+  const deduplicateUsers = useCallback((userList) => {
+    const map = new Map();
+    userList.forEach(user => {
+      const key = getUserDedupKey(user);
+      const candidateScore = scoreUserRecord(user);
+      const existing = map.get(key);
+      if (!existing || candidateScore > existing.score) {
+        map.set(key, { user, score: candidateScore });
+      }
+    });
+    return Array.from(map.values()).map(entry => entry.user);
+  }, [getUserDedupKey, scoreUserRecord]);
+
+  const filteredUsers = useMemo(() => deduplicateUsers(users).filter(user => {
     if (statusFilter === 'enabled') return user.isEnabled;
     if (statusFilter === 'disabled') return !user.isEnabled;
     return true;
-  });
+  }), [users, statusFilter, deduplicateUsers]);
+
+  const paginatedUsers = useMemo(() => {
+    const startIndex = (currentPage - 1) * pageSize;
+    return filteredUsers.slice(startIndex, startIndex + pageSize);
+  }, [filteredUsers, currentPage, pageSize]);
+
+  useEffect(() => {
+    const maxPage = Math.max(1, Math.ceil(filteredUsers.length / pageSize));
+    if (currentPage > maxPage) {
+      setCurrentPage(maxPage);
+    }
+  }, [filteredUsers.length, pageSize, currentPage]);
 
   // ==================== STATISTICS ====================
   
-  const stats = {
-    total: users.length,
-    enabled: users.filter(u => u.isEnabled).length,
-    disabled: users.filter(u => !u.isEnabled).length,
-    departments: new Set(users.filter(u => u.department).map(u => u.department)).size
-  };
+  // ใช้ข้อมูลหลัง dedupe สำหรับสถิติการแสดงผล
+  const stats = useMemo(() => ({
+    total: filteredUsers.length,
+    enabled: filteredUsers.filter(u => u.isEnabled).length,
+    disabled: filteredUsers.filter(u => !u.isEnabled).length,
+    departments: new Set(filteredUsers.filter(u => u.department).map(u => u.department)).size
+  }), [filteredUsers]);
   
   // Debug: Log stats when users change
   useEffect(() => {
-    if (users.length > 0) {
-      console.log('📊 Statistics updated:', {
-        total: stats.total,
-        enabled: stats.enabled,
-        disabled: stats.disabled,
-        departments: stats.departments
-      });
-      
-      // Force re-render when stats change
-      console.log(`🎯 Users array length: ${users.length}`);
+    if (filteredUsers.length > 0) {
+      console.log('📊 Statistics (deduplicated):', stats);
+      console.log(`📥 Raw users from AD: ${users.length}`);
+      console.log(`✅ Visible users (deduped & filtered): ${filteredUsers.length}`);
     }
-  }, [users.length, stats.total, stats.enabled, stats.disabled, stats.departments]);
+  }, [users.length, filteredUsers.length, stats]);
 
   // Calculate category statistics when userGroups change
   useEffect(() => {
@@ -1237,604 +1303,242 @@ const UserManagement = () => {
 
   // ==================== TABLE COLUMNS ====================
   
-  const allColumns = [
-    {
-      title: (
-        <span style={{ fontWeight: 600 }}>
-          <UserOutlined style={{ marginRight: 8 }} />
-          User
-        </span>
-      ),
-      key: 'user',
-      width: 250,
-      fixed: 'left',
-      render: (_, record) => (
-        <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
-          <Avatar
-            size={40}
-            style={{
-              background: record.isEnabled
-                ? 'linear-gradient(135deg, #10b981, #059669)'
-                : 'linear-gradient(135deg, #94a3b8, #64748b)',
-              fontWeight: 700,
-              fontSize: 16
+  const renderCopyableValue = useCallback((value, tooltips = ['คัดลอก', 'คัดลอกแล้ว']) => (
+    value ? (
+      <Text
+        copyable={{ text: value, tooltips }}
+        className="copyable-text"
+        style={{ fontSize: 13 }}
+      >
+        {value}
+      </Text>
+    ) : (
+      <Text type="secondary" style={{ fontSize: 12 }}>-</Text>
+    )
+  ), []);
+
+  const renderUsernameCell = useCallback((value) => (
+    value ? (
+      <div className="username-pill">
+        {renderCopyableValue(value, ['คัดลอกชื่อผู้ใช้', 'คัดลอกแล้ว'])}
+      </div>
+    ) : (
+      <Text type="secondary" style={{ fontSize: 12 }}>-</Text>
+    )
+  ), [renderCopyableValue]);
+
+  const renderTextCell = useCallback((value) => (
+    value ? <Text style={{ fontSize: 13, color: '#1f2937' }}>{value}</Text> : <Text type="secondary" style={{ fontSize: 12 }}>-</Text>
+  ), []);
+
+  const renderDepartmentTag = useCallback((value) => (
+    value ? <Tag className="department-tag">{value}</Tag> : <Text type="secondary" style={{ fontSize: 12 }}>-</Text>
+  ), []);
+
+  const renderDescriptionCell = useCallback((value) => (
+    value ? <Text style={{ fontSize: 13, color: '#4b5563' }}>{value}</Text> : <Text type="secondary" style={{ fontSize: 12 }}>-</Text>
+  ), []);
+
+  const renderDisplayName = useCallback((_, record) => (
+    <Space align="center" size={12} className="display-name-cell">
+      <Avatar
+        size={40}
+        icon={!record.cn && <UserOutlined />}
+        style={{
+          background: record.isEnabled ? '#2563eb' : '#d1d5db',
+          color: '#ffffff',
+          fontWeight: 600
+        }}
+      >
+        {(record.cn || record.displayName || 'U').charAt(0).toUpperCase()}
+      </Avatar>
+      <div>
+        <div className="display-name-text">{record.cn || record.displayName || '-'}</div>
+      </div>
+    </Space>
+  ), []);
+
+  const renderEmailCell = useCallback((value) => renderCopyableValue(value, ['คัดลอกอีเมล', 'คัดลอกแล้ว']), [renderCopyableValue]);
+  const renderEmployeeIdCell = useCallback((value) => renderCopyableValue(value, ['คัดลอก Employee ID', 'คัดลอกแล้ว']), [renderCopyableValue]);
+  const renderStatusCell = useCallback((isEnabled) => (
+    <Tag className={isEnabled ? 'status-tag success' : 'status-tag inactive'}>
+      {isEnabled ? 'Active' : 'Disabled'}
+    </Tag>
+  ), []);
+
+  const renderActionsCell = useCallback((_, record) => (
+    <div className="actions-cell">
+      <Dropdown
+        overlay={
+          <Menu
+            onClick={({ key }) => {
+              if (key === 'view') {
+                handleViewDetails(record);
+                return;
+              }
+              if (key === 'edit') {
+                handleEditUser(record);
+                return;
+              }
+              if (key === 'toggle') {
+                Modal.confirm({
+                  title: record.isEnabled ? 'ปิดใช้งานผู้ใช้' : 'เปิดใช้งานผู้ใช้',
+                  content: `คุณต้องการ${record.isEnabled ? 'ปิด' : 'เปิด'}ใช้งาน ${record.cn || record.displayName || 'ผู้ใช้นี้'} หรือไม่?`,
+                  okText: 'ยืนยัน',
+                  cancelText: 'ยกเลิก',
+                  icon: record.isEnabled ? <LockOutlined style={{ color: '#f59e0b' }} /> : <UnlockOutlined style={{ color: '#10b981' }} />,
+                  onOk: () => handleToggleStatus(record.dn)
+                });
+                return;
+              }
+              if (key === 'delete') {
+                Modal.confirm({
+                  title: 'ลบผู้ใช้',
+                  content: `คุณต้องการลบผู้ใช้ ${record.cn || record.displayName || record.sAMAccountName || ''} หรือไม่?`,
+                  okText: 'ลบ',
+                  cancelText: 'ยกเลิก',
+                  okButtonProps: { danger: true },
+                  icon: <DeleteOutlined style={{ color: '#dc2626' }} />,
+                  onOk: () => handleDeleteUser(record.dn)
+                });
+              }
             }}
-            icon={!record.cn && <UserOutlined />}
-          >
-            {record.cn ? record.cn.charAt(0).toUpperCase() : '?'}
-          </Avatar>
-          <div>
-            <div style={{ fontWeight: 600, fontSize: 14, color: '#1f2937' }}>
-              {record.cn || record.displayName || 'N/A'}
-            </div>
-            <div style={{ fontSize: 12, color: '#6b7280' }}>
-              {record.sAMAccountName}
-            </div>
-          </div>
-        </div>
-      ),
+            items={[
+              {
+                key: 'view',
+                icon: <EyeOutlined style={{ color: '#2563eb' }} />,
+                label: 'ดูรายละเอียด'
+              },
+              {
+                key: 'edit',
+                icon: <EditOutlined style={{ color: '#059669' }} />,
+                label: 'แก้ไขข้อมูล'
+              },
+              {
+                key: 'toggle',
+                icon: record.isEnabled ? <LockOutlined style={{ color: '#f59e0b' }} /> : <UnlockOutlined style={{ color: '#10b981' }} />,
+                label: record.isEnabled ? 'ปิดใช้งาน' : 'เปิดใช้งาน'
+              },
+              {
+                type: 'divider'
+              },
+              {
+                key: 'delete',
+                danger: true,
+                icon: <DeleteOutlined style={{ color: '#dc2626' }} />,
+                label: 'ลบผู้ใช้'
+              }
+            ]}
+          />
+        }
+        trigger={['click']}
+        placement="bottomRight"
+        overlayClassName="actions-dropdown-menu"
+      >
+        <Button
+          className="action-dropdown-button"
+          icon={<MoreOutlined />}
+        >
+          จัดการ
+        </Button>
+      </Dropdown>
+    </div>
+  ), [handleViewDetails, handleEditUser, handleToggleStatus, handleDeleteUser]);
+
+  const allColumns = useMemo(() => [
+    {
+      title: 'Display Name',
+      key: 'user',
+      fixed: 'left',
+      width: 260,
+      render: renderDisplayName
     },
     {
-      title: (
-        <span style={{ fontWeight: 600 }}>
-          <TagOutlined style={{ marginRight: 8 }} />
-          Username
-        </span>
-      ),
+      title: 'Username',
       dataIndex: 'sAMAccountName',
       key: 'sAMAccountName',
-      width: 180,
-      ellipsis: true,
-      filteredValue: null,
-      onFilter: (value, record) => record.sAMAccountName?.toLowerCase().includes(value.toLowerCase()),
-      filterDropdown: ({ setSelectedKeys, selectedKeys, confirm, clearFilters }) => (
-        <div style={{ padding: 8 }}>
-          <Input
-            placeholder="Search username"
-            value={selectedKeys[0]}
-            onChange={(e) => setSelectedKeys(e.target.value ? [e.target.value] : [])}
-            onPressEnter={() => confirm()}
-            style={{ width: 188, marginBottom: 8, display: 'block' }}
-          />
-          <Space>
-            <Button
-              type="primary"
-              onClick={() => confirm()}
-              icon={<SearchOutlined />}
-              size="small"
-              style={{ width: 90 }}
-            >
-              Search
-            </Button>
-            <Button onClick={() => clearFilters()} size="small" style={{ width: 90 }}>
-              Reset
-            </Button>
-          </Space>
-        </div>
-      ),
-      filterIcon: (filtered) => (
-        <SearchOutlined style={{ color: filtered ? '#1890ff' : undefined }} />
-      ),
-      render: (username) => username ? (
-        <Text copyable={{ text: username }} style={{ fontSize: 13 }}>
-          {username}
-        </Text>
-      ) : (
-        <Text type="secondary" style={{ fontSize: 13 }}>-</Text>
-      ),
+      fixed: 'left',
+      width: 200,
+      render: renderUsernameCell
     },
     {
-      title: (
-        <span style={{ fontWeight: 600 }}>
-          <MailOutlined style={{ marginRight: 8 }} />
-          Email
-        </span>
-      ),
+      title: 'Email',
       dataIndex: 'mail',
       key: 'mail',
-      width: 220,
-      ellipsis: true,
-      filteredValue: null,
-      onFilter: (value, record) => record.mail?.toLowerCase().includes(value.toLowerCase()),
-      filterDropdown: ({ setSelectedKeys, selectedKeys, confirm, clearFilters }) => (
-        <div style={{ padding: 8 }}>
-          <Input
-            placeholder="Search email"
-            value={selectedKeys[0]}
-            onChange={(e) => setSelectedKeys(e.target.value ? [e.target.value] : [])}
-            onPressEnter={() => confirm()}
-            style={{ width: 188, marginBottom: 8, display: 'block' }}
-          />
-          <Space>
-            <Button
-              type="primary"
-              onClick={() => confirm()}
-              icon={<SearchOutlined />}
-              size="small"
-              style={{ width: 90 }}
-            >
-              Search
-            </Button>
-            <Button onClick={() => clearFilters()} size="small" style={{ width: 90 }}>
-              Reset
-            </Button>
-          </Space>
-        </div>
-      ),
-      filterIcon: (filtered) => (
-        <SearchOutlined style={{ color: filtered ? '#1890ff' : undefined }} />
-      ),
-      render: (mail) => mail ? (
-        <Text copyable={{ text: mail }} style={{ fontSize: 13 }}>
-          {mail}
-        </Text>
-      ) : (
-        <Text type="secondary" style={{ fontSize: 13 }}>-</Text>
-      ),
+      width: 260,
+      render: renderEmailCell
     },
     {
-      title: (
-        <span style={{ fontWeight: 600 }}>
-          First Name
-        </span>
-      ),
-      dataIndex: 'givenName',
-      key: 'givenName',
-      width: 130,
-      ellipsis: true,
-      filteredValue: null,
-      onFilter: (value, record) => record.givenName?.toLowerCase().includes(value.toLowerCase()),
-      filterDropdown: ({ setSelectedKeys, selectedKeys, confirm, clearFilters }) => (
-        <div style={{ padding: 8 }}>
-          <Input
-            placeholder="Search first name"
-            value={selectedKeys[0]}
-            onChange={(e) => setSelectedKeys(e.target.value ? [e.target.value] : [])}
-            onPressEnter={() => confirm()}
-            style={{ width: 188, marginBottom: 8, display: 'block' }}
-          />
-          <Space>
-            <Button type="primary" onClick={() => confirm()} size="small" style={{ width: 90 }}>
-              Search
-            </Button>
-            <Button onClick={() => clearFilters()} size="small" style={{ width: 90 }}>
-              Reset
-            </Button>
-          </Space>
-        </div>
-      ),
-      filterIcon: (filtered) => <SearchOutlined style={{ color: filtered ? '#1890ff' : undefined }} />,
-      render: (name) => (
-        <Text style={{ fontSize: 13 }}>{name || '-'}</Text>
-      ),
-    },
-    {
-      title: (
-        <span style={{ fontWeight: 600 }}>
-          Last Name
-        </span>
-      ),
-      dataIndex: 'sn',
-      key: 'sn',
-      width: 130,
-      ellipsis: true,
-      filteredValue: null,
-      onFilter: (value, record) => record.sn?.toLowerCase().includes(value.toLowerCase()),
-      filterDropdown: ({ setSelectedKeys, selectedKeys, confirm, clearFilters }) => (
-        <div style={{ padding: 8 }}>
-          <Input
-            placeholder="Search last name"
-            value={selectedKeys[0]}
-            onChange={(e) => setSelectedKeys(e.target.value ? [e.target.value] : [])}
-            onPressEnter={() => confirm()}
-            style={{ width: 188, marginBottom: 8, display: 'block' }}
-          />
-          <Space>
-            <Button type="primary" onClick={() => confirm()} size="small" style={{ width: 90 }}>
-              Search
-            </Button>
-            <Button onClick={() => clearFilters()} size="small" style={{ width: 90 }}>
-              Reset
-            </Button>
-          </Space>
-        </div>
-      ),
-      filterIcon: (filtered) => <SearchOutlined style={{ color: filtered ? '#1890ff' : undefined }} />,
-      render: (name) => (
-        <Text style={{ fontSize: 13 }}>{name || '-'}</Text>
-      ),
-    },
-    {
-      title: (
-        <span style={{ fontWeight: 600 }}>
-          Job Title
-        </span>
-      ),
+      title: 'Job Title',
       dataIndex: 'title',
       key: 'title',
-      width: 160,
-      ellipsis: true,
-      filteredValue: null,
-      onFilter: (value, record) => record.title?.toLowerCase().includes(value.toLowerCase()),
-      filterDropdown: ({ setSelectedKeys, selectedKeys, confirm, clearFilters }) => (
-        <div style={{ padding: 8 }}>
-          <Input
-            placeholder="Search job title"
-            value={selectedKeys[0]}
-            onChange={(e) => setSelectedKeys(e.target.value ? [e.target.value] : [])}
-            onPressEnter={() => confirm()}
-            style={{ width: 188, marginBottom: 8, display: 'block' }}
-          />
-          <Space>
-            <Button type="primary" onClick={() => confirm()} size="small" style={{ width: 90 }}>
-              Search
-            </Button>
-            <Button onClick={() => clearFilters()} size="small" style={{ width: 90 }}>
-              Reset
-            </Button>
-          </Space>
-        </div>
-      ),
-      filterIcon: (filtered) => <SearchOutlined style={{ color: filtered ? '#1890ff' : undefined }} />,
-      render: (title) => (
-        <Text style={{ fontSize: 13 }}>{title || '-'}</Text>
-      ),
+      width: 200,
+      render: renderTextCell
     },
     {
-      title: (
-        <span style={{ fontWeight: 600 }}>
-          <BankOutlined style={{ marginRight: 8 }} />
-          Department
-        </span>
-      ),
+      title: 'Department',
       dataIndex: 'department',
       key: 'department',
-      width: 180,
-      filters: departments.map(dept => ({ text: dept, value: dept })),
-      onFilter: (value, record) => record.department === value,
-      filterIcon: (filtered) => <FilterOutlined style={{ color: filtered ? '#1890ff' : undefined }} />,
-      render: (dept) => dept ? (
-        <Tag
-          style={{
-            background: '#eff6ff',
-            color: '#1e40af',
-            border: '1px solid #bfdbfe',
-            padding: '4px 12px',
-            fontSize: 12,
-            fontWeight: 600
-          }}
-        >
-          {dept}
-        </Tag>
-      ) : (
-        <Text type="secondary" style={{ fontSize: 12 }}>-</Text>
-      ),
+      width: 200,
+      render: renderDepartmentTag
     },
     {
-      title: (
-        <span style={{ fontWeight: 600 }}>
-          Company
-        </span>
-      ),
+      title: 'Company',
       dataIndex: 'company',
       key: 'company',
-      width: 150,
-      ellipsis: true,
-      filteredValue: null,
-      onFilter: (value, record) => record.company?.toLowerCase().includes(value.toLowerCase()),
-      filterDropdown: ({ setSelectedKeys, selectedKeys, confirm, clearFilters }) => (
-        <div style={{ padding: 8 }}>
-          <Input
-            placeholder="Search company"
-            value={selectedKeys[0]}
-            onChange={(e) => setSelectedKeys(e.target.value ? [e.target.value] : [])}
-            onPressEnter={() => confirm()}
-            style={{ width: 188, marginBottom: 8, display: 'block' }}
-          />
-          <Space>
-            <Button type="primary" onClick={() => confirm()} size="small" style={{ width: 90 }}>
-              Search
-            </Button>
-            <Button onClick={() => clearFilters()} size="small" style={{ width: 90 }}>
-              Reset
-            </Button>
-          </Space>
-        </div>
-      ),
-      filterIcon: (filtered) => <SearchOutlined style={{ color: filtered ? '#1890ff' : undefined }} />,
-      render: (company) => (
-        <Text style={{ fontSize: 13 }}>{company || '-'}</Text>
-      ),
+      width: 200,
+      render: renderTextCell
     },
     {
-      title: (
-        <span style={{ fontWeight: 600 }}>
-          <IdcardOutlined style={{ marginRight: 8 }} />
-          Employee ID
-        </span>
-      ),
-      dataIndex: 'employeeID',
-      key: 'employeeID',
-      width: 130,
-      filteredValue: null,
-      onFilter: (value, record) => record.employeeID?.includes(value),
-      filterDropdown: ({ setSelectedKeys, selectedKeys, confirm, clearFilters }) => (
-        <div style={{ padding: 8 }}>
-          <Input
-            placeholder="Search employee ID"
-            value={selectedKeys[0]}
-            onChange={(e) => setSelectedKeys(e.target.value ? [e.target.value] : [])}
-            onPressEnter={() => confirm()}
-            style={{ width: 188, marginBottom: 8, display: 'block' }}
-          />
-          <Space>
-            <Button type="primary" onClick={() => confirm()} size="small" style={{ width: 90 }}>
-              Search
-            </Button>
-            <Button onClick={() => clearFilters()} size="small" style={{ width: 90 }}>
-              Reset
-            </Button>
-          </Space>
-        </div>
-      ),
-      filterIcon: (filtered) => <SearchOutlined style={{ color: filtered ? '#1890ff' : undefined }} />,
-      render: (empId) => empId ? (
-        <Text code style={{ fontSize: 13 }}>{empId}</Text>
-      ) : (
-        <Text type="secondary" style={{ fontSize: 13 }}>-</Text>
-      ),
-    },
-    {
-      title: (
-        <span style={{ fontWeight: 600 }}>
-          <PhoneOutlined style={{ marginRight: 8 }} />
-          Phone
-        </span>
-      ),
-      dataIndex: 'telephoneNumber',
-      key: 'phone',
-      width: 150,
-      ellipsis: true,
-      filteredValue: null,
-      onFilter: (value, record) => record.telephoneNumber?.includes(value),
-      filterDropdown: ({ setSelectedKeys, selectedKeys, confirm, clearFilters }) => (
-        <div style={{ padding: 8 }}>
-          <Input
-            placeholder="Search phone"
-            value={selectedKeys[0]}
-            onChange={(e) => setSelectedKeys(e.target.value ? [e.target.value] : [])}
-            onPressEnter={() => confirm()}
-            style={{ width: 188, marginBottom: 8, display: 'block' }}
-          />
-          <Space>
-            <Button type="primary" onClick={() => confirm()} size="small" style={{ width: 90 }}>
-              Search
-            </Button>
-            <Button onClick={() => clearFilters()} size="small" style={{ width: 90 }}>
-              Reset
-            </Button>
-          </Space>
-        </div>
-      ),
-      filterIcon: (filtered) => <SearchOutlined style={{ color: filtered ? '#1890ff' : undefined }} />,
-      render: (phone) => phone ? (
-        <Text copyable={{ text: phone }} style={{ fontSize: 13 }}>{phone}</Text>
-      ) : (
-        <Text type="secondary" style={{ fontSize: 13 }}>-</Text>
-      ),
-    },
-    {
-      title: (
-        <span style={{ fontWeight: 600 }}>
-          <PhoneOutlined style={{ marginRight: 8 }} />
-          Mobile
-        </span>
-      ),
-      dataIndex: 'mobile',
-      key: 'mobile',
-      width: 150,
-      ellipsis: true,
-      filteredValue: null,
-      onFilter: (value, record) => record.mobile?.includes(value),
-      filterDropdown: ({ setSelectedKeys, selectedKeys, confirm, clearFilters }) => (
-        <div style={{ padding: 8 }}>
-          <Input
-            placeholder="Search mobile"
-            value={selectedKeys[0]}
-            onChange={(e) => setSelectedKeys(e.target.value ? [e.target.value] : [])}
-            onPressEnter={() => confirm()}
-            style={{ width: 188, marginBottom: 8, display: 'block' }}
-          />
-          <Space>
-            <Button type="primary" onClick={() => confirm()} size="small" style={{ width: 90 }}>
-              Search
-            </Button>
-            <Button onClick={() => clearFilters()} size="small" style={{ width: 90 }}>
-              Reset
-            </Button>
-          </Space>
-        </div>
-      ),
-      filterIcon: (filtered) => <SearchOutlined style={{ color: filtered ? '#1890ff' : undefined }} />,
-      render: (mobile) => mobile ? (
-        <Text copyable={{ text: mobile }} style={{ fontSize: 13 }}>{mobile}</Text>
-      ) : (
-        <Text type="secondary" style={{ fontSize: 13 }}>-</Text>
-      ),
-    },
-    {
-      title: (
-        <span style={{ fontWeight: 600 }}>
-          <EnvironmentOutlined style={{ marginRight: 8 }} />
-          Office Location
-        </span>
-      ),
+      title: 'Work Location',
       dataIndex: 'physicalDeliveryOfficeName',
       key: 'location',
-      width: 150,
-      ellipsis: true,
-      filteredValue: null,
-      onFilter: (value, record) => record.physicalDeliveryOfficeName?.toLowerCase().includes(value.toLowerCase()),
-      filterDropdown: ({ setSelectedKeys, selectedKeys, confirm, clearFilters }) => (
-        <div style={{ padding: 8 }}>
-          <Input
-            placeholder="Search location"
-            value={selectedKeys[0]}
-            onChange={(e) => setSelectedKeys(e.target.value ? [e.target.value] : [])}
-            onPressEnter={() => confirm()}
-            style={{ width: 188, marginBottom: 8, display: 'block' }}
-          />
-          <Space>
-            <Button type="primary" onClick={() => confirm()} size="small" style={{ width: 90 }}>
-              Search
-            </Button>
-            <Button onClick={() => clearFilters()} size="small" style={{ width: 90 }}>
-              Reset
-            </Button>
-          </Space>
-        </div>
-      ),
-      filterIcon: (filtered) => <SearchOutlined style={{ color: filtered ? '#1890ff' : undefined }} />,
-      render: (location) => (
-        <Text style={{ fontSize: 13 }}>{location || '-'}</Text>
-      ),
+      width: 200,
+      render: renderTextCell
     },
     {
-      title: (
-        <span style={{ fontWeight: 600 }}>
-          Description
-        </span>
-      ),
+      title: 'Description',
       dataIndex: 'description',
       key: 'description',
-      width: 200,
-      ellipsis: true,
-      filteredValue: null,
-      onFilter: (value, record) => record.description?.toLowerCase().includes(value.toLowerCase()),
-      filterDropdown: ({ setSelectedKeys, selectedKeys, confirm, clearFilters }) => (
-        <div style={{ padding: 8 }}>
-          <Input
-            placeholder="Search description"
-            value={selectedKeys[0]}
-            onChange={(e) => setSelectedKeys(e.target.value ? [e.target.value] : [])}
-            onPressEnter={() => confirm()}
-            style={{ width: 188, marginBottom: 8, display: 'block' }}
-          />
-          <Space>
-            <Button type="primary" onClick={() => confirm()} size="small" style={{ width: 90 }}>
-              Search
-            </Button>
-            <Button onClick={() => clearFilters()} size="small" style={{ width: 90 }}>
-              Reset
-            </Button>
-          </Space>
-        </div>
-      ),
-      filterIcon: (filtered) => <SearchOutlined style={{ color: filtered ? '#1890ff' : undefined }} />,
-      render: (description) => description ? (
-        <Text 
-          ellipsis={{ tooltip: description }}
-          style={{ fontSize: 13, color: '#6b7280' }}
-        >
-          {description}
-        </Text>
-      ) : (
-        <Text type="secondary" style={{ fontSize: 13 }}>-</Text>
-      ),
+      width: 220,
+      render: renderDescriptionCell
     },
     {
-      title: (
-        <span style={{ fontWeight: 600 }}>
-          <CheckCircleOutlined style={{ marginRight: 8 }} />
-          Status
-        </span>
-      ),
+      title: 'Employee ID',
+      dataIndex: 'employeeID',
+      key: 'employeeID',
+      width: 160,
+      render: renderEmployeeIdCell
+    },
+    {
+      title: 'Phone',
+      dataIndex: 'telephoneNumber',
+      key: 'phone',
+      width: 160,
+      render: renderTextCell
+    },
+    {
+      title: 'Mobile',
+      dataIndex: 'mobile',
+      key: 'mobile',
+      width: 160,
+      render: renderTextCell
+    },
+    {
+      title: 'Status',
+      dataIndex: 'isEnabled',
       key: 'status',
-      width: 120,
-      filters: [
-        { text: 'Active', value: true },
-        { text: 'Disabled', value: false },
-      ],
-      onFilter: (value, record) => record.isEnabled === value,
-      filterIcon: (filtered) => <FilterOutlined style={{ color: filtered ? '#1890ff' : undefined }} />,
-      render: (_, record) => (
-        <Tag
-          icon={record.isEnabled ? <CheckCircleOutlined /> : <CloseCircleOutlined />}
-          color={record.isEnabled ? 'success' : 'error'}
-          style={{
-            fontWeight: 600,
-            fontSize: 12,
-            padding: '6px 14px',
-            borderRadius: 20,
-            border: 'none'
-          }}
-        >
-          {record.isEnabled ? 'Active' : 'Disabled'}
-        </Tag>
-      ),
+      width: 140,
+      render: renderStatusCell
     },
     {
-      title: (
-        <span style={{ fontWeight: 600 }}>
-          Actions
-        </span>
-      ),
+      title: 'Actions',
       key: 'actions',
-      width: 200,
       fixed: 'right',
-      render: (_, record) => (
-        <Space size="small">
-          <Tooltip title="View Details">
-            <Button
-              type="default"
-              icon={<EyeOutlined />}
-              size="small"
-              onClick={() => handleViewDetails(record)}
-            />
-          </Tooltip>
-          <Tooltip title="Edit">
-            <Button
-              type="primary"
-              icon={<EditOutlined />}
-              size="small"
-              onClick={() => handleEditUser(record)}
-            />
-          </Tooltip>
-          <Tooltip title={record.isEnabled ? 'Disable' : 'Enable'}>
-            <Popconfirm
-              title={`คุณต้องการ${record.isEnabled ? 'ปิด' : 'เปิด'}ใช้งานผู้ใช้นี้หรือไม่?`}
-              onConfirm={() => handleToggleStatus(record.dn)}
-              okText="Yes"
-              cancelText="No"
-            >
-              <Button
-                icon={record.isEnabled ? <LockOutlined /> : <UnlockOutlined />}
-                size="small"
-                style={{
-                  color: record.isEnabled ? '#f59e0b' : '#10b981',
-                  borderColor: record.isEnabled ? '#f59e0b' : '#10b981'
-                }}
-              />
-            </Popconfirm>
-          </Tooltip>
-          <Popconfirm
-            title="Are you sure you want to delete this user?"
-            onConfirm={() => handleDeleteUser(record.dn)}
-            okText="Yes"
-            cancelText="No"
-          >
-            <Tooltip title="Delete">
-              <Button
-                danger
-                icon={<DeleteOutlined />}
-                size="small"
-              />
-            </Tooltip>
-          </Popconfirm>
-        </Space>
-      ),
-    },
-  ];
+      width: 140,
+      render: renderActionsCell
+    }
+  ], [renderDisplayName, renderUsernameCell, renderEmailCell, renderTextCell, renderDepartmentTag, renderDescriptionCell, renderEmployeeIdCell, renderStatusCell, renderActionsCell]);
 
   // ⚡ Filter columns based on visibility settings
   const columns = allColumns.filter(col => {
@@ -1849,191 +1553,170 @@ const UserManagement = () => {
   
   return (
     <div className="user-management-container" style={{ 
-      padding: '24px', 
-      margin: '0', 
+      padding: '16px 24px 24px',
+      margin: '0',
       minHeight: '100vh',
       height: 'auto',
       width: '100%',
       background: '#fafafa'
     }}>
-      {/* Minimalist Header */}
       <Card
         style={{
-          borderRadius: '8px',
+          borderRadius: '12px',
           background: '#ffffff',
           border: '1px solid #f0f0f0',
           boxShadow: '0 1px 2px rgba(0, 0, 0, 0.03)',
-          marginBottom: '16px',
           width: '100%'
         }}
-        bodyStyle={{ padding: '20px 24px', margin: 0 }}
+        bodyStyle={{ padding: 0 }}
       >
-        <Row justify="space-between" align="middle">
-          <Col>
-            <Space size="middle" align="center">
-              <UserOutlined style={{ fontSize: 24, color: '#1890ff' }} />
-              <div>
-                <Space size="middle" align="center">
-                  <div style={{ 
-                    color: '#262626', 
-                    margin: 0, 
-                    fontWeight: 600, 
-                    fontSize: 20
-                  }}>
-                    User Management
-                  </div>
-                  <Space size={8}>
-                    <Tag style={{
-                      background: '#fafafa',
-                      border: '1px solid #d9d9d9',
-                      color: '#595959',
-                      fontSize: 12,
-                      padding: '2px 10px',
-                      fontWeight: 400,
-                      borderRadius: 10
+        <div className="user-management-card-header">
+          <Row justify="space-between" align="middle">
+            <Col>
+              <Space size="middle" align="center">
+                <UserOutlined style={{ fontSize: 24, color: '#1890ff' }} />
+                <div>
+                  <Space size="middle" align="center">
+                    <div style={{ 
+                      color: '#262626', 
+                      margin: 0, 
+                      fontWeight: 600, 
+                      fontSize: 20
                     }}>
-                      Total: {stats.total}
-                    </Tag>
-                    <Tag style={{
-                      background: '#f6ffed',
-                      border: '1px solid #b7eb8f',
-                      color: '#52c41a',
-                      fontSize: 12,
-                      padding: '2px 10px',
-                      fontWeight: 400,
-                      borderRadius: 10
-                    }}>
-                      Active: {stats.enabled}
-                    </Tag>
-                    <Tag style={{
-                      background: '#fff1f0',
-                      border: '1px solid #ffccc7',
-                      color: '#ff4d4f',
-                      fontSize: 12,
-                      padding: '2px 10px',
-                      fontWeight: 400,
-                      borderRadius: 10
-                    }}>
-                      Disabled: {stats.disabled}
-                    </Tag>
-                    {autoRefreshEnabled && (
+                      User Management
+                    </div>
+                    <Space size={8}>
                       <Tag style={{
-                        background: '#e6f7ff',
-                        border: '1px solid #91d5ff',
-                        color: '#1890ff',
+                        background: '#fafafa',
+                        border: '1px solid #d9d9d9',
+                        color: '#595959',
                         fontSize: 12,
                         padding: '2px 10px',
                         fontWeight: 400,
                         borderRadius: 10
                       }}>
-                        Live
+                        Total: {stats.total}
                       </Tag>
-                    )}
+                      <Tag style={{
+                        background: '#f6ffed',
+                        border: '1px solid #b7eb8f',
+                        color: '#52c41a',
+                        fontSize: 12,
+                        padding: '2px 10px',
+                        fontWeight: 400,
+                        borderRadius: 10
+                      }}>
+                        Active: {stats.enabled}
+                      </Tag>
+                      <Tag style={{
+                        background: '#fff1f0',
+                        border: '1px solid #ffccc7',
+                        color: '#ff4d4f',
+                        fontSize: 12,
+                        padding: '2px 10px',
+                        fontWeight: 400,
+                        borderRadius: 10
+                      }}>
+                        Disabled: {stats.disabled}
+                      </Tag>
+                      {autoRefreshEnabled && (
+                        <Tag style={{
+                          background: '#e6f7ff',
+                          border: '1px solid #91d5ff',
+                          color: '#1890ff',
+                          fontSize: 12,
+                          padding: '2px 10px',
+                          fontWeight: 400,
+                          borderRadius: 10
+                        }}>
+                          Live
+                        </Tag>
+                      )}
+                    </Space>
                   </Space>
-                </Space>
-              </div>
-            </Space>
-          </Col>
-          <Col>
-            <Space>
-              <Button
-                icon={<FilterOutlined />}
-                onClick={() => setIsColumnSettingsVisible(true)}
-              >
-                Columns
-              </Button>
-              <Button
-                icon={<ReloadOutlined />}
-                onClick={() => {
-                  fetchUsers(true);
-                  setLastRefreshTime(new Date());
+                </div>
+              </Space>
+            </Col>
+            <Col>
+              <Space>
+                <Button
+                  icon={<ReloadOutlined />}
+                  onClick={() => {
+                    fetchUsers(true);
+                    setLastRefreshTime(new Date());
+                  }}
+                  loading={loading}
+                >
+                  รีเฟรช
+                </Button>
+                <Button
+                  icon={<FilterOutlined />}
+                  onClick={() => setIsColumnSettingsVisible(true)}
+                >
+                  จัดการคอลัมน์
+                </Button>
+                <Button
+                  type="primary"
+                  icon={<UserAddOutlined />}
+                  onClick={handleCreateUser}
+                >
+                  สร้างผู้ใช้
+                </Button>
+              </Space>
+            </Col>
+          </Row>
+          <Row className="header-search-row" align="middle" gutter={[12, 12]}>
+            <Col xs={24} md={16} lg={14} xl={12}>
+              <Input
+                placeholder="Search users..."
+                prefix={<SearchOutlined />}
+                allowClear
+                value={searchText}
+                onChange={(e) => setSearchText(e.target.value)}
+                className="custom-search-input gradient-search-input search-input-large"
+              />
+            </Col>
+            <Col xs={24} md={8} lg={10} xl={12} style={{ textAlign: 'right' }}>
+              <Pagination
+                size="small"
+                current={currentPage}
+                pageSize={pageSize}
+                total={filteredUsers.length}
+                onChange={(page, size) => {
+                  setCurrentPage(page);
+                  setPageSize(size);
                 }}
-                loading={loading}
-              >
-                Refresh
-              </Button>
-              <Button
-                type="primary"
-                icon={<UserAddOutlined />}
-                onClick={handleCreateUser}
-              >
-                Create User
-              </Button>
-            </Space>
-          </Col>
-        </Row>
+                showSizeChanger
+                showQuickJumper
+                pageSizeOptions={['20', '30', '50', '100', '200']}
+                showTotal={(total, range) => `${range[0]}-${range[1]} of ${total}`}
+              />
+            </Col>
+          </Row>
+        </div>
 
-        {/* Search & Filter Section */}
-        <Row gutter={[8, 8]} align="middle" style={{ marginBottom: 12 }}>
-          <Col xs={24} md={12}>
-            <Input
-              placeholder="Search users..."
-              prefix={<SearchOutlined />}
-              allowClear
-              value={searchText}
-              onChange={(e) => setSearchText(e.target.value)}
+        <Divider style={{ margin: 0 }} />
+
+        <div className="user-management-table-wrapper">
+          <Table
+              columns={columns}
+              dataSource={paginatedUsers}
+              rowKey="dn"
+              loading={loading}
+              bordered={false}
+              size="middle"
+              scroll={{ x: 'max-content', y: tableScrollY }}
+              sticky={{ offsetHeader: 0 }}
+              tableLayout="fixed"
+              rowClassName={(record, index) => index % 2 === 0 ? 'table-row-light' : 'table-row-dark'}
+              pagination={false}
+              components={{
+                body: {
+                  wrapper: (props) => <tbody {...props} />
+                }
+              }}
             />
-          </Col>
-          <Col xs={12} md={6}>
-            <Select
-              placeholder="All Departments"
-              allowClear
-              value={departmentFilter || undefined}
-              onChange={handleDepartmentFilterChange}
-              style={{ width: '100%' }}
-            >
-              <Option value="">All Departments</Option>
-              {departments.map(dept => (
-                <Option key={dept} value={dept}>{dept}</Option>
-              ))}
-            </Select>
-          </Col>
-          <Col xs={12} md={6}>
-            <Select
-              placeholder="All Status"
-              value={statusFilter}
-              onChange={handleStatusFilterChange}
-              style={{ width: '100%' }}
-            >
-              <Option value="all">All Status</Option>
-              <Option value="enabled">Active Only</Option>
-              <Option value="disabled">Disabled Only</Option>
-            </Select>
-          </Col>
-        </Row>
-
-      </Card>
-
-      {/* Table Section */}
-      <Card
-        style={{
-          borderRadius: '8px',
-          background: '#ffffff',
-          border: '1px solid #f0f0f0',
-          boxShadow: '0 1px 2px rgba(0, 0, 0, 0.03)'
-        }}
-        bodyStyle={{ padding: 0 }}
-      >
-        <Table
-            columns={columns}
-            dataSource={filteredUsers}
-            rowKey="dn"
-            loading={loading}
-            bordered={false}
-            size="middle"
-            scroll={{ x: 2400 }}
-            rowClassName={(record, index) => index % 2 === 0 ? 'table-row-light' : 'table-row-dark'}
-            pagination={{
-              pageSize: 50,
-              showSizeChanger: true,
-              showQuickJumper: true,
-              showTotal: (total, range) =>
-                `${range[0]}-${range[1]} of ${total}`,
-              pageSizeOptions: ['20', '50', '100', '200'],
-              position: ['bottomCenter'],
-              defaultPageSize: 50
-            }}
-          />
+        </div>
       </Card>
 
       {/* Create User Modal - Step Wizard */}
@@ -4275,26 +3958,6 @@ const UserManagement = () => {
             
             <Col span={12}>
               <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 12 }}>
-                <Text strong>First Name</Text>
-                <Switch
-                  checked={visibleColumns.givenName}
-                  onChange={(checked) => setVisibleColumns({...visibleColumns, givenName: checked})}
-                />
-              </div>
-            </Col>
-            
-            <Col span={12}>
-              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 12 }}>
-                <Text strong>Last Name</Text>
-                <Switch
-                  checked={visibleColumns.sn}
-                  onChange={(checked) => setVisibleColumns({...visibleColumns, sn: checked})}
-                />
-              </div>
-            </Col>
-            
-            <Col span={12}>
-              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 12 }}>
                 <Text strong>Job Title</Text>
                 <Switch
                   checked={visibleColumns.title}
@@ -4393,8 +4056,6 @@ const UserManagement = () => {
                   user: true,
                   sAMAccountName: true,
                   mail: true,
-                  givenName: true,
-                  sn: true,
                   title: true,
                   department: true,
                   company: true,
@@ -4417,17 +4078,15 @@ const UserManagement = () => {
                   user: true,
                   sAMAccountName: true,
                   mail: true,
-                  givenName: false,
-                  sn: false,
-                  title: false,
+                  title: true,
                   department: true,
-                  company: false,
+                  company: true,
                   employeeID: false,
                   phone: false,
                   mobile: false,
-                  location: false,
-                  description: false,
-                  status: true
+                  location: true,
+                  description: true,
+                  status: false
                 });
                 message.info('แสดงเฉพาะคอลัมน์หลัก');
               }}
