@@ -82,6 +82,12 @@ const UserManagement = () => {
   // ==================== STATES ====================
   const [users, setUsers] = useState([]);
   const [loading, setLoading] = useState(false);
+  const [directoryCounts, setDirectoryCounts] = useState({
+    total: 0,
+    enabled: 0,
+    disabled: 0,
+    fetchedAt: null
+  });
   const [searchText, setSearchText] = useState('');
   const [departmentFilter, setDepartmentFilter] = useState('');
   const [statusFilter, setStatusFilter] = useState('all');
@@ -128,10 +134,6 @@ const UserManagement = () => {
   const [isDetailsDrawerVisible, setIsDetailsDrawerVisible] = useState(false);
   const [isPasswordModalVisible, setIsPasswordModalVisible] = useState(false);
   
-  // Auto-refresh settings
-  const [autoRefreshEnabled, setAutoRefreshEnabled] = useState(false);
-  const [lastRefreshTime, setLastRefreshTime] = useState(new Date());
-  
   // Column visibility settings (⚡ Default: Show only essential for faster loading)
   const [visibleColumns, setVisibleColumns] = useState({
     user: true,
@@ -168,16 +170,6 @@ const UserManagement = () => {
     };
   }, [updateTableScrollY]);
 
-  // Handler for auto-refresh toggle
-  const handleAutoRefreshToggle = (checked) => {
-    setAutoRefreshEnabled(checked);
-    if (checked) {
-      message.success('🔄 เปิดใช้งาน Auto-refresh: อัพเดทข้อมูลทุก 60 วินาที (Smart)', 3);
-    } else {
-      message.info('⏸️ ปิด Auto-refresh: ต้องกด Refresh เอง', 3);
-    }
-  };
-  
   // Selected data
   const [selectedUser, setSelectedUser] = useState(null);
   const [editingUser, setEditingUser] = useState(null);
@@ -202,6 +194,16 @@ const UserManagement = () => {
 
   // ==================== HELPER FUNCTIONS ====================
   
+  const formatCount = useCallback((value) => {
+    if (typeof value === 'number') {
+      return value.toLocaleString();
+    }
+    if (typeof value === 'string') {
+      return value;
+    }
+    return '0';
+  }, []);
+
   /**
    * Convert error detail to string for display
    * Handles FastAPI validation errors (array of objects), strings, and objects
@@ -232,6 +234,28 @@ const UserManagement = () => {
 
   // ==================== DATA FETCHING ====================
   
+  const fetchDirectoryCounts = useCallback(async () => {
+    try {
+      const response = await axios.get(`${config.apiUrl}/api/users/stats`, {
+        headers: getAuthHeaders()
+      });
+      const data = response.data || {};
+      setDirectoryCounts({
+        total: data.total_users ?? 0,
+        enabled: data.enabled_users ?? 0,
+        disabled: data.disabled_users ?? 0,
+        fetchedAt: data.fetched_at ?? null
+      });
+    } catch (error) {
+      console.error('❌ Failed to fetch AD user counts:', error);
+      message.warning({
+        key: 'user-counts',
+        content: 'ไม่สามารถโหลดจำนวนผู้ใช้จาก AD ได้',
+        duration: 3
+      });
+    }
+  }, [getAuthHeaders]);
+
   const fetchUsers = useCallback(async (forceRefresh = false, ignoreFilters = false) => {
     setLoading(true);
     console.log('🔄 Fetching users...', forceRefresh ? '(Force Refresh)' : '', ignoreFilters ? '(Ignore Filters)' : '');
@@ -270,8 +294,8 @@ const UserManagement = () => {
         const cachedData = apiCache.get(cacheKey);
         if (cachedData) {
           setUsers(cachedData);
-          setLoading(false);
           console.log('✅ Users loaded from cache:', cachedData.length);
+          await fetchDirectoryCounts();
           return { success: true, count: cachedData.length };
         }
       }
@@ -284,8 +308,7 @@ const UserManagement = () => {
 
       const firstPageData = firstPageResponse.data || [];
       setUsers(firstPageData);
-      setLastRefreshTime(new Date());
-      setLoading(false);
+      await fetchDirectoryCounts();
 
       console.log(`✅ Users fetched: ${firstPageData.length}`);
       
@@ -303,7 +326,7 @@ const UserManagement = () => {
     } finally {
       setLoading(false);
     }
-  }, [searchText, departmentFilter, getAuthHeaders]);
+  }, [searchText, departmentFilter, getAuthHeaders, fetchDirectoryCounts]);
 
   // ⚡ Debounced version for search (wait 500ms after user stops typing)
   const debouncedFetchUsers = useMemo(
@@ -466,40 +489,6 @@ const UserManagement = () => {
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [searchText, departmentFilter]);
-
-  // ⚡ Auto-refresh every 60 seconds for real-time updates (optimized from 30s)
-  useEffect(() => {
-    if (!autoRefreshEnabled) {
-      console.log('⏸️ Auto-refresh is disabled');
-      return;
-    }
-    
-    // Check if tab is visible (don't refresh background tabs)
-    if (document.visibilityState === 'hidden') {
-      console.log('⏸️ Tab is hidden - skipping auto-refresh setup');
-      return;
-    }
-    
-    console.log('⏰ Setting up smart auto-refresh (every 60 seconds)');
-    
-    const intervalId = setInterval(() => {
-      // Only refresh if tab is visible
-      if (document.visibilityState === 'visible') {
-        console.log('🔄 Auto-refreshing users... (Smart real-time update)');
-        fetchUsers(true, true).then(() => {
-          setLastRefreshTime(new Date());
-        });
-      } else {
-        console.log('⏸️ Tab is hidden - skipping auto-refresh');
-      }
-    }, 60000); // 60 seconds (optimized from 30s)
-    
-    // Cleanup interval on unmount
-    return () => {
-      console.log('🛑 Clearing auto-refresh interval');
-      clearInterval(intervalId);
-    };
-  }, [fetchUsers, autoRefreshEnabled]);
 
   // ==================== HANDLERS ====================
   
@@ -1271,6 +1260,11 @@ const UserManagement = () => {
     return true;
   }), [users, statusFilter, deduplicateUsers]);
 
+  const isFilteredView = useMemo(
+    () => Boolean(searchText || departmentFilter || statusFilter !== 'all'),
+    [searchText, departmentFilter, statusFilter]
+  );
+
   const paginatedUsers = useMemo(() => {
     const startIndex = (currentPage - 1) * pageSize;
     return filteredUsers.slice(startIndex, startIndex + pageSize);
@@ -1616,7 +1610,7 @@ const UserManagement = () => {
                         fontWeight: 400,
                         borderRadius: 10
                       }}>
-                        Total: {stats.total}
+                        AD Total: {formatCount(directoryCounts.total)}
                       </Tag>
                       <Tag style={{
                         background: '#f6ffed',
@@ -1627,7 +1621,7 @@ const UserManagement = () => {
                         fontWeight: 400,
                         borderRadius: 10
                       }}>
-                        Active: {stats.enabled}
+                        Active: {formatCount(directoryCounts.enabled)}
                       </Tag>
                       <Tag style={{
                         background: '#fff1f0',
@@ -1638,9 +1632,9 @@ const UserManagement = () => {
                         fontWeight: 400,
                         borderRadius: 10
                       }}>
-                        Disabled: {stats.disabled}
+                        Disabled: {formatCount(directoryCounts.disabled)}
                       </Tag>
-                      {autoRefreshEnabled && (
+                      {(searchText || departmentFilter || statusFilter !== 'all') && (
                         <Tag style={{
                           background: '#e6f7ff',
                           border: '1px solid #91d5ff',
@@ -1650,7 +1644,7 @@ const UserManagement = () => {
                           fontWeight: 400,
                           borderRadius: 10
                         }}>
-                          Live
+                          Filtered: {formatCount(stats.total)}
                         </Tag>
                       )}
                     </Space>
@@ -1664,7 +1658,6 @@ const UserManagement = () => {
                   icon={<ReloadOutlined />}
                   onClick={() => {
                     fetchUsers(true);
-                    setLastRefreshTime(new Date());
                   }}
                   loading={loading}
                 >
@@ -1702,7 +1695,7 @@ const UserManagement = () => {
                 size="small"
                 current={currentPage}
                 pageSize={pageSize}
-                total={filteredUsers.length}
+                total={isFilteredView ? filteredUsers.length : directoryCounts.total || filteredUsers.length}
                 onChange={(page, size) => {
                   setCurrentPage(page);
                   setPageSize(size);

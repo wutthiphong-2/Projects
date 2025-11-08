@@ -55,13 +55,12 @@ const Dashboard = () => {
   const [departmentStats, setDepartmentStats] = useState([]);
   const [recentUsers, setRecentUsers] = useState([]);
   const [recentActivities, setRecentActivities] = useState([]);
-  const [systemHealth, setSystemHealth] = useState({
-    userAccountHealth: 0,
-    groupDistribution: 0,
-    ouUtilization: 0
-  });
+  const [recentLogins, setRecentLogins] = useState([]);
+  const [singleLoginUsers, setSingleLoginUsers] = useState([]);
+  const [loadingRecentLogins, setLoadingRecentLogins] = useState(false);
+  const [loadingSingleLoginUsers, setLoadingSingleLoginUsers] = useState(false);
   const { getAuthHeaders } = useAuth();
-  const { notifications } = useNotification();
+  const { notifyError } = useNotification();
 
   const normalizeString = useCallback((value) => (
     value ? value.toString().trim().toLowerCase() : ''
@@ -146,12 +145,11 @@ const Dashboard = () => {
     };
   }, [deriveUniqueUsers, isLikelyNonHumanAccount]);
 
-  const fetchStats = async () => {
+  const fetchStats = useCallback(async () => {
     try {
-      const [usersResponse, groupsResponse, ousResponse, departmentsResponse, activitiesResponse] = await Promise.all([
-        axios.get(`${config.apiUrl}/api/users/`, { 
-          headers: getAuthHeaders(), 
-          params: { page: 1, page_size: 1000 } 
+      const [countsResponse, groupsResponse, ousResponse, departmentsResponse, activitiesResponse] = await Promise.all([
+        axios.get(`${config.apiUrl}/api/users/stats`, {
+          headers: getAuthHeaders()
         }),
         axios.get(`${config.apiUrl}/api/groups/`, { 
           headers: getAuthHeaders(), 
@@ -170,17 +168,13 @@ const Dashboard = () => {
         }).catch(() => ({ data: [] }))
       ]);
 
-      const users = usersResponse.data;
-      const enabledUsers = users.filter(user => user.isEnabled).length;
-      const disabledUsers = users.length - enabledUsers;
+      const countsData = countsResponse.data || {};
+      const totalUsers = countsData.total_users ?? 0;
+      const enabledUsers = countsData.enabled_users ?? 0;
+      const disabledUsers = countsData.disabled_users ?? 0;
       
-      // Calculate System Health
-      const userHealth = users.length > 0 ? Math.round((enabledUsers / users.length) * 100) : 0;
-      const groupDist = groupsResponse.data.length;
-      const ouUtil = ousResponse.data.length;
-
       setStats({
-        totalUsers: users.length,
+        totalUsers,
         enabledUsers,
         disabledUsers,
         totalGroups: groupsResponse.data.length,
@@ -189,18 +183,44 @@ const Dashboard = () => {
       });
       
       setRecentActivities(activitiesResponse.data || []);
-
-      setSystemHealth({
-        userAccountHealth: userHealth,
-        groupDistribution: groupDist,
-        ouUtilization: ouUtil
-      });
     } catch (error) {
       console.error('Error fetching stats:', error);
     }
-  };
+  }, [getAuthHeaders]);
 
-  const fetchDepartmentStats = async () => {
+  const fetchRecentLoginInsights = useCallback(async () => {
+    setLoadingRecentLogins(true);
+    try {
+      const response = await axios.get(`${config.apiUrl}/api/users/login-insights/recent`, {
+        headers: getAuthHeaders(),
+        params: { limit: 10 }
+      });
+      setRecentLogins(response.data || []);
+    } catch (error) {
+      console.error('Error fetching recent login insights:', error);
+      notifyError('โหลดข้อมูลไม่สำเร็จ', 'ไม่สามารถโหลดรายชื่อผู้ที่ล็อกอินล่าสุดได้');
+    } finally {
+      setLoadingRecentLogins(false);
+    }
+  }, [getAuthHeaders, notifyError]);
+
+  const fetchSingleLoginInsights = useCallback(async () => {
+    setLoadingSingleLoginUsers(true);
+    try {
+      const response = await axios.get(`${config.apiUrl}/api/users/login-insights/never`, {
+        headers: getAuthHeaders(),
+        params: { limit: 10 }
+      });
+      setSingleLoginUsers(response.data || []);
+    } catch (error) {
+      console.error('Error fetching single-login insights:', error);
+      notifyError('โหลดข้อมูลไม่สำเร็จ', 'ไม่สามารถโหลดรายชื่อผู้ใช้ที่ล็อกอินครั้งเดียวได้');
+    } finally {
+      setLoadingSingleLoginUsers(false);
+    }
+  }, [getAuthHeaders, notifyError]);
+
+  const fetchDepartmentStats = useCallback(async () => {
     try {
       const [usersResponse] = await Promise.all([
         axios.get(`${config.apiUrl}/api/users/`, { 
@@ -235,9 +255,9 @@ const Dashboard = () => {
     } catch (error) {
       console.error('Error fetching department stats:', error);
     }
-  };
+  }, [getAuthHeaders]);
 
-  const fetchRecentUsers = async () => {
+  const fetchRecentUsers = useCallback(async () => {
     try {
       const response = await axios.get(`${config.apiUrl}/api/users/`, { 
         headers: getAuthHeaders(), 
@@ -256,7 +276,7 @@ const Dashboard = () => {
     } catch (error) {
       console.error('Error fetching recent users:', error);
     }
-  };
+  }, [getAuthHeaders]);
 
   const fetchAllData = useCallback(async () => {
     setLoading(true);
@@ -264,14 +284,16 @@ const Dashboard = () => {
       await Promise.all([
         fetchStats(),
         fetchDepartmentStats(),
-        fetchRecentUsers()
+        fetchRecentUsers(),
+        fetchRecentLoginInsights(),
+        fetchSingleLoginInsights()
       ]);
     } catch (error) {
       console.error('Error fetching dashboard data:', error);
     } finally {
       setLoading(false);
     }
-  }, [getAuthHeaders]);
+  }, [fetchStats, fetchDepartmentStats, fetchRecentUsers, fetchRecentLoginInsights, fetchSingleLoginInsights]);
 
   useEffect(() => {
     fetchAllData();
@@ -393,73 +415,128 @@ const Dashboard = () => {
         </Col>
       </Row>
 
-      {/* System Health Overview */}
+      {/* Login Insights */}
       <Row gutter={[16, 16]} style={{ marginBottom: '20px' }}>
-        <Col span={24}>
-          <Card 
+        <Col xs={24} lg={12}>
+          <Card
             title={
               <Space>
-                <CheckCircleOutlined style={{ color: '#10b981' }} />
-                <span>System Health Overview</span>
+                <ClockCircleOutlined className="icon-blue" />
+                <span>Latest User Logins (Top 10)</span>
               </Space>
             }
-            className="system-health-card"
+            extra={
+              <Button type="link" onClick={fetchRecentLoginInsights} loading={loadingRecentLogins}>
+                รีเฟรช
+              </Button>
+            }
           >
-            <Row gutter={[16, 16]}>
-              <Col xs={24} md={8}>
-                <div className="health-item">
-                  <div className="health-label">
-                    <UserOutlined /> User Account Status
-                  </div>
-                  <Progress 
-                    type="circle" 
-                    percent={systemHealth.userAccountHealth} 
-                    strokeColor={{
-                      '0%': '#10b981',
-                      '100%': '#3b82f6',
-                    }}
-                    width={120}
-                  />
-                  <div className="health-description">
-                    {systemHealth.userAccountHealth}% Accounts Active
-                  </div>
-                </div>
-              </Col>
-              <Col xs={24} md={8}>
-                <div className="health-item">
-                  <div className="health-label">
-                    <TeamOutlined /> Active Groups
-                  </div>
-                  <Progress 
-                    type="circle" 
-                    percent={Math.min(100, (systemHealth.groupDistribution / 50) * 100)}
-                    strokeColor="#8b5cf6"
-                    width={120}
-                    format={() => systemHealth.groupDistribution}
-                  />
-                  <div className="health-description">
-                    {systemHealth.groupDistribution} Groups in System
-                  </div>
-                </div>
-              </Col>
-              <Col xs={24} md={8}>
-                <div className="health-item">
-                  <div className="health-label">
-                    <FolderOutlined /> OU Structure
-                  </div>
-                  <Progress 
-                    type="circle" 
-                    percent={Math.min(100, (systemHealth.ouUtilization / 20) * 100)}
-                    strokeColor="#f59e0b"
-                    width={120}
-                    format={() => systemHealth.ouUtilization}
-                  />
-                  <div className="health-description">
-                    {systemHealth.ouUtilization} OUs in System
-                  </div>
-                </div>
-              </Col>
-            </Row>
+            {loadingRecentLogins ? (
+              <div style={{ textAlign: 'center', padding: '24px 0' }}>
+                <Spin />
+              </div>
+            ) : recentLogins.length > 0 ? (
+              <List
+                itemLayout="horizontal"
+                dataSource={recentLogins}
+                renderItem={(item, index) => (
+                  <List.Item>
+                    <List.Item.Meta
+                      avatar={<Avatar icon={<UserOutlined />} />}
+                      title={
+                        <Space size={6}>
+                          <Text strong>{index + 1}.</Text>
+                          <span>{item.display_name || item.username || 'ไม่ระบุชื่อ'}</span>
+                          {item.department && (
+                            <Tag color="blue" style={{ marginLeft: 4 }}>
+                              {item.department}
+                            </Tag>
+                          )}
+                        </Space>
+                      }
+                      description={
+                        <Space size="small" split={<span>•</span>} wrap>
+                          {item.username && (
+                            <Text type="secondary">Username: {item.username}</Text>
+                          )}
+                          <Text type="secondary">
+                            Last Login: {formatDate(item.last_login)}
+                          </Text>
+                          {item.logon_count !== undefined && (
+                            <Text type="secondary">Logons: {item.logon_count}</Text>
+                          )}
+                        </Space>
+                      }
+                    />
+                  </List.Item>
+                )}
+              />
+            ) : (
+              <Empty description="ไม่พบข้อมูลการล็อกอินล่าสุด" image={Empty.PRESENTED_IMAGE_SIMPLE} />
+            )}
+          </Card>
+        </Col>
+
+        <Col xs={24} lg={12}>
+          <Card
+            title={
+              <Space>
+                <ExclamationCircleOutlined className="icon-orange" />
+                <span>Logged Once & Never Returned (Top 10)</span>
+              </Space>
+            }
+            extra={
+              <Button type="link" onClick={fetchSingleLoginInsights} loading={loadingSingleLoginUsers}>
+                รีเฟรช
+              </Button>
+            }
+          >
+            {loadingSingleLoginUsers ? (
+              <div style={{ textAlign: 'center', padding: '24px 0' }}>
+                <Spin />
+              </div>
+            ) : singleLoginUsers.length > 0 ? (
+              <List
+                itemLayout="horizontal"
+                dataSource={singleLoginUsers}
+                renderItem={(item, index) => (
+                  <List.Item>
+                    <List.Item.Meta
+                      avatar={<Avatar icon={<UserOutlined />} />}
+                      title={
+                        <Space size={6}>
+                          <Text strong>{index + 1}.</Text>
+                          <span>{item.display_name || item.username || 'ไม่ระบุชื่อ'}</span>
+                          {item.department && (
+                            <Tag color="gold" style={{ marginLeft: 4 }}>
+                              {item.department}
+                            </Tag>
+                          )}
+                        </Space>
+                      }
+                      description={
+                        <Space size="small" split={<span>•</span>} wrap>
+                          {item.username && (
+                            <Text type="secondary">Username: {item.username}</Text>
+                          )}
+                          <Text type="secondary">
+                            First Login: {formatDate(item.first_login)}
+                          </Text>
+                          <Text type="secondary">
+                            Last Login: {formatDate(item.last_login)}
+                          </Text>
+                          {item.logon_count !== undefined && (
+                            <Text type="secondary">Logons: {item.logon_count}</Text>
+                          )}
+                        </Space>
+                      }
+                    />
+                  </List.Item>
+                )}
+              />
+            ) : (
+              <Empty description="ไม่พบผู้ใช้ที่ล็อกอินครั้งเดียว" image={Empty.PRESENTED_IMAGE_SIMPLE} />
+            )}
           </Card>
         </Col>
       </Row>
@@ -540,66 +617,7 @@ const Dashboard = () => {
           </Card>
         </Col>
 
-        {/* Department Statistics */}
-        <Col xs={24} lg={12}>
-          <Card 
-            title={
-              <Space>
-                <PieChartOutlined className="icon-purple" />
-                <span>Department Distribution (Top 5)</span>
-              </Space>
-            }
-            className="department-stats-card"
-            extra={
-              <Button 
-                type="link" 
-                size="small"
-                onClick={() => navigate('/users')}
-              >
-                View All
-              </Button>
-            }
-          >
-            {departmentStats.length > 0 ? (
-              <List
-                dataSource={departmentStats}
-                renderItem={(dept, index) => (
-                  <List.Item>
-                    <div style={{ width: '100%' }}>
-                      <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '8px' }}>
-                        <Space>
-                          <Avatar 
-                            style={{ 
-                              backgroundColor: ['#3b82f6', '#8b5cf6', '#f59e0b', '#10b981', '#06b6d4'][index % 5]
-                            }}
-                          >
-                            {index + 1}
-                          </Avatar>
-                          <Text strong>{dept.name}</Text>
-                        </Space>
-                        <Space>
-                          <Text type="secondary">{dept.count} users</Text>
-                          <Tag color="blue">{dept.percentage}%</Tag>
-                        </Space>
-                      </div>
-                      <Progress 
-                        percent={dept.percentage} 
-                        strokeColor={['#3b82f6', '#8b5cf6', '#f59e0b', '#10b981', '#06b6d4'][index % 5]}
-                        showInfo={false}
-                      />
-                    </div>
-                  </List.Item>
-                )}
-              />
-            ) : (
-              <Empty description="No department data" />
-            )}
-          </Card>
-        </Col>
-      </Row>
-
-      {/* Recent Users Row */}
-      <Row gutter={[16, 16]} style={{ marginTop: '20px' }}>
+        {/* Recently Created Users */}
         <Col xs={24} lg={12}>
           <Card 
             title={

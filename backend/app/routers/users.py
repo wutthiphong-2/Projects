@@ -3,7 +3,7 @@ from pydantic import BaseModel, EmailStr
 from typing import List, Optional, Dict, Any
 from ldap3 import MODIFY_REPLACE, MODIFY_ADD
 import ldap3
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 import logging
 import re
 import platform
@@ -98,10 +98,147 @@ class UserResponse(BaseModel):
     lastLogon: Optional[str] = None
     pwdLastSet: Optional[str] = None
 
+class UserStatsResponse(BaseModel):
+    total_users: int
+    enabled_users: int
+    disabled_users: int
+    fetched_at: datetime
+
+class LoginInsightEntry(BaseModel):
+    dn: str
+    display_name: Optional[str] = None
+    username: Optional[str] = None
+    email: Optional[str] = None
+    department: Optional[str] = None
+    last_login: Optional[datetime] = None
+    first_login: Optional[datetime] = None
+    when_created: Optional[datetime] = None
+    logon_count: Optional[int] = None
+
 # Helper functions
+THAILAND_TZ = timezone(timedelta(hours=7))
+WINDOWS_EPOCH_OFFSET_SECONDS = 11644473600
+MAX_FILETIME = 9223372036854775807
+
 def is_account_disabled(user_account_control: int) -> bool:
     """Check if user account is disabled"""
     return bool(user_account_control & 0x2)
+
+def ensure_timezone(dt: datetime) -> datetime:
+    if dt.tzinfo is None:
+        dt = dt.replace(tzinfo=timezone.utc)
+    return dt.astimezone(THAILAND_TZ)
+
+def ad_timestamp_to_datetime(value: Optional[str]) -> Optional[datetime]:
+    """Convert Windows FILETIME string or ISO datetime to timezone-aware datetime"""
+    if value is None or value == "0":
+        return None
+    try:
+        if isinstance(value, datetime):
+            return ensure_timezone(value)
+        if isinstance(value, str):
+            cleaned = value.strip()
+            # Handle LDAP3 auto-converted datetime strings
+            if "-" in cleaned and ":" in cleaned:
+                try:
+                    dt = datetime.fromisoformat(cleaned.replace("Z", "+00:00"))
+                    return ensure_timezone(dt)
+                except ValueError:
+                    pass
+            filetime = int(cleaned)
+            if filetime in (0, MAX_FILETIME):
+                return None
+            unix_timestamp = (filetime / 10_000_000) - WINDOWS_EPOCH_OFFSET_SECONDS
+            dt_utc = datetime.fromtimestamp(unix_timestamp, tz=timezone.utc)
+            return dt_utc.astimezone(THAILAND_TZ)
+    except Exception as exc:
+        logger.debug(f"Failed to convert FILETIME '{value}': {exc}")
+        return None
+
+def parse_when_created(value: Optional[str]) -> Optional[datetime]:
+    """Parse AD generalized time string to datetime"""
+    if value is None:
+        return None
+    try:
+        if isinstance(value, datetime):
+            return ensure_timezone(value)
+        if isinstance(value, str):
+            cleaned = value.strip()
+            if "-" in cleaned and ":" in cleaned:
+                try:
+                    dt = datetime.fromisoformat(cleaned.replace("Z", "+00:00"))
+                    return ensure_timezone(dt)
+                except ValueError:
+                    pass
+            formats = ("%Y%m%d%H%M%S.%fZ", "%Y%m%d%H%M%SZ")
+            for fmt in formats:
+                try:
+                    dt_utc = datetime.strptime(cleaned, fmt).replace(tzinfo=timezone.utc)
+                    return dt_utc.astimezone(THAILAND_TZ)
+                except ValueError:
+                    continue
+        logger.debug(f"Unsupported whenCreated format: {value}")
+    except Exception as exc:
+        logger.debug(f"Failed to parse whenCreated '{value}': {exc}")
+    return None
+
+def parse_logon_count(value: Optional[str]) -> int:
+    if not value:
+        return 0
+    try:
+        return int(value)
+    except (TypeError, ValueError):
+        return 0
+
+def is_likely_system_account(username: Optional[str], display_name: Optional[str], email: Optional[str]) -> bool:
+    if not username:
+        return False
+    username_lower = username.lower()
+    display_lower = (display_name or "").lower()
+
+    # Machine accounts end with $
+    if username_lower.endswith("$"):
+        return True
+
+    # Presence of email typically indicates real user
+    if email and "@" in email:
+        return False
+
+    system_prefixes = ("adm", "svc", "sys", "test", "lab", "script", "automation")
+    if username_lower.startswith(system_prefixes):
+        return True
+    if display_lower.startswith(system_prefixes):
+        return True
+
+    return False
+
+def build_login_insight_entry(entry: tuple) -> LoginInsightEntry:
+    dn, attrs = entry
+    username = (attrs.get("sAMAccountName") or [None])[0]
+    display_name = (attrs.get("displayName") or attrs.get("cn") or [None])[0]
+    email = (attrs.get("mail") or [None])[0]
+    department = (attrs.get("department") or [None])[0]
+
+    last_logon_precise_raw = (attrs.get("lastLogon") or [None])[0]
+    last_logon_replicated_raw = (attrs.get("lastLogonTimestamp") or [None])[0]
+    last_login = ad_timestamp_to_datetime(last_logon_precise_raw) or ad_timestamp_to_datetime(last_logon_replicated_raw)
+
+    when_created = parse_when_created((attrs.get("whenCreated") or [None])[0])
+    first_login = when_created
+
+    logon_count = parse_logon_count((attrs.get("logonCount") or ["0"])[0])
+
+    return LoginInsightEntry(
+        dn=dn,
+        display_name=display_name,
+        username=username,
+        email=email,
+        department=department,
+        last_login=last_login,
+        first_login=first_login,
+        when_created=when_created,
+        logon_count=logon_count,
+    )
 
 def format_user_data(entry: tuple, full_details: bool = True) -> Dict[str, Any]:
     """Format LDAP entry data for response
@@ -287,8 +424,19 @@ async def get_users(
         results = ldap_conn.search(
             settings.LDAP_BASE_DN,
             filter_str,
-            ["cn", "sAMAccountName", "mail", "displayName", "department", 
-             "physicalDeliveryOfficeName", "description", "userAccountControl", "whenCreated"]
+            [
+                "cn",
+                "sAMAccountName",
+                "mail",
+                "displayName",
+                "title",
+                "department",
+                "company",
+                "physicalDeliveryOfficeName",
+                "description",
+                "userAccountControl",
+                "whenCreated"
+            ]
         )
         
         if results is None:
@@ -314,6 +462,151 @@ async def get_users(
     except Exception as e:
         logger.error(f"Error getting users: {e}")
         raise HTTPException(status_code=500, detail="Failed to retrieve users")
+
+
+@router.get("/stats", response_model=UserStatsResponse)
+async def get_user_stats(token: str = Depends(verify_token)):
+    """Return real-time user counts from Active Directory"""
+    ldap_conn = get_ldap_connection()
+    try:
+        results = ldap_conn.search(
+            settings.LDAP_BASE_DN,
+            "(&(objectCategory=person)(objectClass=user))",
+            ["userAccountControl"]
+        )
+
+        if results is None:
+            raise HTTPException(status_code=500, detail="Failed to search users")
+
+        total_users = len(results)
+        disabled_users = 0
+
+        for _, attrs in results:
+            uac_values = attrs.get("userAccountControl", [])
+            is_disabled = False
+            for value in uac_values:
+                try:
+                    if int(value) & 0b10:
+                        is_disabled = True
+                        break
+                except (TypeError, ValueError):
+                    continue
+            if is_disabled:
+                disabled_users += 1
+
+        enabled_users = max(total_users - disabled_users, 0)
+
+        return UserStatsResponse(
+            total_users=total_users,
+            enabled_users=enabled_users,
+            disabled_users=disabled_users,
+            fetched_at=datetime.now().astimezone()
+        )
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Error getting user stats: {e}")
+        raise HTTPException(status_code=500, detail="Failed to retrieve user statistics")
+
+
+@router.get("/login-insights/recent", response_model=List[LoginInsightEntry])
+async def get_recent_logins(
+    limit: int = Query(10, ge=1, le=100),
+    token: str = Depends(verify_token)
+):
+    """Return top N users with the most recent logins"""
+    ldap_conn = get_ldap_connection()
+    try:
+        results = ldap_conn.search(
+            settings.LDAP_BASE_DN,
+            "(&(objectCategory=person)(objectClass=user))",
+            [
+                "cn",
+                "displayName",
+                "sAMAccountName",
+                "mail",
+                "department",
+                "lastLogon",
+                "lastLogonTimestamp",
+                "logonCount",
+                "whenCreated"
+            ]
+        )
+
+        if results is None:
+            raise HTTPException(status_code=500, detail="Failed to search users")
+
+        insights: List[LoginInsightEntry] = []
+        for entry in results:
+            record = build_login_insight_entry(entry)
+            if is_likely_system_account(record.username, record.display_name, record.email):
+                continue
+            if not record.last_login:
+                continue
+            insights.append(record)
+
+        insights.sort(
+            key=lambda item: item.last_login or datetime.min.replace(tzinfo=timezone.utc),
+            reverse=True
+        )
+
+        return insights[:limit]
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Error getting recent login insights: {e}")
+        raise HTTPException(status_code=500, detail="Failed to retrieve recent login insights")
+
+
+@router.get("/login-insights/never", response_model=List[LoginInsightEntry])
+async def get_users_single_login(
+    limit: int = Query(10, ge=1, le=100),
+    token: str = Depends(verify_token)
+):
+    """Return top N users who have logged in only once (first login with no subsequent logins)"""
+    ldap_conn = get_ldap_connection()
+    try:
+        results = ldap_conn.search(
+            settings.LDAP_BASE_DN,
+            "(&(objectCategory=person)(objectClass=user))",
+            [
+                "cn",
+                "displayName",
+                "sAMAccountName",
+                "mail",
+                "department",
+                "lastLogon",
+                "lastLogonTimestamp",
+                "logonCount",
+                "whenCreated"
+            ]
+        )
+
+        if results is None:
+            raise HTTPException(status_code=500, detail="Failed to search users")
+
+        insights: List[LoginInsightEntry] = []
+        for entry in results:
+            record = build_login_insight_entry(entry)
+            if is_likely_system_account(record.username, record.display_name, record.email):
+                continue
+
+            if record.logon_count <= 1 and record.last_login:
+                # Treat the only recorded login as both first/last login
+                record.first_login = record.last_login
+                insights.append(record)
+
+        insights.sort(
+            key=lambda item: item.last_login or datetime.max.replace(tzinfo=timezone.utc),
+            reverse=False
+        )
+
+        return insights[:limit]
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Error getting single-login insights: {e}")
+        raise HTTPException(status_code=500, detail="Failed to retrieve single-login insights")
 
 
 @router.get("/departments", response_model=List[str])
@@ -1066,34 +1359,22 @@ async def get_login_history(dn: str, token_data = Depends(verify_token)):
     """Get login history for a user"""
     ldap_conn = get_ldap_connection()
     
-    def convert_filetime_to_datetime(filetime_str):
-        """Convert Windows FILETIME to datetime"""
+    def convert_filetime_to_datetime(value):
+        """Convert LDAP timestamp (FILETIME or ISO string) to datetime"""
         try:
-            if not filetime_str or filetime_str == "0":
-                return None
-            
-            # Convert to integer
-            filetime = int(filetime_str)
-            
-            if filetime == 0 or filetime == 9223372036854775807:  # Max int64 means never
-                return None
-            
-            # Windows FILETIME is 100-nanosecond intervals since 1601-01-01
-            # Convert to seconds
-            timestamp_seconds = filetime / 10000000.0
-            
-            # Windows epoch: January 1, 1601
-            # Unix epoch: January 1, 1970
-            # Difference in seconds: 11644473600
-            unix_timestamp = timestamp_seconds - 11644473600
-            
-            # Convert to datetime
-            from datetime import datetime, timezone
-            dt = datetime.fromtimestamp(unix_timestamp, tz=timezone.utc)
-            return dt
-        except Exception as e:
-            logger.error(f"Error converting filetime {filetime_str}: {e}")
+            return ad_timestamp_to_datetime(value)
+        except Exception as exc:
+            logger.error(f"Error converting filetime {value}: {exc}")
             return None
+
+    def get_first(attr_dict, key, default=None):
+        values = attr_dict.get(key)
+        if not values:
+            return default
+        try:
+            return values[0]
+        except (IndexError, TypeError):
+            return default
     
     try:
         results = ldap_conn.search(
@@ -1126,13 +1407,13 @@ async def get_login_history(dn: str, token_data = Depends(verify_token)):
         login_history = []
         
         # Get user info
-        username = attrs.get("sAMAccountName", [None])[0]
-        cn = attrs.get("cn", [None])[0]
-        logon_count = attrs.get("logonCount", ["0"])[0] or "0"
+        username = get_first(attrs, "sAMAccountName")
+        cn = get_first(attrs, "cn")
+        logon_count = get_first(attrs, "logonCount", "0") or "0"
         
         # Get raw values for debugging
-        last_logon_raw = attrs.get("lastLogon", [None])[0]
-        last_logon_timestamp_raw = attrs.get("lastLogonTimestamp", [None])[0]
+        last_logon_raw = get_first(attrs, "lastLogon")
+        last_logon_timestamp_raw = get_first(attrs, "lastLogonTimestamp")
         
         logger.info(f"Login history for {username}: lastLogon={last_logon_raw}, lastLogonTimestamp={last_logon_timestamp_raw}, logonCount={logon_count}")
         
