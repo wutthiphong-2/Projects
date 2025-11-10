@@ -45,7 +45,9 @@ class UserCreate(BaseModel):
     ou: Optional[str] = None  # OU DN where user will be created
     groups: Optional[List[str]] = []  # List of group DNs to add user to
     mustChangePassword: Optional[bool] = False  # User must change password at next logon
+    userCannotChangePassword: Optional[bool] = False  # Prevent user from changing password
     passwordNeverExpires: Optional[bool] = False  # Password never expires
+    storePasswordUsingReversibleEncryption: Optional[bool] = False  # Store password using reversible encryption
     accountDisabled: Optional[bool] = False  # Create account as disabled
 
 class UserUpdate(BaseModel):
@@ -68,6 +70,13 @@ class UserUpdate(BaseModel):
     postalCode: Optional[str] = None
     co: Optional[str] = None  # country in AD
     description: Optional[str] = None
+
+class AccountOptionsResponse(BaseModel):
+    mustChangePassword: bool = False
+    userCannotChangePassword: bool = False
+    passwordNeverExpires: bool = False
+    storePasswordUsingReversibleEncryption: bool = False
+
 
 class UserResponse(BaseModel):
     dn: str
@@ -93,6 +102,7 @@ class UserResponse(BaseModel):
     userAccountControl: int
     memberOf: List[str]
     isEnabled: bool
+    accountOptions: AccountOptionsResponse = AccountOptionsResponse()
     whenCreated: Optional[str] = None
     whenChanged: Optional[str] = None
     lastLogon: Optional[str] = None
@@ -256,6 +266,20 @@ def format_user_data(entry: tuple, full_details: bool = True) -> Dict[str, Any]:
     
     user_account_control = int(attrs.get("userAccountControl", ["0"])[0]) if attrs.get("userAccountControl") else 0
     
+    pwd_last_set_raw = (attrs.get("pwdLastSet", [None]) or [None])[0]
+    must_change_password = False
+    if isinstance(pwd_last_set_raw, str):
+        must_change_password = pwd_last_set_raw == "0"
+    elif isinstance(pwd_last_set_raw, (int, float)):
+        must_change_password = pwd_last_set_raw == 0
+
+    account_options = {
+        "mustChangePassword": must_change_password,
+        "userCannotChangePassword": bool(user_account_control & 0x40),
+        "passwordNeverExpires": bool(user_account_control & 0x10000),
+        "storePasswordUsingReversibleEncryption": bool(user_account_control & 0x80),
+    }
+
     # Always include basic info
     result = {
         "dn": dn,
@@ -269,6 +293,7 @@ def format_user_data(entry: tuple, full_details: bool = True) -> Dict[str, Any]:
         "description": get_attr("description") or None,
         "userAccountControl": user_account_control,
         "isEnabled": not is_account_disabled(user_account_control),
+        "accountOptions": account_options,
     }
     
     # Only include full details when requested (single user view)
@@ -781,6 +806,12 @@ async def create_user(user_data: UserCreate, request: Request, token_data = Depe
         if user_data.passwordNeverExpires:
             uac |= 65536  # Add DONT_EXPIRE_PASSWD flag
             logger.info("⏳ Password set to NEVER EXPIRE")
+        if user_data.userCannotChangePassword:
+            uac |= 64  # Add PASSWD_CANT_CHANGE flag
+            logger.info("🚫 User will be prevented from changing password")
+        if user_data.storePasswordUsingReversibleEncryption:
+            uac |= 128  # Add ENCRYPTED_TEXT_PWD_ALLOWED flag
+            logger.info("⚠️ Password will be stored using reversible encryption")
         
         # Prepare user attributes
         user_attrs = {
@@ -870,6 +901,10 @@ async def create_user(user_data: UserCreate, request: Request, token_data = Depe
                 
                 if user_data.passwordNeverExpires:
                     final_uac |= 65536  # Add DONT_EXPIRE_PASSWD
+                if user_data.userCannotChangePassword:
+                    final_uac |= 64  # Add PASSWD_CANT_CHANGE flag
+                if user_data.storePasswordUsingReversibleEncryption:
+                    final_uac |= 128  # Add ENCRYPTED_TEXT_PWD_ALLOWED flag
                 
                 enable_mod = [(MODIFY_REPLACE, "userAccountControl", [str(final_uac)])]
                 if ldap_conn.modify_entry(user_dn, enable_mod):

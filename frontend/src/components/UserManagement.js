@@ -102,8 +102,9 @@ const UserManagement = () => {
   const [currentTab, setCurrentTab] = useState('1');
   const [accountOptions, setAccountOptions] = useState({
     mustChangePassword: false,
+    userCannotChangePassword: false,
     passwordNeverExpires: false,
-    accountDisabled: false
+    storePasswordUsingReversibleEncryption: false
   });
   const [suggestedGroupsData, setSuggestedGroupsData] = useState(null); // Stores analysis results
   
@@ -179,6 +180,43 @@ const UserManagement = () => {
   const [userPermissions, setUserPermissions] = useState([]);
   const [loginHistory, setLoginHistory] = useState([]);
   const [passwordExpiry, setPasswordExpiry] = useState(null);
+  const accountOptionDetails = useMemo(() => {
+    const options = selectedUser?.accountOptions || {};
+    return [
+      {
+        key: 'mustChangePassword',
+        label: 'User must change password at next logon',
+        description: 'Forces password change on first login',
+        icon: <CheckCircleOutlined style={{ color: '#10b981' }} />,
+        inactiveIcon: <CloseCircleOutlined style={{ color: '#d1d5db' }} />,
+        active: Boolean(options.mustChangePassword)
+      },
+      {
+        key: 'userCannotChangePassword',
+        label: 'User cannot change password',
+        description: 'Locks the password change option for this account',
+        icon: <LockOutlined style={{ color: '#f59e0b' }} />,
+        inactiveIcon: <UnlockOutlined style={{ color: '#d1d5db' }} />,
+        active: Boolean(options.userCannotChangePassword)
+      },
+      {
+        key: 'passwordNeverExpires',
+        label: 'Password never expires',
+        description: 'User will not be required to change password',
+        icon: <ClockCircleOutlined style={{ color: '#3b82f6' }} />,
+        inactiveIcon: <ClockCircleOutlined style={{ color: '#d1d5db' }} />,
+        active: Boolean(options.passwordNeverExpires)
+      },
+      {
+        key: 'storePasswordUsingReversibleEncryption',
+        label: 'Store password using reversible encryption',
+        description: 'Only needed for legacy protocols requiring clear-text access',
+        icon: <InfoCircleOutlined style={{ color: '#6366f1' }} />,
+        inactiveIcon: <InfoCircleOutlined style={{ color: '#d1d5db' }} />,
+        active: Boolean(options.storePasswordUsingReversibleEncryption)
+      }
+    ];
+  }, [selectedUser]);
   
   const [form] = Form.useForm();
   const [passwordForm] = Form.useForm();
@@ -517,8 +555,9 @@ const UserManagement = () => {
     setStep2Valid(true);
     setAccountOptions({
       mustChangePassword: false,
+      userCannotChangePassword: false,
       passwordNeverExpires: false,
-      accountDisabled: false
+      storePasswordUsingReversibleEncryption: false
     });
     setIsCreateModalVisible(true);
   };
@@ -976,8 +1015,9 @@ const UserManagement = () => {
         dataToSend.groups = selectedGroups;
       }
       dataToSend.mustChangePassword = accountOptions.mustChangePassword;
+      dataToSend.userCannotChangePassword = accountOptions.userCannotChangePassword;
       dataToSend.passwordNeverExpires = accountOptions.passwordNeverExpires;
-      dataToSend.accountDisabled = accountOptions.accountDisabled;
+      dataToSend.storePasswordUsingReversibleEncryption = accountOptions.storePasswordUsingReversibleEncryption;
       
       const response = await axios.post(`${config.apiUrl}/api/users/`, dataToSend, {
         headers: getAuthHeaders()
@@ -2062,6 +2102,17 @@ const UserManagement = () => {
                   <Divider style={{ margin: '8px 0' }} />
                   <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
                     <div>
+                      <Text strong>User cannot change password</Text>
+                      <div><Text type="secondary" style={{ fontSize: 12 }}>Locks the password change option for this account</Text></div>
+                    </div>
+                    <Switch
+                      checked={accountOptions.userCannotChangePassword}
+                      onChange={(checked) => setAccountOptions({...accountOptions, userCannotChangePassword: checked})}
+                    />
+                  </div>
+                  <Divider style={{ margin: '8px 0' }} />
+                  <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                    <div>
                       <Text strong>Password never expires</Text>
                       <div><Text type="secondary" style={{ fontSize: 12 }}>User won't need to change password</Text></div>
                     </div>
@@ -2073,12 +2124,12 @@ const UserManagement = () => {
                   <Divider style={{ margin: '8px 0' }} />
                   <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
                     <div>
-                      <Text strong>Create account as disabled</Text>
-                      <div><Text type="secondary" style={{ fontSize: 12 }}>Account will be created but not active</Text></div>
+                      <Text strong>Store password using reversible encryption</Text>
+                      <div><Text type="secondary" style={{ fontSize: 12 }}>Required only for legacy protocols that need clear-text password access</Text></div>
                     </div>
                     <Switch
-                      checked={accountOptions.accountDisabled}
-                      onChange={(checked) => setAccountOptions({...accountOptions, accountDisabled: checked})}
+                      checked={accountOptions.storePasswordUsingReversibleEncryption}
+                      onChange={(checked) => setAccountOptions({...accountOptions, storePasswordUsingReversibleEncryption: checked})}
                     />
                   </div>
                 </Space>
@@ -2321,19 +2372,28 @@ const UserManagement = () => {
                           Must change password at next logon
                         </Text>
                       )}
+                      {accountOptions.userCannotChangePassword && (
+                        <Text style={{ fontSize: 12 }}>
+                          <LockOutlined style={{ color: '#f59e0b', marginRight: 6 }} />
+                          User cannot change password
+                        </Text>
+                      )}
                       {accountOptions.passwordNeverExpires && (
                         <Text style={{ fontSize: 12 }}>
                           <CheckCircleOutlined style={{ color: '#10b981', marginRight: 6 }} />
                           Password never expires
                         </Text>
                       )}
-                      {accountOptions.accountDisabled && (
+                      {accountOptions.storePasswordUsingReversibleEncryption && (
                         <Text style={{ fontSize: 12 }}>
-                          <CloseCircleOutlined style={{ color: '#ef4444', marginRight: 6 }} />
-                          Account will be disabled
+                          <InfoCircleOutlined style={{ color: '#3b82f6', marginRight: 6 }} />
+                          Store password using reversible encryption
                         </Text>
                       )}
-                      {!accountOptions.mustChangePassword && !accountOptions.passwordNeverExpires && !accountOptions.accountDisabled && (
+                      {!accountOptions.mustChangePassword
+                        && !accountOptions.userCannotChangePassword
+                        && !accountOptions.passwordNeverExpires
+                        && !accountOptions.storePasswordUsingReversibleEncryption && (
                         <Text type="secondary" style={{ fontSize: 12 }}>
                           Standard settings
                         </Text>
@@ -3045,6 +3105,76 @@ const UserManagement = () => {
                   Reset Password
                 </Button>
               </Space>
+            </TabPane>
+
+            <TabPane
+              tab={
+                <span>
+                  <KeyOutlined />
+                  Account Options
+                </span>
+              }
+              key="account-options"
+            >
+              <Card
+                size="small"
+                bodyStyle={{ padding: 0 }}
+                style={{
+                  background: '#ffffff',
+                  border: '1px solid #e5e7eb',
+                  borderRadius: 8
+                }}
+                title={
+                  <Space align="center">
+                    <KeyOutlined style={{ color: '#2563eb' }} />
+                    <Text strong>User Account Options</Text>
+                  </Space>
+                }
+                headStyle={{
+                  background: '#f8fafc',
+                  borderBottom: '1px solid #e5e7eb'
+                }}
+              >
+                <List
+                  itemLayout="horizontal"
+                  dataSource={accountOptionDetails}
+                  renderItem={(item) => (
+                    <List.Item
+                      style={{ borderBottom: '1px solid #f3f4f6', padding: '12px 16px' }}
+                      actions={[
+                        <Switch
+                          key={`${item.key}-switch`}
+                          checked={item.active}
+                          disabled
+                          style={{ background: item.active ? '#10b981' : undefined }}
+                        />
+                      ]}
+                    >
+                      <List.Item.Meta
+                        avatar={
+                          <Avatar
+                            icon={item.active ? item.icon : item.inactiveIcon}
+                            style={{
+                              background: item.active ? '#ecfdf5' : '#f3f4f6',
+                              color: item.active ? '#047857' : '#6b7280'
+                            }}
+                          />
+                        }
+                        title={
+                          <Text strong style={{ fontSize: 13 }}>
+                            {item.label}
+                          </Text>
+                        }
+                        description={
+                          <Text type="secondary" style={{ fontSize: 12 }}>
+                            {item.description}
+                          </Text>
+                        }
+                      />
+                    </List.Item>
+                  )}
+                />
+              </Card>
             </TabPane>
 
             <TabPane
