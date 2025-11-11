@@ -93,6 +93,7 @@ const UserManagement = () => {
   const [statusFilter, setStatusFilter] = useState('all');
   const [departments, setDepartments] = useState([]);
   const [availableGroups, setAvailableGroups] = useState([]);
+  const [ouFilter, setOuFilter] = useState('');
   
   // Enhanced user creation states
   const [availableOUs, setAvailableOUs] = useState([]);
@@ -154,6 +155,7 @@ const UserManagement = () => {
   const [currentPage, setCurrentPage] = useState(1);
   const [pageSize, setPageSize] = useState(30);
   const [tableScrollY, setTableScrollY] = useState(520);
+  const [selectedRowKeys, setSelectedRowKeys] = useState([]);
   
   const updateTableScrollY = useCallback(() => {
     if (typeof window === 'undefined') return;
@@ -317,6 +319,11 @@ const UserManagement = () => {
           params.department = departmentFilter;
           console.log('🏢 Department filter:', departmentFilter);
         }
+
+        if (ouFilter) {
+          params.ou = ouFilter;
+          console.log('📁 OU filter:', ouFilter);
+        }
       } else {
         console.log('⚠️ Ignoring all filters - fetching ALL users from AD');
       }
@@ -364,7 +371,7 @@ const UserManagement = () => {
     } finally {
       setLoading(false);
     }
-  }, [searchText, departmentFilter, getAuthHeaders, fetchDirectoryCounts]);
+  }, [searchText, departmentFilter, ouFilter, getAuthHeaders, fetchDirectoryCounts]);
 
   // ⚡ Debounced version for search (wait 500ms after user stops typing)
   const debouncedFetchUsers = useMemo(
@@ -518,7 +525,7 @@ const UserManagement = () => {
 
   // ⚡ Auto-search when searchText or departmentFilter changes (with debounce)
   useEffect(() => {
-    console.log('🔍 Search/filter changed - debouncing...', searchText, departmentFilter);
+    console.log('🔍 Search/filter changed - debouncing...', searchText, departmentFilter, ouFilter);
     debouncedFetchUsers(false, false);
     
     // Cleanup debounce on unmount
@@ -526,7 +533,7 @@ const UserManagement = () => {
       debouncedFetchUsers.cancel();
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [searchText, departmentFilter]);
+  }, [searchText, departmentFilter, ouFilter]);
 
   // ==================== HANDLERS ====================
   
@@ -534,9 +541,17 @@ const UserManagement = () => {
     setDepartmentFilter(value);
   };
 
+  const handleOuFilterChange = (value) => {
+    setOuFilter(value || '');
+  };
+
   const handleStatusFilterChange = (value) => {
     setStatusFilter(value);
   };
+
+  useEffect(() => {
+    setCurrentPage(1);
+  }, [ouFilter]);
 
   const handleViewDetails = async (user) => {
     setSelectedUser(user);
@@ -1178,7 +1193,7 @@ const UserManagement = () => {
       // Remove fields that shouldn't be updated or are empty
       const updateData = {};
       Object.keys(formValues).forEach(key => {
-        if (formValues[key] !== undefined && formValues[key] !== null && formValues[key] !== '') {
+        if (formValues[key] !== undefined && formValues[key] !== null) {
           // Skip sAMAccountName and password as they're not editable
           if (key !== 'sAMAccountName' && key !== 'password') {
             updateData[key] = formValues[key];
@@ -1202,6 +1217,53 @@ const UserManagement = () => {
       console.log('✅ User updated:', response.data);
       
       notifyUserUpdated(updateData.cn || editingUser.cn || editingUser.displayName);
+      
+      const updatedDn = response.data?.dn || editingUser.dn;
+      const oldDn = editingUser.dn;
+      const refreshedUser = response.data?.user ? response.data.user : {
+        ...editingUser,
+        ...updateData,
+        dn: updatedDn
+      };
+      
+      setUsers(prev => {
+        let replaced = false;
+        const updated = prev.map(user => {
+          if (
+            user.dn === oldDn ||
+            user.dn === updatedDn ||
+            (refreshedUser && (
+              (user.cn && refreshedUser.cn && user.cn.toLowerCase() === refreshedUser.cn.toLowerCase()) ||
+              (user.displayName && refreshedUser.displayName && user.displayName.toLowerCase() === refreshedUser.displayName.toLowerCase()) ||
+              (user.sAMAccountName && refreshedUser.sAMAccountName && user.sAMAccountName.toLowerCase() === refreshedUser.sAMAccountName.toLowerCase())
+            ))
+          ) {
+            replaced = true;
+            return { ...user, ...refreshedUser };
+          }
+          return user;
+        });
+        if (!replaced) {
+          updated.push(refreshedUser);
+        }
+        return updated;
+      });
+      
+      if (
+        selectedUser?.dn === oldDn ||
+        selectedUser?.dn === updatedDn ||
+        (
+          selectedUser &&
+          refreshedUser &&
+          (
+            (selectedUser.cn && refreshedUser.cn && selectedUser.cn.toLowerCase() === refreshedUser.cn.toLowerCase()) ||
+            (selectedUser.displayName && refreshedUser.displayName && selectedUser.displayName.toLowerCase() === refreshedUser.displayName.toLowerCase()) ||
+            (selectedUser.sAMAccountName && refreshedUser.sAMAccountName && selectedUser.sAMAccountName.toLowerCase() === refreshedUser.sAMAccountName.toLowerCase())
+          )
+        )
+      ) {
+        setSelectedUser(refreshedUser);
+      }
       setIsEditModalVisible(false);
       form.resetFields();
       setEditingUser(null);
@@ -1252,6 +1314,8 @@ const UserManagement = () => {
     if (user.title) score += 2;
     if (user.department) score += 2;
     if (user.company) score += 1.5;
+    if (user.physicalDeliveryOfficeName) score += 1.2;
+    if (user.employeeID) score += 1;
     if (user.telephoneNumber || user.mobile) score += 1;
     if (user.description) score += 0.5;
     if (user.isEnabled) score += 1;
@@ -1281,8 +1345,9 @@ const UserManagement = () => {
       const key = getUserDedupKey(user);
       const candidateScore = scoreUserRecord(user);
       const existing = map.get(key);
-      if (!existing || candidateScore > existing.score) {
-        map.set(key, { user, score: candidateScore });
+      if (!existing || candidateScore >= existing.score) {
+        const mergedUser = { ...(existing?.user || {}), ...user };
+        map.set(key, { user: mergedUser, score: Math.max(candidateScore, existing?.score || 0) });
       }
     });
     return Array.from(map.values()).map(entry => entry.user);
@@ -1294,15 +1359,24 @@ const UserManagement = () => {
     return mobileWidth;
   }, [screens]);
 
-  const filteredUsers = useMemo(() => deduplicateUsers(users).filter(user => {
-    if (statusFilter === 'enabled') return user.isEnabled;
-    if (statusFilter === 'disabled') return !user.isEnabled;
-    return true;
-  }), [users, statusFilter, deduplicateUsers]);
+  const filteredUsers = useMemo(() => {
+    const deduped = deduplicateUsers(users);
+    return deduped.filter(user => {
+      if (statusFilter === 'enabled' && !user.isEnabled) return false;
+      if (statusFilter === 'disabled' && user.isEnabled) return false;
+
+      if (ouFilter) {
+        const userDn = (user.dn || '').toLowerCase();
+        if (!userDn.includes(ouFilter.toLowerCase())) return false;
+      }
+
+      return true;
+    });
+  }, [users, statusFilter, ouFilter, deduplicateUsers]);
 
   const isFilteredView = useMemo(
-    () => Boolean(searchText || departmentFilter || statusFilter !== 'all'),
-    [searchText, departmentFilter, statusFilter]
+    () => Boolean(searchText || departmentFilter || statusFilter !== 'all' || ouFilter),
+    [searchText, departmentFilter, statusFilter, ouFilter]
   );
 
   const paginatedUsers = useMemo(() => {
@@ -1347,19 +1421,24 @@ const UserManagement = () => {
 
   // ==================== TABLE COLUMNS ====================
   
-  const renderCopyableValue = useCallback((value, tooltips = ['คัดลอก', 'คัดลอกแล้ว']) => (
-    value ? (
-      <Text
-        copyable={{ text: value, tooltips }}
-        className="copyable-text"
-        style={{ fontSize: 13 }}
-      >
-        {value}
-      </Text>
-    ) : (
-      <Text type="secondary" style={{ fontSize: 12 }}>-</Text>
-    )
-  ), []);
+  const renderCopyableValue = useCallback((value, tooltips = ['คัดลอก', 'คัดลอกแล้ว']) => {
+    if (!value) {
+      return <Text type="secondary" style={{ fontSize: 12 }}>-</Text>;
+    }
+
+    return (
+      <Tooltip title={value} placement="topLeft">
+        <Text
+          ellipsis
+          copyable={{ text: value, tooltips }}
+          className="copyable-text table-cell-text"
+          style={{ fontSize: 13 }}
+        >
+          {value}
+        </Text>
+      </Tooltip>
+    );
+  }, []);
 
   const renderUsernameCell = useCallback((value) => (
     value ? (
@@ -1372,15 +1451,37 @@ const UserManagement = () => {
   ), [renderCopyableValue]);
 
   const renderTextCell = useCallback((value) => (
-    value ? <Text style={{ fontSize: 13, color: '#1f2937' }}>{value}</Text> : <Text type="secondary" style={{ fontSize: 12 }}>-</Text>
+    value ? (
+      <Tooltip title={value} placement="topLeft">
+        <Text className="table-cell-text" ellipsis style={{ fontSize: 13, color: '#1f2937' }}>
+          {value}
+        </Text>
+      </Tooltip>
+    ) : (
+      <Text type="secondary" style={{ fontSize: 12 }}>-</Text>
+    )
   ), []);
 
   const renderDepartmentTag = useCallback((value) => (
-    value ? <Tag className="department-tag">{value}</Tag> : <Text type="secondary" style={{ fontSize: 12 }}>-</Text>
+    value ? (
+      <Tooltip title={value} placement="topLeft">
+        <Tag className="department-tag status-pill info">{value}</Tag>
+      </Tooltip>
+    ) : (
+      <Text type="secondary" style={{ fontSize: 12 }}>-</Text>
+    )
   ), []);
 
   const renderDescriptionCell = useCallback((value) => (
-    value ? <Text style={{ fontSize: 13, color: '#4b5563' }}>{value}</Text> : <Text type="secondary" style={{ fontSize: 12 }}>-</Text>
+    value ? (
+      <Tooltip title={value} placement="topLeft">
+        <Text className="table-cell-text" ellipsis style={{ fontSize: 13, color: '#4b5563' }}>
+          {value}
+        </Text>
+      </Tooltip>
+    ) : (
+      <Text type="secondary" style={{ fontSize: 12 }}>-</Text>
+    )
   ), []);
 
   const renderDisplayName = useCallback((_, record) => (
@@ -1396,8 +1497,17 @@ const UserManagement = () => {
       >
         {(record.cn || record.displayName || 'U').charAt(0).toUpperCase()}
       </Avatar>
-      <div>
-        <div className="display-name-text">{record.cn || record.displayName || '-'}</div>
+      <div className="display-name-content">
+        <Tooltip title={record.cn || record.displayName || '-'} placement="topLeft">
+          <div className="display-name-text table-cell-text">
+            {record.cn || record.displayName || '-'}
+          </div>
+        </Tooltip>
+        {record.title && (
+          <Text type="secondary" style={{ fontSize: 12 }} className="table-cell-supporting">
+            {record.title}
+          </Text>
+        )}
       </div>
     </Space>
   ), []);
@@ -1405,7 +1515,10 @@ const UserManagement = () => {
   const renderEmailCell = useCallback((value) => renderCopyableValue(value, ['คัดลอกอีเมล', 'คัดลอกแล้ว']), [renderCopyableValue]);
   const renderEmployeeIdCell = useCallback((value) => renderCopyableValue(value, ['คัดลอก Employee ID', 'คัดลอกแล้ว']), [renderCopyableValue]);
   const renderStatusCell = useCallback((isEnabled) => (
-    <Tag className={isEnabled ? 'status-tag success' : 'status-tag inactive'}>
+    <Tag
+      className={`status-pill ${isEnabled ? 'success' : 'inactive'}`}
+      icon={isEnabled ? <CheckCircleOutlined /> : <CloseCircleOutlined />}
+    >
       {isEnabled ? 'Active' : 'Disabled'}
     </Tag>
   ), []);
@@ -1495,6 +1608,9 @@ const UserManagement = () => {
       key: 'user',
       fixed: (screens.md || screens.lg || screens.xl) ? 'left' : undefined,
       width: 260,
+      className: 'col-display-name',
+      sorter: (a, b) => (a.cn || a.displayName || '').localeCompare(b.cn || b.displayName || ''),
+      ellipsis: true,
       render: renderDisplayName
     },
     {
@@ -1503,6 +1619,9 @@ const UserManagement = () => {
       key: 'sAMAccountName',
       fixed: (screens.md || screens.lg || screens.xl) ? 'left' : undefined,
       width: 200,
+      className: 'col-username',
+      sorter: (a, b) => (a.sAMAccountName || '').localeCompare(b.sAMAccountName || ''),
+      ellipsis: true,
       render: renderUsernameCell
     },
     {
@@ -1510,6 +1629,9 @@ const UserManagement = () => {
       dataIndex: 'mail',
       key: 'mail',
       width: 260,
+      className: 'col-email',
+      sorter: (a, b) => (a.mail || '').localeCompare(b.mail || ''),
+      ellipsis: true,
       render: renderEmailCell
     },
     {
@@ -1517,6 +1639,9 @@ const UserManagement = () => {
       dataIndex: 'title',
       key: 'title',
       width: 200,
+      className: 'col-job-title',
+      responsive: ['sm'],
+      ellipsis: true,
       render: renderTextCell
     },
     {
@@ -1524,6 +1649,9 @@ const UserManagement = () => {
       dataIndex: 'department',
       key: 'department',
       width: 200,
+      className: 'col-department',
+      responsive: ['md'],
+      ellipsis: true,
       render: renderDepartmentTag
     },
     {
@@ -1531,6 +1659,9 @@ const UserManagement = () => {
       dataIndex: 'company',
       key: 'company',
       width: 200,
+      className: 'col-company',
+      responsive: ['lg'],
+      ellipsis: true,
       render: renderTextCell
     },
     {
@@ -1538,6 +1669,9 @@ const UserManagement = () => {
       dataIndex: 'physicalDeliveryOfficeName',
       key: 'location',
       width: 200,
+      className: 'col-location',
+      responsive: ['lg'],
+      ellipsis: true,
       render: renderTextCell
     },
     {
@@ -1545,6 +1679,9 @@ const UserManagement = () => {
       dataIndex: 'description',
       key: 'description',
       width: 220,
+      className: 'col-description',
+      responsive: ['lg'],
+      ellipsis: true,
       render: renderDescriptionCell
     },
     {
@@ -1552,6 +1689,9 @@ const UserManagement = () => {
       dataIndex: 'employeeID',
       key: 'employeeID',
       width: 160,
+      className: 'col-employee-id',
+      responsive: ['xl'],
+      ellipsis: true,
       render: renderEmployeeIdCell
     },
     {
@@ -1559,6 +1699,9 @@ const UserManagement = () => {
       dataIndex: 'telephoneNumber',
       key: 'phone',
       width: 160,
+      className: 'col-phone',
+      responsive: ['lg'],
+      ellipsis: true,
       render: renderTextCell
     },
     {
@@ -1566,6 +1709,9 @@ const UserManagement = () => {
       dataIndex: 'mobile',
       key: 'mobile',
       width: 160,
+      className: 'col-mobile',
+      responsive: ['lg'],
+      ellipsis: true,
       render: renderTextCell
     },
     {
@@ -1573,6 +1719,12 @@ const UserManagement = () => {
       dataIndex: 'isEnabled',
       key: 'status',
       width: 140,
+      className: 'col-status',
+      filters: [
+        { text: 'Active', value: true },
+        { text: 'Disabled', value: false }
+      ],
+      onFilter: (value, record) => record.isEnabled === value,
       render: renderStatusCell
     },
     {
@@ -1580,6 +1732,7 @@ const UserManagement = () => {
       key: 'actions',
       fixed: (screens.md || screens.lg || screens.xl) ? 'right' : undefined,
       width: 140,
+      className: 'col-actions',
       render: renderActionsCell
     }
   ], [renderDisplayName, renderUsernameCell, renderEmailCell, renderTextCell, renderDepartmentTag, renderDescriptionCell, renderEmployeeIdCell, renderStatusCell, renderActionsCell, screens.md, screens.lg, screens.xl]);
@@ -1603,6 +1756,14 @@ const UserManagement = () => {
     // Check visibility setting for other columns
     return visibleColumns[col.key] !== false;
   });
+
+  const rowSelection = useMemo(() => ({
+    selectedRowKeys,
+    onChange: (keys) => setSelectedRowKeys(keys),
+    columnWidth: 48,
+    fixed: (screens.md || screens.lg || screens.xl) ? 'left' : undefined,
+    preserveSelectedRowKeys: true
+  }), [selectedRowKeys, screens.md, screens.lg, screens.xl]);
 
   // ==================== RENDER ====================
   
@@ -1720,7 +1881,28 @@ const UserManagement = () => {
             </Col>
           </Row>
           <Row className="header-search-row" align="middle" gutter={[12, 12]}>
-            <Col xs={24} md={16} lg={14} xl={12}>
+            <Col xs={24} md={8} lg={6} xl={6}>
+              <Select
+                className="ou-filter-select"
+                placeholder="Filter by OU"
+                allowClear
+                showSearch
+                suffixIcon={<BankOutlined />}
+                value={ouFilter || undefined}
+                onChange={handleOuFilterChange}
+                optionFilterProp="children"
+                filterOption={(input, option) =>
+                  option?.children?.toLowerCase().includes(input.toLowerCase())
+                }
+              >
+                {availableOUs.map((ou) => (
+                  <Option key={ou.dn} value={ou.dn}>
+                    {ou.fullPath}
+                  </Option>
+                ))}
+              </Select>
+            </Col>
+            <Col xs={24} md={10} lg={10} xl={10}>
               <Input
                 placeholder="Search users..."
                 prefix={<SearchOutlined />}
@@ -1730,7 +1912,7 @@ const UserManagement = () => {
                 className="custom-search-input gradient-search-input search-input-large"
               />
             </Col>
-            <Col xs={24} md={8} lg={10} xl={12} style={{ textAlign: 'right' }}>
+            <Col xs={24} md={6} lg={8} xl={8} className="header-pagination">
               <Pagination
                 size="small"
                 current={currentPage}
@@ -1753,23 +1935,27 @@ const UserManagement = () => {
 
         <div className="user-management-table-wrapper">
           <Table
-              columns={columns}
-              dataSource={paginatedUsers}
-              rowKey="dn"
-              loading={loading}
-              bordered={false}
-              size="middle"
-              scroll={{ x: 'max-content', y: tableScrollY }}
-              sticky={{ offsetHeader: 0 }}
-              tableLayout="fixed"
-              rowClassName={(record, index) => index % 2 === 0 ? 'table-row-light' : 'table-row-dark'}
-              pagination={false}
-              components={{
-                body: {
-                  wrapper: (props) => <tbody {...props} />
-                }
-              }}
-            />
+            columns={columns}
+            dataSource={paginatedUsers}
+            rowKey="dn"
+            rowSelection={rowSelection}
+            loading={loading}
+            bordered={false}
+            size="middle"
+            scroll={{ x: 'max-content', y: tableScrollY }}
+            sticky={{ offsetHeader: 0 }}
+            tableLayout="fixed"
+            rowClassName={(record, index) => {
+              const baseClass = index % 2 === 0 ? 'table-row-light' : 'table-row-dark';
+              return selectedRowKeys.includes(record.dn) ? `${baseClass} row-selected` : baseClass;
+            }}
+            pagination={false}
+            components={{
+              body: {
+                wrapper: (props) => <tbody {...props} />
+              }
+            }}
+          />
         </div>
       </Card>
 
@@ -2058,29 +2244,6 @@ const UserManagement = () => {
                 showIcon
                 style={{ marginBottom: 24 }}
               />
-
-              {/* Analysis Summary */}
-              {suggestedGroupsData && suggestedGroupsData.totalUsers > 0 && (
-                <div style={{
-                  background: 'linear-gradient(135deg, #eff6ff 0%, #dbeafe 100%)',
-                  padding: '16px',
-                  borderRadius: 8,
-                  marginBottom: 16,
-                  border: '2px solid #3b82f6'
-                }}>
-                  <div style={{ marginBottom: 8 }}>
-                    <Text strong style={{ fontSize: 14, color: '#1e40af' }}>
-                      🎯 Smart Auto-Selection
-                    </Text>
-                  </div>
-                  <Text style={{ fontSize: 12, color: '#3b82f6' }}>
-                    Groups auto-selected based on <strong>{suggestedGroupsData.totalUsers} existing users</strong> in this OU
-                  </Text>
-                  <div style={{ marginTop: 8, fontSize: 11, color: '#6b7280' }}>
-                    ⭐ = Recommended (≥60% of users have this group)
-                  </div>
-                </div>
-              )}
 
               {/* Account Options */}
               <Card

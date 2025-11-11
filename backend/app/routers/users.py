@@ -288,6 +288,7 @@ def format_user_data(entry: tuple, full_details: bool = True) -> Dict[str, Any]:
         "mail": get_attr("mail"),
         "displayName": get_attr("displayName"),
         "department": get_attr("department") or None,
+        "company": get_attr("company") or None,
         "physicalDeliveryOfficeName": get_attr("physicalDeliveryOfficeName") or None,
         "title": get_attr("title") or None,
         "description": get_attr("description") or None,
@@ -317,21 +318,10 @@ def format_user_data(entry: tuple, full_details: bool = True) -> Dict[str, Any]:
             "pwdLastSet": get_attr("pwdLastSet") or None,
         })
     else:
-        # ⚡ Include whenCreated for sorting even in list view
+        # ⚡ Include limited metadata needed for list view (avoid heavy attributes)
         result.update({
-            "givenName": None,
-            "sn": None,
-            "telephoneNumber": None,
-            "mobile": None,
-            "company": None,
-            "employeeID": None,
-            "streetAddress": None,
-            "l": None,
-            "st": None,
-            "postalCode": None,
-            "co": None,
             "memberOf": [],
-            "whenCreated": get_attr("whenCreated") or None,  # ⚡ Include for sorting
+            "whenCreated": get_attr("whenCreated") or None,  # keep for sorting/filtering
             "whenChanged": None,
             "lastLogon": None,
             "pwdLastSet": None,
@@ -460,6 +450,16 @@ async def get_users(
                 "physicalDeliveryOfficeName",
                 "description",
                 "userAccountControl",
+                "givenName",
+                "sn",
+                "telephoneNumber",
+                "mobile",
+                "employeeID",
+                "streetAddress",
+                "l",
+                "st",
+                "postalCode",
+                "co",
                 "whenCreated"
             ]
         )
@@ -1033,29 +1033,57 @@ async def update_user(dn: str, user_data: UserUpdate, request: Request, token_da
         # Prepare modifications - only for fields that are explicitly set
         user_dict = user_data.dict(exclude_unset=True)
         
+        # Handle CN rename before other modifications
+        renamed_dn = None
+        if "cn" in user_dict:
+            new_cn = user_dict.pop("cn")
+            if new_cn is not None:
+                new_cn_stripped = new_cn.strip()
+                current_cn = dn.split(',')[0].replace('CN=', '')
+                if new_cn_stripped and new_cn_stripped != current_cn:
+                    new_rdn = f"CN={new_cn_stripped}"
+                    parent_dn = ','.join(dn.split(',')[1:])
+                    logger.info(f"🔄 Renaming DN from {dn} to {new_rdn},{parent_dn}")
+                    if not ldap_conn.rename_entry(dn, new_rdn, new_superior=parent_dn):
+                        raise HTTPException(status_code=500, detail="Failed to rename user (CN change)")
+                    changes.append({
+                        "field": "cn",
+                        "old_value": current_cn,
+                        "new_value": new_cn_stripped
+                    })
+                    dn = f"{new_rdn},{parent_dn}"
+                    renamed_dn = dn
+
         for field, value in user_dict.items():
-            if value is not None and value != "":
-                # Skip cn as it requires renaming the entry
-                if field == "cn":
-                    logger.warning(f"⚠️ Skipping CN modification (requires entry rename)")
-                    continue
-                
-                # 🔒 Handle password reset - skip here, do it separately after user update
-                if field == "password":
-                    password_changed = True
-                    continue
-                    
+            if value is None:
+                continue
+            
+            if field == "cn":
+                logger.warning(f"⚠️ Skipping CN modification (requires entry rename)")
+                continue
+            
+            # 🔒 Handle password reset - skip here, do it separately after user update
+            if field == "password":
+                password_changed = True
+                continue
+            
+            if isinstance(value, str) and value.strip() == "":
+                modifications.append((MODIFY_REPLACE, field, []))
+                logger.info(f"  • {field} cleared")
+                new_value = None
+            else:
                 modifications.append((MODIFY_REPLACE, field, [value]))
                 logger.info(f"  • {field} = {value}")
-                
-                # Track change details
-                old_value = old_data.get(field)
-                if old_value != value:
-                    changes.append({
-                        "field": field,
-                        "old_value": old_value,
-                        "new_value": value
-                    })
+                new_value = value
+            
+            # Track change details
+            old_value = old_data.get(field)
+            if old_value != new_value:
+                changes.append({
+                    "field": field,
+                    "old_value": old_value,
+                    "new_value": new_value
+                })
         
         # Handle password reset separately (requires LDAPS or PowerShell)
         password_reset_success = False
@@ -1132,6 +1160,25 @@ async def update_user(dn: str, user_data: UserUpdate, request: Request, token_da
             
             logger.info(f"✅ User updated successfully: {dn}")
         
+        # Fetch updated user details to return in response (for frontend sync)
+        refreshed_user = None
+        try:
+            refreshed_result = ldap_conn.search(
+                dn,
+                "(objectClass=user)",
+                ["cn", "sAMAccountName", "mail", "displayName", "givenName", "sn",
+                 "title", "telephoneNumber", "mobile", "department", "company",
+                 "employeeID", "physicalDeliveryOfficeName", "streetAddress", "l",
+                 "st", "postalCode", "co", "description",
+                 "userAccountControl", "memberOf", "whenCreated", "whenChanged",
+                 "lastLogon", "pwdLastSet"]
+            )
+            if refreshed_result:
+                refreshed_user = format_user_data(refreshed_result[0], full_details=True)
+        except Exception as fetch_error:
+            logger.warning(f"⚠️ Could not fetch refreshed user data: {fetch_error}")
+            refreshed_user = None
+        
         # Invalidate cache after user update
         invalidate_cache("get_users")
         
@@ -1152,10 +1199,14 @@ async def update_user(dn: str, user_data: UserUpdate, request: Request, token_da
         )
         
         message = "Password reset successfully" if password_changed else "User updated successfully"
-        return {
+        response_payload = {
             "success": True,
-            "message": message
+            "message": message,
+            "user": refreshed_user
         }
+        if renamed_dn:
+            response_payload["dn"] = renamed_dn
+        return response_payload
         
     except HTTPException:
         raise
