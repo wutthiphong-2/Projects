@@ -2,6 +2,7 @@ from fastapi import FastAPI, Request, status
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 from fastapi.exceptions import RequestValidationError
+from contextlib import asynccontextmanager
 import uvicorn
 from dotenv import load_dotenv
 from app.core.config import settings
@@ -19,11 +20,30 @@ logger = logging.getLogger(__name__)
 # Load environment variables
 load_dotenv()
 
-# Create FastAPI app
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    """Handle application startup and shutdown"""
+    # Startup
+    try:
+        init_ldap_connection()
+        logger.info("🚀 Application started - Ready to receive AD events from PowerShell script")
+    except Exception as e:
+        logger.error(f"❌ Failed to initialize application: {e}")
+    
+    yield
+    
+    # Shutdown
+    try:
+        logger.info("🛑 Application shutting down gracefully...")
+    except Exception as e:
+        logger.warning(f"⚠️ Error during shutdown: {e}")
+
+# Create FastAPI app with lifespan
 app = FastAPI(
     title="AD Management API",
     description="API for managing Active Directory users, groups, and OUs",
-    version="1.0.0"
+    version="1.0.0",
+    lifespan=lifespan
 )
 
 # Exception handler for validation errors
@@ -64,12 +84,6 @@ app.include_router(users_router.router, prefix="/api/users", tags=["users"])
 app.include_router(groups_router.router, prefix="/api/groups", tags=["groups"])
 app.include_router(ous_router.router, prefix="/api/ous", tags=["ous"])
 app.include_router(activity_logs_router.router, prefix="/api/activity-logs", tags=["activity-logs"])
-
-@app.on_event("startup")
-async def startup_event():
-    """Initialize LDAP connection on startup"""
-    init_ldap_connection()
-    logger.info("🚀 Application started - Ready to receive AD events from PowerShell script")
 
 @app.get("/")
 async def root():

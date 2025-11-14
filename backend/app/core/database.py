@@ -2,6 +2,7 @@ from ldap3 import Server, Connection, ALL, MODIFY_REPLACE, MODIFY_ADD, MODIFY_DE
 import ssl
 from app.core.config import settings
 import logging
+from typing import Optional, Tuple
 
 logger = logging.getLogger(__name__)
 
@@ -9,6 +10,62 @@ class LDAPConnection:
     def __init__(self):
         self.connection = None
         self.server = None
+
+    def _is_connection_error(self, message: Optional[str]) -> bool:
+        if not message:
+            return False
+        lowered = message.lower()
+        return (
+            "winerror 10054" in lowered
+            or "socket" in lowered
+            or "connection" in lowered
+            or "server is unwilling" in lowered  # add safety for abrupt resets
+        )
+
+    def _ensure_connection(self) -> bool:
+        if self.connection and self.connection.bound:
+            return True
+        logger.warning("🔄 LDAP connection not bound. Attempting to reconnect...")
+        self.disconnect()
+        return self.connect()
+
+    def _reset_connection(self):
+        logger.warning("🔁 Resetting LDAP connection...")
+        self.disconnect()
+        self.connect()
+
+    def _execute_with_retry(self, operation_name: str, operation_callable) -> Tuple[bool, Optional[str]]:
+        attempts = 0
+        last_error = None
+
+        while attempts < 2:
+            attempts += 1
+
+            if not self._ensure_connection():
+                last_error = "Unable to bind to LDAP server"
+                break
+
+            try:
+                result = operation_callable()
+                if result:
+                    return True, None
+
+                last_error = self.connection.last_error if self.connection else "Unknown error"
+                logger.error(f"{operation_name} failed: {last_error}")
+
+                if self._is_connection_error(last_error) and attempts < 2:
+                    self._reset_connection()
+                    continue
+                break
+            except Exception as e:
+                last_error = str(e)
+                logger.error(f"{operation_name} raised exception: {last_error}")
+                if self._is_connection_error(last_error) and attempts < 2:
+                    self._reset_connection()
+                    continue
+                break
+
+        return False, last_error
         
     def connect(self):
         """Establish LDAP connection"""
@@ -57,9 +114,13 @@ class LDAPConnection:
         if self.connection:
             try:
                 self.connection.unbind()
-                logger.info("LDAP connection closed")
             except Exception as e:
-                logger.error(f"Error closing LDAP connection: {e}")
+                err = str(e)
+                if "socket sending error" in err.lower() or "winerror 10054" in err:
+                    # Connection already dropped by server – safe to ignore
+                    logger.warning("LDAP connection already closed by remote host (WinError 10054). Resetting locally.")
+                else:
+                    logger.error(f"Error closing LDAP connection: {e}")
         self.connection = None
     
     def _do_search(self, base_dn, filter_str, attributes=None):
@@ -143,8 +204,18 @@ class LDAPConnection:
                         entry_dict[attr] = values
                     all_results.append((str(entry.entry_dn), entry_dict))
                 
-                # Get the cookie for the next page
-                cookie = self.connection.result['controls']['1.2.840.113556.1.4.319']['value']['cookie']
+                # Get the cookie for the next page (handle servers without paged controls)
+                controls = self.connection.result.get('controls') if isinstance(self.connection.result, dict) else None
+                paging_control = None
+                cookie = None
+
+                if isinstance(controls, dict):
+                    paging_control = controls.get('1.2.840.113556.1.4.319')
+
+                if paging_control and isinstance(paging_control, dict):
+                    value_dict = paging_control.get('value')
+                    if isinstance(value_dict, dict):
+                        cookie = value_dict.get('cookie')
                 
                 # If no more pages, break
                 if not cookie:
@@ -175,79 +246,77 @@ class LDAPConnection:
     
     def add_entry(self, dn, attributes):
         """Add new LDAP entry"""
-        if not self.connection:
-            if not self.connect():
-                return False
-        
-        try:
-            # Convert attributes to ldap3 format
-            ldap_attrs = {}
-            for key, values in attributes.items():
-                if isinstance(values, list):
-                    ldap_attrs[key] = values
-                else:
-                    ldap_attrs[key] = [values]
-            
-            result = self.connection.add(dn, attributes=ldap_attrs)
-            if result:
-                logger.info(f"Successfully added entry: {dn}")
-                return True
+        # Convert attributes to ldap3 format
+        ldap_attrs = {}
+        for key, values in attributes.items():
+            if isinstance(values, list):
+                ldap_attrs[key] = values
             else:
-                logger.error(f"Failed to add entry {dn}: {self.connection.last_error}")
-                return False
-        except Exception as e:
-            logger.error(f"Failed to add entry {dn}: {e}")
+                ldap_attrs[key] = [values]
+
+        def operation():
+            return self.connection.add(dn, attributes=ldap_attrs)
+
+        success, error_msg = self._execute_with_retry(f"Add entry {dn}", operation)
+        if success:
+            logger.info(f"Successfully added entry: {dn}")
+            return True
+        else:
+            logger.error(f"Failed to add entry {dn}: {error_msg}")
             return False
     
     def modify_entry(self, dn, modifications):
         """Modify LDAP entry"""
-        if not self.connection:
-            if not self.connect():
-                return False
-        
-        try:
-            # Convert modifications to ldap3 format: { attr: [(operation, [values...])] }
-            changes = {}
-            for mod_type, attr_name, values in modifications:
-                if values is None:
-                    values_list = []
-                elif isinstance(values, (bytes, str)):
-                    values_list = [values]
-                else:
-                    values_list = values
-
-                if not isinstance(values_list, list):
-                    values_list = [values_list]
-
-                changes[attr_name] = [(mod_type, values_list)]
-
-            result = self.connection.modify(dn, changes)
-            if result:
-                logger.info(f"Successfully modified entry: {dn}")
-                return True
+        # Convert modifications to ldap3 format: { attr: [(operation, [values...])] }
+        changes = {}
+        for mod_type, attr_name, values in modifications:
+            if values is None:
+                values_list = []
+            elif isinstance(values, (bytes, str)):
+                values_list = [values]
             else:
-                logger.error(f"Failed to modify entry {dn}: {self.connection.last_error}")
-                return False
-        except Exception as e:
-            logger.error(f"Failed to modify entry {dn}: {e}")
+                values_list = values
+
+            if not isinstance(values_list, list):
+                values_list = [values_list]
+
+            changes[attr_name] = [(mod_type, values_list)]
+
+        def operation():
+            return self.connection.modify(dn, changes)
+
+        success, error_msg = self._execute_with_retry(f"Modify entry {dn}", operation)
+        if success:
+            logger.info(f"Successfully modified entry: {dn}")
+            return True
+        else:
+            logger.error(f"Failed to modify entry {dn}: {error_msg}")
             return False
     
     def delete_entry(self, dn):
         """Delete LDAP entry"""
-        if not self.connection:
-            if not self.connect():
-                return False
-        
-        try:
-            result = self.connection.delete(dn)
-            if result:
-                logger.info(f"Successfully deleted entry: {dn}")
-                return True
-            else:
-                logger.error(f"Failed to delete entry {dn}: {self.connection.last_error}")
-                return False
-        except Exception as e:
-            logger.error(f"Failed to delete entry {dn}: {e}")
+        def operation():
+            return self.connection.delete(dn)
+
+        success, error_msg = self._execute_with_retry(f"Delete entry {dn}", operation)
+        if success:
+            logger.info(f"Successfully deleted entry: {dn}")
+            return True
+        else:
+            logger.error(f"Failed to delete entry {dn}: {error_msg}")
+            return False
+
+    def rename_entry(self, dn, new_rdn, new_superior=None):
+        """Rename or move LDAP entry"""
+        def operation():
+            return self.connection.modify_dn(dn, new_rdn, new_superior=new_superior)
+
+        success, error_msg = self._execute_with_retry(f"Rename entry {dn}", operation)
+        if success:
+            logger.info(f"Successfully renamed entry: {dn} -> {new_rdn}{',' + new_superior if new_superior else ''}")
+            return True
+        else:
+            logger.error(f"Failed to rename entry {dn}: {error_msg}")
             return False
 
 # Global LDAP connection instance

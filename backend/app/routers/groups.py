@@ -4,6 +4,7 @@ from typing import List, Optional, Dict, Any
 from ldap3 import MODIFY_REPLACE, MODIFY_ADD, MODIFY_DELETE
 import logging
 import json
+import time
 from pathlib import Path
 
 from app.core.config import settings
@@ -568,18 +569,61 @@ async def add_group_member(group_dn: str, member_data: GroupMemberAdd, request: 
         
         logger.info(f"User before: {user_sam} is member of {len(old_member_of)} groups")
         
+        # Check if user is already a member of this group
+        if group_dn in old_member_of:
+            logger.info(f"User {user_sam} is already a member of group {group_dn}. Returning success (idempotent operation).")
+            group_cn = group_dn.split(',')[0].replace('CN=', '')
+            return {
+                "success": True,
+                "message": f"User {user_sam} is already a member of this group.",
+                "user_dn": member_data.user_dn,
+                "user_cn": user_cn,
+                "groups_before": len(old_member_of),
+                "groups_after": len(old_member_of),
+                "already_member": True
+            }
+        
         # Add user to group by modifying the group's member attribute
         modifications = [(MODIFY_ADD, "member", [member_data.user_dn])]
         
         if not ldap_conn.modify_entry(group_dn, modifications):
             error_msg = ldap_conn.connection.last_error if ldap_conn.connection else "Unknown error"
+            
+            # Check if error is due to entry already existing (race condition or AD replication delay)
+            if "entryAlreadyExists" in error_msg or "entry already exists" in error_msg.lower():
+                logger.info(f"User {user_sam} appears to already be a member (entryAlreadyExists). Verifying...")
+                
+                # Verify current membership status
+                time.sleep(0.3)  # Brief wait for AD replication
+                
+                user_results_check = ldap_conn.search(
+                    member_data.user_dn,
+                    "(objectClass=user)",
+                    ["memberOf"]
+                )
+                
+                if user_results_check:
+                    current_member_of = user_results_check[0][1].get("memberOf", [])
+                    if group_dn in current_member_of:
+                        logger.info(f"Verified: User {user_sam} is already a member. Returning success.")
+                        group_cn = group_dn.split(',')[0].replace('CN=', '')
+                        return {
+                            "success": True,
+                            "message": f"User {user_sam} is already a member of this group.",
+                            "user_dn": member_data.user_dn,
+                            "user_cn": user_cn,
+                            "groups_before": len(old_member_of),
+                            "groups_after": len(current_member_of),
+                            "already_member": True
+                        }
+            
+            # If not an entryAlreadyExists error, raise the error
             logger.error(f"Failed to add member: {error_msg}")
             raise HTTPException(status_code=500, detail=f"Failed to add member to group: {error_msg}")
         
         logger.info(f"Successfully modified group {group_dn}")
         
         # Verify that memberOf was updated in AD (check after modification)
-        import time
         time.sleep(0.5)  # Wait for AD to update memberOf attribute
         
         user_results_after = ldap_conn.search(
@@ -620,6 +664,8 @@ async def add_group_member(group_dn: str, member_data: GroupMemberAdd, request: 
             "groups_after": len(new_member_of) if user_results_after else len(old_member_of)
         }
         
+    except HTTPException:
+        raise
     except Exception as e:
         logger.error(f"Error adding member to group {group_dn}: {e}")
         raise HTTPException(status_code=500, detail="Failed to add member to group")

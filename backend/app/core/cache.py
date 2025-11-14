@@ -66,13 +66,16 @@ class SimpleCache:
 cache = SimpleCache()
 
 def make_cache_key(endpoint: str, **kwargs) -> str:
-    """Create a cache key from endpoint and parameters"""
+    """Create a cache key from endpoint and parameters.
+    
+    The key keeps the endpoint name as plain text so it can be invalidated via pattern matching.
+    Parameters are hashed to keep the key compact.
+    """
     # Sort kwargs for consistent keys
     sorted_params = sorted(kwargs.items())
     params_str = json.dumps(sorted_params, sort_keys=True)
-    key_str = f"{endpoint}:{params_str}"
-    # Hash for shorter keys
-    return hashlib.md5(key_str.encode()).hexdigest()
+    params_hash = hashlib.md5(params_str.encode()).hexdigest()
+    return f"{endpoint}:{params_hash}"
 
 def cached_response(ttl_seconds: int = 300):
     """

@@ -32,7 +32,9 @@ import {
   Empty,
   Steps,
   Progress,
-  Alert
+  Alert,
+  DatePicker,
+  Collapse
 } from 'antd';
 import {
   EditOutlined,
@@ -63,6 +65,7 @@ import {
   TagOutlined,
   MoreOutlined
 } from '@ant-design/icons';
+import dayjs from 'dayjs';
 import axios from 'axios';
 import config from '../config';
 import { useAuth } from '../contexts/AuthContext';
@@ -77,6 +80,7 @@ const { TabPane } = Tabs;
 const { Option } = Select;
 const { Step } = Steps;
 const { useBreakpoint } = Grid;
+const { RangePicker } = DatePicker;
 
 const UserManagement = () => {
   // ==================== STATES ====================
@@ -156,6 +160,8 @@ const UserManagement = () => {
   const [pageSize, setPageSize] = useState(30);
   const [tableScrollY, setTableScrollY] = useState(520);
   const [selectedRowKeys, setSelectedRowKeys] = useState([]);
+  const [isFilterDrawerVisible, setIsFilterDrawerVisible] = useState(false);
+  const [dateRangeFilter, setDateRangeFilter] = useState(null);
   
   const updateTableScrollY = useCallback(() => {
     if (typeof window === 'undefined') return;
@@ -220,8 +226,10 @@ const UserManagement = () => {
     ];
   }, [selectedUser]);
   
-  const [form] = Form.useForm();
+  const [createForm] = Form.useForm();
+  const [editForm] = Form.useForm();
   const [passwordForm] = Form.useForm();
+  const [filterForm] = Form.useForm();
   const { getAuthHeaders } = useAuth();
   const {
     notifyUserCreated,
@@ -243,6 +251,25 @@ const UserManagement = () => {
     }
     return '0';
   }, []);
+
+  const formatDateTime = useCallback((value, fallback = '-') => {
+    if (!value) return fallback;
+    const parsed = dayjs(value);
+    if (!parsed.isValid()) return fallback;
+    return parsed.format('DD MMM YYYY HH:mm');
+  }, []);
+
+  const getOuLabel = useCallback((dn) => {
+    if (!dn) return 'CN=Users';
+    const found = availableOUs.find((ou) => ou.dn === dn);
+    if (found?.fullPath) return found.fullPath;
+    return dn
+      .replace(/,?DC=[^,]+/gi, '')
+      .replace(/^CN=/i, '')
+      .replace(/^OU=/i, '')
+      .replace(/OU=/gi, '')
+      .replace(/,/g, ' / ');
+  }, [availableOUs]);
 
   /**
    * Convert error detail to string for display
@@ -270,6 +297,66 @@ const UserManagement = () => {
     }
     
     return String(detail);
+  };
+
+  const handleFilterTagClose = (key) => {
+    switch (key) {
+      case 'department':
+        setDepartmentFilter('');
+        break;
+      case 'ou':
+        setOuFilter('');
+        break;
+      case 'status':
+        setStatusFilter('all');
+        break;
+      case 'dateRange':
+        setDateRangeFilter(null);
+        break;
+      default:
+        break;
+    }
+  };
+
+  const handleClearAllFilters = () => {
+    setDepartmentFilter('');
+    setOuFilter('');
+    setStatusFilter('all');
+    setDateRangeFilter(null);
+    setSearchText('');
+  };
+
+  const openAdvancedFilterDrawer = () => {
+    filterForm.setFieldsValue({
+      department: departmentFilter || undefined,
+      ou: ouFilter || undefined,
+      status: statusFilter,
+      dateRange: Array.isArray(dateRangeFilter) ? dateRangeFilter : []
+    });
+    setIsFilterDrawerVisible(true);
+  };
+
+  const handleApplyAdvancedFilters = async () => {
+    try {
+      const values = await filterForm.validateFields();
+      setDepartmentFilter(values.department || '');
+      setOuFilter(values.ou || '');
+      setStatusFilter(values.status || 'all');
+      setDateRangeFilter(
+        values.dateRange && values.dateRange.length === 2 ? values.dateRange : null
+      );
+      setIsFilterDrawerVisible(false);
+    } catch (error) {
+      console.error('Failed to apply advanced filters:', error);
+    }
+  };
+
+  const handleResetAdvancedFilters = () => {
+    filterForm.resetFields();
+    setDepartmentFilter('');
+    setOuFilter('');
+    setStatusFilter('all');
+    setDateRangeFilter(null);
   };
 
   // ==================== DATA FETCHING ====================
@@ -523,6 +610,24 @@ const UserManagement = () => {
     }, 1000); // Load after 1 second
   }, [fetchUsers, fetchDepartments, fetchAvailableGroups, fetchUserOUs, fetchCategorizedGroups]);
 
+  useEffect(() => {
+    if (isFilterDrawerVisible) {
+      filterForm.setFieldsValue({
+        department: departmentFilter || undefined,
+        ou: ouFilter || undefined,
+        status: statusFilter,
+        dateRange: Array.isArray(dateRangeFilter) ? dateRangeFilter : []
+      });
+    }
+  }, [
+    isFilterDrawerVisible,
+    departmentFilter,
+    ouFilter,
+    statusFilter,
+    dateRangeFilter,
+    filterForm
+  ]);
+
   // ⚡ Auto-search when searchText or departmentFilter changes (with debounce)
   useEffect(() => {
     console.log('🔍 Search/filter changed - debouncing...', searchText, departmentFilter, ouFilter);
@@ -560,7 +665,7 @@ const UserManagement = () => {
   };
 
   const handleCreateUser = () => {
-    form.resetFields();
+    createForm.resetFields();
     setSelectedOU(null);
     setSelectedGroups([]);
     setSuggestedGroupsData(null);
@@ -581,7 +686,7 @@ const UserManagement = () => {
     try {
       if (currentStep === 0) {
         // Validate Step 1 fields
-        await form.validateFields(['cn', 'sAMAccountName', 'password', 'confirmPassword', 'mail']);
+        await createForm.validateFields(['cn', 'sAMAccountName', 'password', 'confirmPassword', 'mail']);
         setStep1Valid(true);
         setCurrentStep(1);
       } else if (currentStep === 1) {
@@ -714,7 +819,7 @@ const UserManagement = () => {
 
   const handleEditUser = (user) => {
     setEditingUser(user);
-    form.setFieldsValue({
+    editForm.setFieldsValue({
       cn: user.cn,
       sAMAccountName: user.sAMAccountName,
       mail: user.mail,
@@ -1002,7 +1107,7 @@ const UserManagement = () => {
     let formValues = null;
     
     try {
-      formValues = await form.validateFields();
+      formValues = await createForm.validateFields();
       
       // 🔒 Security Warning: Check if using HTTPS
       if (!config.apiUrl.startsWith('https://') && window.location.protocol !== 'file:') {
@@ -1048,7 +1153,7 @@ const UserManagement = () => {
       
       // Close modal first
       setIsCreateModalVisible(false);
-      form.resetFields();
+      createForm.resetFields();
       
       // Show notification
       notifyUserCreated(formValues.cn || formValues.displayName, formValues.mail);
@@ -1185,7 +1290,7 @@ const UserManagement = () => {
     let formValues = null;
     
     try {
-      formValues = await form.validateFields();
+      formValues = await editForm.validateFields();
       
       console.log('📝 Editing user:', editingUser.dn);
       console.log('📝 Form values:', formValues);
@@ -1265,7 +1370,7 @@ const UserManagement = () => {
         setSelectedUser(refreshedUser);
       }
       setIsEditModalVisible(false);
-      form.resetFields();
+      editForm.resetFields();
       setEditingUser(null);
       
       // ⚡ Invalidate cache and refresh
@@ -1370,13 +1475,31 @@ const UserManagement = () => {
         if (!userDn.includes(ouFilter.toLowerCase())) return false;
       }
 
+      if (Array.isArray(dateRangeFilter) && dateRangeFilter.length === 2) {
+        const createdDate = user.whenCreated ? dayjs(user.whenCreated) : null;
+        if (!createdDate) return false;
+        if (
+          createdDate.isBefore(dateRangeFilter[0], 'day') ||
+          createdDate.isAfter(dateRangeFilter[1], 'day')
+        ) {
+          return false;
+        }
+      }
+
       return true;
     });
-  }, [users, statusFilter, ouFilter, deduplicateUsers]);
+  }, [users, statusFilter, ouFilter, deduplicateUsers, dateRangeFilter]);
 
   const isFilteredView = useMemo(
-    () => Boolean(searchText || departmentFilter || statusFilter !== 'all' || ouFilter),
-    [searchText, departmentFilter, statusFilter, ouFilter]
+    () =>
+      Boolean(
+        searchText ||
+        departmentFilter ||
+        statusFilter !== 'all' ||
+        ouFilter ||
+        (Array.isArray(dateRangeFilter) && dateRangeFilter.length === 2)
+      ),
+    [searchText, departmentFilter, statusFilter, ouFilter, dateRangeFilter]
   );
 
   const paginatedUsers = useMemo(() => {
@@ -1400,6 +1523,69 @@ const UserManagement = () => {
     disabled: filteredUsers.filter(u => !u.isEnabled).length,
     departments: new Set(filteredUsers.filter(u => u.department).map(u => u.department)).size
   }), [filteredUsers]);
+
+  const heroMetrics = useMemo(() => ([
+    {
+      key: 'total',
+      label: 'ผู้ใช้ทั้งหมด',
+      value: formatCount(directoryCounts.total),
+      hint: 'ข้อมูลจาก AD',
+      accent: '#2563eb'
+    },
+    {
+      key: 'enabled',
+      label: 'เปิดใช้งาน',
+      value: formatCount(directoryCounts.enabled),
+      hint: `${formatCount(stats.enabled)} แสดงอยู่`,
+      accent: '#059669'
+    },
+    {
+      key: 'disabled',
+      label: 'ปิดใช้งาน',
+      value: formatCount(directoryCounts.disabled),
+      hint: `${formatCount(stats.disabled)} แสดงอยู่`,
+      accent: '#ef4444'
+    },
+    {
+      key: 'visible',
+      label: 'ผลลัพธ์ปัจจุบัน',
+      value: formatCount(stats.total),
+      hint: isFilteredView ? 'หลังใช้ตัวกรอง' : 'มุมมองปัจจุบัน',
+      accent: '#f97316'
+    }
+  ]), [
+    directoryCounts.total,
+    directoryCounts.enabled,
+    directoryCounts.disabled,
+    stats.enabled,
+    stats.disabled,
+    stats.total,
+    formatCount,
+    isFilteredView
+  ]);
+
+  const activeFilterTags = useMemo(() => {
+    const tags = [];
+    if (departmentFilter) {
+      tags.push({ key: 'department', label: `แผนก: ${departmentFilter}` });
+    }
+    if (ouFilter) {
+      tags.push({ key: 'ou', label: `OU: ${getOuLabel(ouFilter)}` });
+    }
+    if (statusFilter !== 'all') {
+      tags.push({
+        key: 'status',
+        label: statusFilter === 'enabled' ? 'สถานะ: Active' : 'สถานะ: Disabled'
+      });
+    }
+    if (Array.isArray(dateRangeFilter) && dateRangeFilter.length === 2) {
+      tags.push({
+        key: 'dateRange',
+        label: `สร้าง: ${dateRangeFilter[0].format('DD MMM YYYY')} - ${dateRangeFilter[1].format('DD MMM YYYY')}`
+      });
+    }
+    return tags;
+  }, [departmentFilter, ouFilter, statusFilter, dateRangeFilter, getOuLabel]);
   
   // Debug: Log stats when users change
   useEffect(() => {
@@ -1537,6 +1723,10 @@ const UserManagement = () => {
                 handleEditUser(record);
                 return;
               }
+              if (key === 'reset-password') {
+                handleResetPassword(record);
+                return;
+              }
               if (key === 'toggle') {
                 Modal.confirm({
                   title: record.isEnabled ? 'ปิดใช้งานผู้ใช้' : 'เปิดใช้งานผู้ใช้',
@@ -1572,12 +1762,17 @@ const UserManagement = () => {
                 label: 'แก้ไขข้อมูล'
               },
               {
-                key: 'toggle',
-                icon: record.isEnabled ? <LockOutlined style={{ color: '#f59e0b' }} /> : <UnlockOutlined style={{ color: '#10b981' }} />,
-                label: record.isEnabled ? 'ปิดใช้งาน' : 'เปิดใช้งาน'
+                key: 'reset-password',
+                icon: <KeyOutlined style={{ color: '#f59e0b' }} />,
+                label: 'รีเซ็ตรหัสผ่าน'
               },
               {
                 type: 'divider'
+              },
+              {
+                key: 'toggle',
+                icon: record.isEnabled ? <LockOutlined style={{ color: '#f59e0b' }} /> : <UnlockOutlined style={{ color: '#10b981' }} />,
+                label: record.isEnabled ? 'ปิดใช้งาน' : 'เปิดใช้งาน'
               },
               {
                 key: 'delete',
@@ -1600,7 +1795,7 @@ const UserManagement = () => {
         </Button>
       </Dropdown>
     </div>
-  ), [handleViewDetails, handleEditUser, handleToggleStatus, handleDeleteUser]);
+  ), [handleViewDetails, handleEditUser, handleToggleStatus, handleDeleteUser, handleResetPassword]);
 
   const allColumns = useMemo(() => [
     {
@@ -1768,196 +1963,228 @@ const UserManagement = () => {
   // ==================== RENDER ====================
   
   return (
-    <div className="user-management-container" style={{ 
-      padding: '16px 24px 24px',
-      margin: '0',
-      minHeight: '100vh',
-      height: 'auto',
-      width: '100%',
-      background: '#fafafa'
-    }}>
-      <Card
-        style={{
-          borderRadius: '12px',
-          background: '#ffffff',
-          border: '1px solid #f0f0f0',
-          boxShadow: '0 1px 2px rgba(0, 0, 0, 0.03)',
-          width: '100%'
-        }}
-        bodyStyle={{ padding: 0 }}
-      >
-        <div className="user-management-card-header">
-          <Row gutter={[16, 16]} align="middle">
-            <Col xs={24} lg={16}>
-              <Space size="middle" align="center" className="header-title-group" wrap>
-                <UserOutlined style={{ fontSize: 24, color: '#1890ff' }} />
-                <div>
-                  <Space size="middle" align="center" wrap>
-                    <div style={{ 
-                      color: '#262626', 
-                      margin: 0, 
-                      fontWeight: 600, 
-                      fontSize: 20
-                    }}>
-                      User Management
-                    </div>
-                    <Space size={8} wrap>
-                      <Tag style={{
-                        background: '#fafafa',
-                        border: '1px solid #d9d9d9',
-                        color: '#595959',
-                        fontSize: 12,
-                        padding: '2px 10px',
-                        fontWeight: 400,
-                        borderRadius: 10
-                      }}>
-                        AD Total: {formatCount(directoryCounts.total)}
-                      </Tag>
-                      <Tag style={{
-                        background: '#f6ffed',
-                        border: '1px solid #b7eb8f',
-                        color: '#52c41a',
-                        fontSize: 12,
-                        padding: '2px 10px',
-                        fontWeight: 400,
-                        borderRadius: 10
-                      }}>
-                        Active: {formatCount(directoryCounts.enabled)}
-                      </Tag>
-                      <Tag style={{
-                        background: '#fff1f0',
-                        border: '1px solid #ffccc7',
-                        color: '#ff4d4f',
-                        fontSize: 12,
-                        padding: '2px 10px',
-                        fontWeight: 400,
-                        borderRadius: 10
-                      }}>
-                        Disabled: {formatCount(directoryCounts.disabled)}
-                      </Tag>
-                      {(searchText || departmentFilter || statusFilter !== 'all') && (
-                        <Tag style={{
-                          background: '#e6f7ff',
-                          border: '1px solid #91d5ff',
-                          color: '#1890ff',
-                          fontSize: 12,
-                          padding: '2px 10px',
-                          fontWeight: 400,
-                          borderRadius: 10
-                        }}>
-                          Filtered: {formatCount(stats.total)}
-                        </Tag>
-                      )}
-                    </Space>
-                  </Space>
-                </div>
-              </Space>
-            </Col>
-            <Col xs={24} lg={8} style={{ display: 'flex', justifyContent: 'flex-end' }}>
-              <Space className="header-actions" size={[12, 12]} wrap>
-                <Button
-                  icon={<ReloadOutlined />}
-                  onClick={() => {
-                    fetchUsers(true);
-                  }}
-                  loading={loading}
-                >
-                  รีเฟรช
-                </Button>
-                <Button
-                  icon={<FilterOutlined />}
-                  onClick={() => setIsColumnSettingsVisible(true)}
-                >
-                  จัดการคอลัมน์
-                </Button>
-                <Button
-                  type="primary"
-                  icon={<UserAddOutlined />}
-                  onClick={handleCreateUser}
-                >
-                  สร้างผู้ใช้
-                </Button>
-              </Space>
-            </Col>
-          </Row>
-          <Row className="header-search-row" align="middle" gutter={[12, 12]}>
-            <Col xs={24} md={8} lg={6} xl={6}>
-              <Select
-                className="ou-filter-select"
-                placeholder="Filter by OU"
-                allowClear
-                showSearch
-                suffixIcon={<BankOutlined />}
-                value={ouFilter || undefined}
-                onChange={handleOuFilterChange}
-                optionFilterProp="children"
-                filterOption={(input, option) =>
-                  option?.children?.toLowerCase().includes(input.toLowerCase())
-                }
-              >
-                {availableOUs.map((ou) => (
-                  <Option key={ou.dn} value={ou.dn}>
-                    {ou.fullPath}
-                  </Option>
-                ))}
-              </Select>
-            </Col>
-            <Col xs={24} md={10} lg={10} xl={10}>
-              <Input
-                placeholder="Search users..."
-                prefix={<SearchOutlined />}
-                allowClear
-                value={searchText}
-                onChange={(e) => setSearchText(e.target.value)}
-                className="custom-search-input gradient-search-input search-input-large"
-              />
-            </Col>
-            <Col xs={24} md={6} lg={8} xl={8} className="header-pagination">
-              <Pagination
-                size="small"
-                current={currentPage}
-                pageSize={pageSize}
-                total={isFilteredView ? filteredUsers.length : directoryCounts.total || filteredUsers.length}
-                onChange={(page, size) => {
-                  setCurrentPage(page);
-                  setPageSize(size);
-                }}
-                showSizeChanger
-                showQuickJumper
-                pageSizeOptions={['20', '30', '50', '100', '200']}
-                showTotal={(total, range) => `${range[0]}-${range[1]} of ${total}`}
-              />
-            </Col>
-          </Row>
+    <div className="umx-root">
+      <section className="umx-hero">
+        <div className="umx-hero-content">
+          <div>
+            <Tag color="blue" className="umx-hero-badge">
+              DIRECTORY CONTROL CENTER
+            </Tag>
+            <div className="umx-hero-title">User Management Workspace</div>
+            <Text className="umx-hero-subtitle">
+              ตรวจสอบผู้ใช้ Active Directory, จัดการสิทธิ์ และสร้างบัญชีใหม่ได้ในหน้าจอเดียว
+            </Text>
+          </div>
+          <Space size="middle" wrap className="umx-hero-actions">
+            <Button icon={<ReloadOutlined />} onClick={() => fetchUsers(true)} loading={loading}>
+              รีเฟรชข้อมูล
+            </Button>
+            <Button icon={<FilterOutlined />} onClick={openAdvancedFilterDrawer}>
+              ตัวกรองเพิ่มเติม
+            </Button>
+            <Button icon={<TagOutlined />} onClick={() => setIsColumnSettingsVisible(true)}>
+              คอลัมน์
+            </Button>
+            <Button type="primary" icon={<UserAddOutlined />} onClick={handleCreateUser}>
+              สร้างผู้ใช้ใหม่
+            </Button>
+          </Space>
         </div>
+        <div className="umx-hero-metrics">
+          {heroMetrics.map((metric) => (
+            <div key={metric.key} className="umx-metric-card">
+              <div className="umx-metric-label">{metric.label}</div>
+              <div className="umx-metric-value" style={{ color: metric.accent }}>
+                {metric.value}
+              </div>
+              <div className="umx-metric-hint">{metric.hint}</div>
+            </div>
+          ))}
+        </div>
+      </section>
 
-        <Divider style={{ margin: 0 }} />
-
-        <div className="user-management-table-wrapper">
-          <Table
-            columns={columns}
-            dataSource={paginatedUsers}
-            rowKey="dn"
-            rowSelection={rowSelection}
-            loading={loading}
-            bordered={false}
-            size="middle"
-            scroll={{ x: 'max-content', y: tableScrollY }}
-            sticky={{ offsetHeader: 0 }}
-            tableLayout="fixed"
-            rowClassName={(record, index) => {
-              const baseClass = index % 2 === 0 ? 'table-row-light' : 'table-row-dark';
-              return selectedRowKeys.includes(record.dn) ? `${baseClass} row-selected` : baseClass;
-            }}
-            pagination={false}
-            components={{
-              body: {
-                wrapper: (props) => <tbody {...props} />
+      <section className="umx-filter-panel">
+        <div className="umx-filter-row">
+          <Input
+            placeholder="ค้นหาด้วยชื่อ อีเมล หรือ Username..."
+            prefix={<SearchOutlined className="umx-filter-icon" />}
+            allowClear
+            value={searchText}
+            onChange={(e) => setSearchText(e.target.value)}
+            size="large"
+            className="umx-search-input"
+          />
+          <Space size="middle" wrap className="umx-filter-controls">
+            <Select
+              placeholder="แผนก"
+              allowClear
+              value={departmentFilter || undefined}
+              onChange={handleDepartmentFilterChange}
+              className="umx-filter-select"
+            >
+              {departments.map((dept) => (
+                <Option key={dept} value={dept}>
+                  {dept}
+                </Option>
+              ))}
+            </Select>
+            <Select
+              value={statusFilter}
+              onChange={handleStatusFilterChange}
+              className="umx-filter-select"
+            >
+              <Option value="all">สถานะทั้งหมด</Option>
+              <Option value="enabled">Active</Option>
+              <Option value="disabled">Disabled</Option>
+            </Select>
+            <Select
+              showSearch
+              allowClear
+              placeholder="เลือก OU"
+              value={ouFilter || undefined}
+              onChange={handleOuFilterChange}
+              className="umx-filter-select"
+              optionFilterProp="children"
+              filterOption={(input, option) =>
+                option?.children?.toLowerCase().includes(input.toLowerCase())
               }
+            >
+              {availableOUs.map((ou) => (
+                <Option key={ou.dn} value={ou.dn}>
+                  {ou.fullPath}
+                </Option>
+              ))}
+            </Select>
+          </Space>
+        </div>
+        {activeFilterTags.length > 0 && (
+          <div className="umx-active-tags">
+            <Space size={[8, 8]} wrap>
+              {activeFilterTags.map((tag) => (
+                <Tag
+                  key={tag.key}
+                  closable
+                  className="umx-filter-tag"
+                  onClose={(e) => {
+                    e.preventDefault();
+                    handleFilterTagClose(tag.key);
+                  }}
+                >
+                  {tag.label}
+                </Tag>
+              ))}
+              <Button type="link" size="small" onClick={handleClearAllFilters}>
+                ล้างตัวกรองทั้งหมด
+              </Button>
+            </Space>
+          </div>
+        )}
+      </section>
+      <Card className="umx-table-card" bodyStyle={{ padding: 0 }}>
+        <div className="umx-table-head">
+          <div>
+            <div className="umx-table-title">รายชื่อผู้ใช้</div>
+            <Text type="secondary">
+              แสดง {paginatedUsers.length} จาก {formatCount(filteredUsers.length)} รายการในมุมมองนี้
+            </Text>
+          </div>
+          <Space size="middle">
+            <Tag color="blue">{formatCount(filteredUsers.length)} Visible</Tag>
+            <Tag color="green">{formatCount(directoryCounts.total)} AD Total</Tag>
+          </Space>
+        </div>
+        <Table
+          columns={columns}
+          dataSource={paginatedUsers}
+          rowKey="dn"
+          rowSelection={rowSelection}
+          loading={loading}
+          bordered={false}
+          size="middle"
+          scroll={{ x: 'max-content', y: tableScrollY }}
+          tableLayout="fixed"
+          rowClassName={(record, index) => {
+            const baseClass = index % 2 === 0 ? 'table-row-light' : 'table-row-dark';
+            return selectedRowKeys.includes(record.dn) ? `${baseClass} row-selected` : baseClass;
+          }}
+          pagination={false}
+          className="umx-table"
+          onRow={(record) => ({
+            onDoubleClick: () => handleViewDetails(record)
+          })}
+        />
+        <div className="umx-table-footer">
+          <Pagination
+            size="small"
+            current={currentPage}
+            pageSize={pageSize}
+            total={isFilteredView ? filteredUsers.length : directoryCounts.total || filteredUsers.length}
+            onChange={(page, size) => {
+              setCurrentPage(page);
+              setPageSize(size);
             }}
+            showSizeChanger
+            showQuickJumper
+            pageSizeOptions={['20', '30', '50', '100', '200']}
+            showTotal={(total, range) => `${range[0]}-${range[1]} จาก ${total}`}
           />
         </div>
       </Card>
+
+      <Drawer
+        title="ตัวกรองขั้นสูง"
+        placement="right"
+        width={360}
+        open={isFilterDrawerVisible}
+        onClose={() => setIsFilterDrawerVisible(false)}
+        destroyOnClose
+        className="umx-filter-drawer"
+      >
+        <Form layout="vertical" form={filterForm}>
+          <Form.Item label="แผนก" name="department">
+            <Select allowClear placeholder="เลือกแผนก">
+              {departments.map((dept) => (
+                <Option key={dept} value={dept}>
+                  {dept}
+                </Option>
+              ))}
+            </Select>
+          </Form.Item>
+          <Form.Item label="สถานะบัญชี" name="status">
+            <Select>
+              <Option value="all">ทั้งหมด</Option>
+              <Option value="enabled">Active</Option>
+              <Option value="disabled">Disabled</Option>
+            </Select>
+          </Form.Item>
+          <Form.Item label="OU" name="ou">
+            <Select
+              allowClear
+              showSearch
+              placeholder="เลือก OU"
+              optionFilterProp="children"
+              filterOption={(input, option) =>
+                option?.children?.toLowerCase().includes(input.toLowerCase())
+              }
+            >
+              {availableOUs.map((ou) => (
+                <Option key={ou.dn} value={ou.dn}>
+                  {ou.fullPath}
+                </Option>
+              ))}
+            </Select>
+          </Form.Item>
+          <Form.Item label="วันที่สร้าง" name="dateRange">
+            <RangePicker style={{ width: '100%' }} />
+          </Form.Item>
+        </Form>
+        <div className="umx-drawer-actions">
+          <Button onClick={handleResetAdvancedFilters}>รีเซ็ต</Button>
+          <Button type="primary" onClick={handleApplyAdvancedFilters}>
+            ใช้ตัวกรอง
+          </Button>
+        </div>
+      </Drawer>
 
       {/* Create User Modal - Step Wizard */}
       <Modal
@@ -2057,182 +2284,299 @@ const UserManagement = () => {
 
           {/* Single Form wrapping all steps */}
           <Form
-            form={form}
+            form={createForm}
             layout="vertical"
             name="createUserForm"
           >
             {/* Step 1: Essential Information */}
             <div style={{ display: currentStep === 0 ? 'block' : 'none' }}>
-                <Row gutter={16}>
-                  <Col span={12}>
-                    <Form.Item
-                      name="cn"
-                      label={
-                        <Space>
-                          <Text strong style={{ fontSize: 13 }}>Common Name (CN)</Text>
-                          <Tooltip title="Full name as it will appear in Active Directory">
-                            <QuestionCircleOutlined style={{ color: '#6b7280', fontSize: 12 }} />
-                          </Tooltip>
-                        </Space>
-                      }
-                      rules={[{ required: true, message: 'Please enter CN' }]}
-                    >
-                      <Input placeholder="e.g., Wutthiphong Chaiyaphoom" size="large" />
-                    </Form.Item>
-                  </Col>
-                  <Col span={12}>
-                    <Form.Item
-                      name="sAMAccountName"
-                      label={
-                        <Space>
-                          <Text strong style={{ fontSize: 13 }}>Username (Login)</Text>
-                          <Tooltip title="This will be used to login. Cannot be changed later.">
-                            <QuestionCircleOutlined style={{ color: '#6b7280', fontSize: 12 }} />
-                          </Tooltip>
-                        </Space>
-                      }
-                      rules={[{ required: true, message: 'Please enter username' }]}
-                    >
-                      <Input placeholder="e.g., wutthiphong.c" size="large" />
-                    </Form.Item>
-                  </Col>
-                </Row>
-
-            <Row gutter={16}>
-              <Col span={24}>
-                <Form.Item
-                  name="password"
-                  label={<Text strong style={{ fontSize: 13 }}>Password</Text>}
-                  rules={[
-                    { required: true, message: 'Please enter password' },
-                    { 
-                      min: 8, 
-                      message: 'Password must be at least 8 characters' 
-                    },
-                    {
-                      pattern: /^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)(?=.*[@$!%*?&#^()_+\-=\[\]{};:'",.<>\/\\|`~])[A-Za-z\d@$!%*?&#^()_+\-=\[\]{};:'",.<>\/\\|`~]{8,}$/,
-                      message: 'Password must contain: uppercase, lowercase, number, and special character'
-                    }
-                  ]}
-                >
-                  <Input.Password 
-                    placeholder="Enter strong password (min 8 chars)" 
-                    size="large"
-                    autoComplete="new-password"
-                  />
-                </Form.Item>
-              </Col>
-            </Row>
-
-            <Row gutter={16}>
-              <Col span={24}>
-                <Form.Item
-                  name="confirmPassword"
-                  label={<Text strong style={{ fontSize: 13 }}>Confirm Password</Text>}
-                  dependencies={['password']}
-                  rules={[
-                    { required: true, message: 'Please confirm your password' },
-                    ({ getFieldValue }) => ({
-                      validator(_, value) {
-                        if (!value || getFieldValue('password') === value) {
-                          return Promise.resolve();
-                        }
-                        return Promise.reject(new Error('The two passwords do not match!'));
-                      },
-                    }),
-                  ]}
-                >
-                  <Input.Password
-                    placeholder="Re-enter password to confirm"
-                    size="large"
-                    autoComplete="new-password"
-                  />
-                </Form.Item>
-              </Col>
-            </Row>
-
-                <Row gutter={16}>
-                  <Col span={12}>
-                    <Form.Item
-                      name="mail"
-                      label={
-                        <Space>
-                          <Text strong style={{ fontSize: 13 }}>Email</Text>
-                          <Tooltip title="Corporate email address">
-                            <QuestionCircleOutlined style={{ color: '#6b7280', fontSize: 12 }} />
-                          </Tooltip>
-                        </Space>
-                      }
-                      rules={[
-                        { required: true, message: 'Please enter email' },
-                        { type: 'email', message: 'Please enter valid email' }
-                      ]}
-                    >
-                      <Input placeholder="user@tbkk.co.th" size="large" suffix={<MailOutlined />} />
-                    </Form.Item>
-                  </Col>
-                  <Col span={12}>
-                    <Form.Item
-                      name="displayName"
-                      label={<Text strong style={{ fontSize: 13 }}>Display Name</Text>}
-                    >
-                      <Input placeholder="Auto-filled from CN" size="large" />
-                    </Form.Item>
-                  </Col>
-                </Row>
-
-                <Divider orientation="left">
-                  <Text strong>Organization</Text>
-                </Divider>
-
-                <Form.Item
-                  label={
-                    <Space>
-                      <Text strong style={{ fontSize: 13 }}>Organizational Unit (OU)</Text>
-                      <Tooltip title="Select where this user will be created. This will auto-select appropriate groups.">
-                        <QuestionCircleOutlined style={{ color: '#6b7280', fontSize: 12 }} />
-                      </Tooltip>
-                    </Space>
-                  }
-                >
-                  <Select
-                    placeholder="Select department/OU (optional - defaults to CN=Users)"
-                    size="large"
-                    allowClear
-                    showSearch
-                    value={selectedOU}
-                    onChange={handleOUChange}
-                    suffixIcon={<BankOutlined />}
-                    optionFilterProp="children"
-                    filterOption={(input, option) =>
-                      option.children.toLowerCase().includes(input.toLowerCase())
-                    }
+              <div className="umx-step-wrapper">
+                <div className="umx-step-columns">
+                  <Card
+                    className="umx-form-card"
+                    title="Account Basics"
+                    extra={<Tag color="blue">Required</Tag>}
+                    bodyStyle={{ padding: 0 }}
                   >
-                    {availableOUs.map(ou => (
-                      <Option key={ou.dn} value={ou.dn}>
-                        {ou.fullPath}
-                      </Option>
-                    ))}
-                  </Select>
-                  {selectedOU && (
-                    <div style={{
-                      background: '#ecfdf5',
-                      padding: '12px',
-                      borderRadius: 6,
-                      marginTop: 12,
-                      border: '1px solid #10b981'
-                    }}>
-                      <Space direction="vertical" size={4}>
-                        <Text style={{ fontSize: 12, color: '#059669', fontWeight: 600 }}>
-                          ✓ OU Selected: {availableOUs.find(ou => ou.dn === selectedOU)?.name}
-                        </Text>
-                        <Text style={{ fontSize: 11, color: '#6b7280' }}>
-                          💡 Groups will be auto-selected in the next step
-                        </Text>
-                      </Space>
+                    <div className="umx-form-card-body">
+                      <Row gutter={16}>
+                        <Col xs={24} md={12}>
+                          <Form.Item
+                            name="cn"
+                            label={
+                              <Space>
+                                <Text strong style={{ fontSize: 13 }}>Common Name (CN)</Text>
+                                <Tooltip title="Full name as it will appear in Active Directory">
+                                  <QuestionCircleOutlined style={{ color: '#6b7280', fontSize: 12 }} />
+                                </Tooltip>
+                              </Space>
+                            }
+                            rules={[{ required: true, message: 'Please enter CN' }]}
+                          >
+                            <Input placeholder="e.g., Wutthiphong Chaiyaphoom" size="large" />
+                          </Form.Item>
+                        </Col>
+                        <Col xs={24} md={12}>
+                          <Form.Item
+                            name="sAMAccountName"
+                            label={
+                              <Space>
+                                <Text strong style={{ fontSize: 13 }}>Username (Login)</Text>
+                                <Tooltip title="This will be used to login. Cannot be changed later.">
+                                  <QuestionCircleOutlined style={{ color: '#6b7280', fontSize: 12 }} />
+                                </Tooltip>
+                              </Space>
+                            }
+                            rules={[{ required: true, message: 'Please enter username' }]}
+                          >
+                            <Input placeholder="e.g., wutthiphong.c" size="large" />
+                          </Form.Item>
+                        </Col>
+                      </Row>
+
+                      <Row gutter={16}>
+                        <Col xs={24} md={12}>
+                          <Form.Item
+                            name="password"
+                            label={<Text strong style={{ fontSize: 13 }}>Password</Text>}
+                            rules={[
+                              { required: true, message: 'Please enter password' },
+                              { min: 8, message: 'Password must be at least 8 characters' },
+                              {
+                                pattern: /^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)(?=.*[@$!%*?&#^()_+\-=\[\]{};:'",.<>\/\\|`~])[A-Za-z\d@$!%*?&#^()_+\-=\[\]{};:'",.<>\/\\|`~]{8,}$/,
+                                message: 'Password must contain: uppercase, lowercase, number, and special character'
+                              }
+                            ]}
+                          >
+                            <Input.Password 
+                              placeholder="Enter strong password" 
+                              size="large"
+                              autoComplete="new-password"
+                            />
+                          </Form.Item>
+                        </Col>
+                        <Col xs={24} md={12}>
+                          <Form.Item
+                            name="confirmPassword"
+                            label={<Text strong style={{ fontSize: 13 }}>Confirm Password</Text>}
+                            dependencies={['password']}
+                            rules={[
+                              { required: true, message: 'Please confirm your password' },
+                              ({ getFieldValue }) => ({
+                                validator(_, value) {
+                                  if (!value || getFieldValue('password') === value) {
+                                    return Promise.resolve();
+                                  }
+                                  return Promise.reject(new Error('The two passwords do not match!'));
+                                },
+                              }),
+                            ]}
+                          >
+                            <Input.Password
+                              placeholder="Re-enter password"
+                              size="large"
+                              autoComplete="new-password"
+                            />
+                          </Form.Item>
+                        </Col>
+                      </Row>
+
+                      <Row gutter={16}>
+                        <Col xs={24} md={12}>
+                          <Form.Item
+                            name="mail"
+                            label={
+                              <Space>
+                                <Text strong style={{ fontSize: 13 }}>Email</Text>
+                                <Tooltip title="Corporate email address">
+                                  <QuestionCircleOutlined style={{ color: '#6b7280', fontSize: 12 }} />
+                                </Tooltip>
+                              </Space>
+                            }
+                            rules={[
+                              { required: true, message: 'Please enter email' },
+                              { type: 'email', message: 'Please enter valid email' }
+                            ]}
+                          >
+                            <Input placeholder="user@tbkk.co.th" size="large" suffix={<MailOutlined />} />
+                          </Form.Item>
+                        </Col>
+                        <Col xs={24} md={12}>
+                          <Form.Item
+                            name="displayName"
+                            label={<Text strong style={{ fontSize: 13 }}>Display Name</Text>}
+                          >
+                            <Input placeholder="Auto-filled from CN" size="large" />
+                          </Form.Item>
+                        </Col>
+                      </Row>
                     </div>
-                  )}
-                </Form.Item>
+                  </Card>
+
+                  <Card
+                    className="umx-form-card"
+                    title="Profile & Contact"
+                    bodyStyle={{ padding: 0 }}
+                  >
+                    <div className="umx-form-card-body">
+                      <Collapse
+                        defaultActiveKey={['personal', 'contact']}
+                        ghost
+                        className="umx-form-collapse"
+                      >
+                        <Collapse.Panel header="Personal Details" key="personal">
+                          <Row gutter={16}>
+                            <Col xs={24} md={12}>
+                              <Form.Item
+                                name="givenName"
+                                label={<Text strong style={{ fontSize: 13 }}>First Name</Text>}
+                              >
+                                <Input placeholder="Enter first name" size="large" />
+                              </Form.Item>
+                            </Col>
+                            <Col xs={24} md={12}>
+                              <Form.Item
+                                name="sn"
+                                label={<Text strong style={{ fontSize: 13 }}>Last Name</Text>}
+                              >
+                                <Input placeholder="Enter last name" size="large" />
+                              </Form.Item>
+                            </Col>
+                          </Row>
+                          <Row gutter={16}>
+                            <Col xs={24} md={12}>
+                              <Form.Item
+                                name="title"
+                                label={<Text strong style={{ fontSize: 13 }}>Job Title</Text>}
+                              >
+                                <Input placeholder="Enter job title" size="large" />
+                              </Form.Item>
+                            </Col>
+                            <Col xs={24} md={12}>
+                              <Form.Item
+                                name="department"
+                                label={<Text strong style={{ fontSize: 13 }}>Department</Text>}
+                              >
+                                <Input placeholder="Enter department name" size="large" />
+                              </Form.Item>
+                            </Col>
+                          </Row>
+                          <Row gutter={16}>
+                            <Col xs={24} md={12}>
+                              <Form.Item
+                                name="company"
+                                label={<Text strong style={{ fontSize: 13 }}>Company</Text>}
+                              >
+                                <Input placeholder="Enter company name" size="large" />
+                              </Form.Item>
+                            </Col>
+                            <Col xs={24} md={12}>
+                              <Form.Item
+                                name="employeeID"
+                                label={<Text strong style={{ fontSize: 13 }}>Employee ID</Text>}
+                              >
+                                <Input placeholder="Enter employee ID" size="large" />
+                              </Form.Item>
+                            </Col>
+                          </Row>
+                        </Collapse.Panel>
+
+                        <Collapse.Panel header="Contact & Office" key="contact">
+                          <Row gutter={16}>
+                            <Col xs={24} md={12}>
+                              <Form.Item
+                                name="telephoneNumber"
+                                label={<Text strong style={{ fontSize: 13 }}>Phone</Text>}
+                              >
+                                <Input placeholder="Enter phone number" size="large" />
+                              </Form.Item>
+                            </Col>
+                            <Col xs={24} md={12}>
+                              <Form.Item
+                                name="mobile"
+                                label={<Text strong style={{ fontSize: 13 }}>Mobile</Text>}
+                              >
+                                <Input placeholder="Enter mobile number" size="large" />
+                              </Form.Item>
+                            </Col>
+                          </Row>
+                          <Row gutter={16}>
+                            <Col xs={24} md={12}>
+                              <Form.Item
+                                name="physicalDeliveryOfficeName"
+                                label={<Text strong style={{ fontSize: 13 }}>Office Location</Text>}
+                              >
+                                <Input placeholder="Enter office location" size="large" />
+                              </Form.Item>
+                            </Col>
+                            <Col xs={24} md={12}>
+                              <Form.Item
+                                name="description"
+                                label={<Text strong style={{ fontSize: 13 }}>Description</Text>}
+                              >
+                                <Input.TextArea rows={3} placeholder="Enter description or notes" />
+                              </Form.Item>
+                            </Col>
+                          </Row>
+                        </Collapse.Panel>
+                      </Collapse>
+                    </div>
+                  </Card>
+                </div>
+
+                <div className="umx-step-lower">
+                  <Card
+                    className="umx-form-card"
+                    title="Organizational Placement"
+                    bodyStyle={{ padding: 0 }}
+                  >
+                    <div className="umx-form-card-body">
+                      <Form.Item
+                        label={
+                          <Space>
+                            <Text strong style={{ fontSize: 13 }}>Organizational Unit (OU)</Text>
+                            <Tooltip title="Select where this user will be created. This will auto-select appropriate groups.">
+                              <QuestionCircleOutlined style={{ color: '#6b7280', fontSize: 12 }} />
+                            </Tooltip>
+                          </Space>
+                        }
+                      >
+                        <Select
+                          placeholder="Select OU (optional - defaults to CN=Users)"
+                          size="large"
+                          allowClear
+                          showSearch
+                          value={selectedOU}
+                          onChange={handleOUChange}
+                          suffixIcon={<BankOutlined />}
+                          optionFilterProp="children"
+                          filterOption={(input, option) =>
+                            option.children.toLowerCase().includes(input.toLowerCase())
+                          }
+                        >
+                          {availableOUs.map(ou => (
+                            <Option key={ou.dn} value={ou.dn}>
+                              {ou.fullPath}
+                            </Option>
+                          ))}
+                        </Select>
+                        {selectedOU && (
+                          <div className="umx-ou-preview">
+                            <Space direction="vertical" size={4}>
+                              <Text style={{ fontSize: 12, color: '#059669', fontWeight: 600 }}>
+                                ✓ OU Selected: {availableOUs.find(ou => ou.dn === selectedOU)?.name}
+                              </Text>
+                              <Text style={{ fontSize: 11, color: '#6b7280' }}>
+                                💡 Groups will be auto-selected in the next step
+                              </Text>
+                            </Space>
+                          </div>
+                        )}
+                      </Form.Item>
+                    </div>
+                  </Card>
+                </div>
+              </div>
             </div>
 
             {/* Step 2: Groups & Permissions */}
@@ -2439,7 +2783,7 @@ const UserManagement = () => {
                     labelStyle={{ width: '35%', background: '#f8fafc' }}
                   >
                     <Text strong style={{ fontSize: 14 }}>
-                      {form.getFieldValue('cn') || '-'}
+                      {createForm.getFieldValue('cn') || '-'}
                     </Text>
                   </Descriptions.Item>
                   <Descriptions.Item 
@@ -2447,7 +2791,7 @@ const UserManagement = () => {
                     labelStyle={{ background: '#f8fafc' }}
                   >
                     <Text code style={{ fontSize: 13 }}>
-                      {form.getFieldValue('sAMAccountName') || '-'}
+                      {createForm.getFieldValue('sAMAccountName') || '-'}
                     </Text>
                   </Descriptions.Item>
                   <Descriptions.Item 
@@ -2456,7 +2800,7 @@ const UserManagement = () => {
                   >
                     <Text style={{ fontSize: 13 }}>
                       <MailOutlined style={{ marginRight: 6, color: '#3b82f6' }} />
-                      {form.getFieldValue('mail') || '-'}
+                      {createForm.getFieldValue('mail') || '-'}
                     </Text>
                   </Descriptions.Item>
                   <Descriptions.Item 
@@ -2464,7 +2808,87 @@ const UserManagement = () => {
                     labelStyle={{ background: '#f8fafc' }}
                   >
                     <Text style={{ fontSize: 13 }}>
-                      {form.getFieldValue('displayName') || form.getFieldValue('cn') || '-'}
+                      {createForm.getFieldValue('displayName') || createForm.getFieldValue('cn') || '-'}
+                    </Text>
+                  </Descriptions.Item>
+                  <Descriptions.Item 
+                    label={<Text strong>First Name</Text>}
+                    labelStyle={{ background: '#f8fafc' }}
+                  >
+                    <Text style={{ fontSize: 13 }}>
+                      {createForm.getFieldValue('givenName') || '-'}
+                    </Text>
+                  </Descriptions.Item>
+                  <Descriptions.Item 
+                    label={<Text strong>Last Name</Text>}
+                    labelStyle={{ background: '#f8fafc' }}
+                  >
+                    <Text style={{ fontSize: 13 }}>
+                      {createForm.getFieldValue('sn') || '-'}
+                    </Text>
+                  </Descriptions.Item>
+                  <Descriptions.Item 
+                    label={<Text strong>Job Title</Text>}
+                    labelStyle={{ background: '#f8fafc' }}
+                  >
+                    <Text style={{ fontSize: 13 }}>
+                      {createForm.getFieldValue('title') || '-'}
+                    </Text>
+                  </Descriptions.Item>
+                  <Descriptions.Item 
+                    label={<Text strong>Department</Text>}
+                    labelStyle={{ background: '#f8fafc' }}
+                  >
+                    <Text style={{ fontSize: 13 }}>
+                      {createForm.getFieldValue('department') || '-'}
+                    </Text>
+                  </Descriptions.Item>
+                  <Descriptions.Item 
+                    label={<Text strong>Company</Text>}
+                    labelStyle={{ background: '#f8fafc' }}
+                  >
+                    <Text style={{ fontSize: 13 }}>
+                      {createForm.getFieldValue('company') || '-'}
+                    </Text>
+                  </Descriptions.Item>
+                  <Descriptions.Item 
+                    label={<Text strong>Employee ID</Text>}
+                    labelStyle={{ background: '#f8fafc' }}
+                  >
+                    <Text style={{ fontSize: 13 }}>
+                      {createForm.getFieldValue('employeeID') || '-'}
+                    </Text>
+                  </Descriptions.Item>
+                  <Descriptions.Item 
+                    label={<Text strong>Phone</Text>}
+                    labelStyle={{ background: '#f8fafc' }}
+                  >
+                    <Text style={{ fontSize: 13 }}>
+                      {createForm.getFieldValue('telephoneNumber') || '-'}
+                    </Text>
+                  </Descriptions.Item>
+                  <Descriptions.Item 
+                    label={<Text strong>Mobile</Text>}
+                    labelStyle={{ background: '#f8fafc' }}
+                  >
+                    <Text style={{ fontSize: 13 }}>
+                      {createForm.getFieldValue('mobile') || '-'}
+                    </Text>
+                  </Descriptions.Item>
+                  <Descriptions.Item 
+                    label={<Text strong>Office Location</Text>}
+                    labelStyle={{ background: '#f8fafc' }}
+                  >
+                    <Text style={{ fontSize: 13 }}>
+                      {createForm.getFieldValue('physicalDeliveryOfficeName') || '-'}
+                    </Text>
+                  </Descriptions.Item>
+                  <Descriptions.Item 
+                    label={<Text strong>Description</Text>}
+                    labelStyle={{ background: '#f8fafc' }}
+                  >
+                    <Text style={{ fontSize: 13 }}>
+                      {createForm.getFieldValue('description') || '-'}
                     </Text>
                   </Descriptions.Item>
                   <Descriptions.Item 
@@ -2637,7 +3061,7 @@ const UserManagement = () => {
       >
         <div style={{ padding: '20px 0' }}>
           <Form
-            form={form}
+            form={editForm}
             layout="vertical"
             name="editUserForm"
           >
@@ -3229,116 +3653,8 @@ const UserManagement = () => {
                 </Descriptions>
               </Card>
 
-              <Space direction="vertical" style={{ width: '100%' }} size="middle">
-                <Button
-                  type="primary"
-                  icon={<EditOutlined />}
-                  onClick={() => {
-                    setIsDetailsDrawerVisible(false);
-                    handleEditUser(selectedUser);
-                  }}
-                  size="large"
-                  style={{
-                    width: '100%',
-                    background: 'linear-gradient(135deg, #3b82f6, #2563eb)',
-                    border: 'none',
-                    fontWeight: 600,
-                    borderRadius: 8,
-                    height: 44
-                  }}
-                >
-                  Edit User
-                </Button>
-                <Button
-                  icon={<KeyOutlined />}
-                  onClick={() => {
-                    setIsDetailsDrawerVisible(false);
-                    handleResetPassword(selectedUser);
-                  }}
-                  size="large"
-                  style={{
-                    width: '100%',
-                    fontWeight: 600,
-                    borderRadius: 8,
-                    height: 44,
-                    border: '2px solid #f59e0b',
-                    color: '#f59e0b'
-                  }}
-                >
-                  Reset Password
-                </Button>
-              </Space>
             </TabPane>
 
-            <TabPane
-              tab={
-                <span>
-                  <KeyOutlined />
-                  Account Options
-                </span>
-              }
-              key="account-options"
-            >
-              <Card
-                size="small"
-                bodyStyle={{ padding: 0 }}
-                style={{
-                  background: '#ffffff',
-                  border: '1px solid #e5e7eb',
-                  borderRadius: 8
-                }}
-                title={
-                  <Space align="center">
-                    <KeyOutlined style={{ color: '#2563eb' }} />
-                    <Text strong>User Account Options</Text>
-                  </Space>
-                }
-                headStyle={{
-                  background: '#f8fafc',
-                  borderBottom: '1px solid #e5e7eb'
-                }}
-              >
-                <List
-                  itemLayout="horizontal"
-                  dataSource={accountOptionDetails}
-                  renderItem={(item) => (
-                    <List.Item
-                      style={{ borderBottom: '1px solid #f3f4f6', padding: '12px 16px' }}
-                      actions={[
-                        <Switch
-                          key={`${item.key}-switch`}
-                          checked={item.active}
-                          disabled
-                          style={{ background: item.active ? '#10b981' : undefined }}
-                        />
-                      ]}
-                    >
-                      <List.Item.Meta
-                        avatar={
-                          <Avatar
-                            icon={item.active ? item.icon : item.inactiveIcon}
-                            style={{
-                              background: item.active ? '#ecfdf5' : '#f3f4f6',
-                              color: item.active ? '#047857' : '#6b7280'
-                            }}
-                          />
-                        }
-                        title={
-                          <Text strong style={{ fontSize: 13 }}>
-                            {item.label}
-                          </Text>
-                        }
-                        description={
-                          <Text type="secondary" style={{ fontSize: 12 }}>
-                            {item.description}
-                          </Text>
-                        }
-                      />
-                    </List.Item>
-                  )}
-                />
-              </Card>
-            </TabPane>
 
             <TabPane
               tab={

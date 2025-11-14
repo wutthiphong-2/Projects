@@ -267,11 +267,8 @@ def format_user_data(entry: tuple, full_details: bool = True) -> Dict[str, Any]:
     user_account_control = int(attrs.get("userAccountControl", ["0"])[0]) if attrs.get("userAccountControl") else 0
     
     pwd_last_set_raw = (attrs.get("pwdLastSet", [None]) or [None])[0]
-    must_change_password = False
-    if isinstance(pwd_last_set_raw, str):
-        must_change_password = pwd_last_set_raw == "0"
-    elif isinstance(pwd_last_set_raw, (int, float)):
-        must_change_password = pwd_last_set_raw == 0
+    pwd_last_set_dt = ad_timestamp_to_datetime(pwd_last_set_raw)
+    must_change_password = pwd_last_set_raw in ("0", 0)
 
     account_options = {
         "mustChangePassword": must_change_password,
@@ -299,6 +296,10 @@ def format_user_data(entry: tuple, full_details: bool = True) -> Dict[str, Any]:
     
     # Only include full details when requested (single user view)
     if full_details:
+        last_logon_raw = get_attr("lastLogon") or None
+        last_logon_ts_raw = get_attr("lastLogonTimestamp") or None
+        last_logon_dt = ad_timestamp_to_datetime(last_logon_raw) or ad_timestamp_to_datetime(last_logon_ts_raw)
+
         result.update({
             "givenName": get_attr("givenName") or None,
             "sn": get_attr("sn") or None,
@@ -314,8 +315,8 @@ def format_user_data(entry: tuple, full_details: bool = True) -> Dict[str, Any]:
             "memberOf": attrs.get("memberOf", []),
             "whenCreated": get_attr("whenCreated") or None,
             "whenChanged": get_attr("whenChanged") or None,
-            "lastLogon": get_attr("lastLogon") or None,
-            "pwdLastSet": get_attr("pwdLastSet") or None,
+            "lastLogon": last_logon_dt.isoformat() if last_logon_dt else None,
+            "pwdLastSet": pwd_last_set_dt.isoformat() if pwd_last_set_dt else None,
         })
     else:
         # ⚡ Include limited metadata needed for list view (avoid heavy attributes)
@@ -964,6 +965,9 @@ async def create_user(user_data: UserCreate, request: Request, token_data = Depe
         
         # Invalidate cache after user creation
         invalidate_cache("get_users")
+        invalidate_cache("/api/users")
+        invalidate_cache("/api/users")
+        invalidate_cache("/api/users")
         
         # Log activity
         activity_logger.log_activity(
