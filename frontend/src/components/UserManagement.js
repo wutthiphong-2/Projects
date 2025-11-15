@@ -72,6 +72,12 @@ import { useAuth } from '../contexts/AuthContext';
 import { useNotification } from '../contexts/NotificationContext';
 import { GROUP_DEFAULTS_CONFIG, getDefaultGroupsForOU, getCategoryStatistics } from '../config/groupDefaults';
 import { apiCache } from '../utils/cache';
+import {
+  formatCount,
+  resolveOuLabel,
+  formatErrorDetail,
+  deduplicateUsers as deduplicateUserRecords
+} from '../utils/userManagementHelpers';
 import './UserManagement.css';
 
 const { Title, Text } = Typography;
@@ -242,63 +248,15 @@ const UserManagement = () => {
 
   // ==================== HELPER FUNCTIONS ====================
   
-  const formatCount = useCallback((value) => {
-    if (typeof value === 'number') {
-      return value.toLocaleString();
-    }
-    if (typeof value === 'string') {
-      return value;
-    }
-    return '0';
-  }, []);
-
-  const formatDateTime = useCallback((value, fallback = '-') => {
-    if (!value) return fallback;
-    const parsed = dayjs(value);
-    if (!parsed.isValid()) return fallback;
-    return parsed.format('DD MMM YYYY HH:mm');
-  }, []);
-
-  const getOuLabel = useCallback((dn) => {
-    if (!dn) return 'CN=Users';
-    const found = availableOUs.find((ou) => ou.dn === dn);
-    if (found?.fullPath) return found.fullPath;
-    return dn
-      .replace(/,?DC=[^,]+/gi, '')
-      .replace(/^CN=/i, '')
-      .replace(/^OU=/i, '')
-      .replace(/OU=/gi, '')
-      .replace(/,/g, ' / ');
-  }, [availableOUs]);
+  const getOuLabel = useCallback(
+    (dn) => resolveOuLabel(dn, availableOUs),
+    [availableOUs]
+  );
 
   /**
    * Convert error detail to string for display
    * Handles FastAPI validation errors (array of objects), strings, and objects
    */
-  const formatErrorDetail = (detail) => {
-    if (!detail) return null;
-    
-    // Handle FastAPI validation errors (array of objects)
-    if (Array.isArray(detail)) {
-      return detail.map(err => {
-        const field = err.loc?.join(' > ') || 'Unknown field';
-        return `• ${field}: ${err.msg}`;
-      }).join('\n');
-    }
-    
-    // Handle string errors
-    if (typeof detail === 'string') {
-      return detail;
-    }
-    
-    // Handle object errors
-    if (typeof detail === 'object') {
-      return JSON.stringify(detail, null, 2);
-    }
-    
-    return String(detail);
-  };
-
   const handleFilterTagClose = (key) => {
     switch (key) {
       case 'department':
@@ -1412,51 +1370,10 @@ const UserManagement = () => {
 
   // ==================== FILTERED DATA ====================
   
-  const scoreUserRecord = useCallback((user) => {
-    if (!user) return 0;
-    let score = 0;
-    if (user.mail) score += 4;
-    if (user.title) score += 2;
-    if (user.department) score += 2;
-    if (user.company) score += 1.5;
-    if (user.physicalDeliveryOfficeName) score += 1.2;
-    if (user.employeeID) score += 1;
-    if (user.telephoneNumber || user.mobile) score += 1;
-    if (user.description) score += 0.5;
-    if (user.isEnabled) score += 1;
-    const username = (user.sAMAccountName || '').toString().toLowerCase();
-    if (username) {
-      if (username.endsWith('$')) {
-        score -= 3;
-      } else {
-        score += 1;
-      }
-    }
-    return score;
-  }, []);
-
-  const getUserDedupKey = useCallback((user) => {
-    if (!user) return `unknown-${Math.random()}`;
-    const displayKey = (user.cn || user.displayName || '').toString().trim().toLowerCase();
-    if (displayKey) return displayKey;
-    const usernameKey = (user.sAMAccountName || user.userPrincipalName || '').toString().trim().toLowerCase();
-    if (usernameKey) return usernameKey;
-    return (user.dn || user.id || `unknown-${Math.random()}`).toString().trim().toLowerCase();
-  }, []);
-
-  const deduplicateUsers = useCallback((userList) => {
-    const map = new Map();
-    userList.forEach(user => {
-      const key = getUserDedupKey(user);
-      const candidateScore = scoreUserRecord(user);
-      const existing = map.get(key);
-      if (!existing || candidateScore >= existing.score) {
-        const mergedUser = { ...(existing?.user || {}), ...user };
-        map.set(key, { user: mergedUser, score: Math.max(candidateScore, existing?.score || 0) });
-      }
-    });
-    return Array.from(map.values()).map(entry => entry.user);
-  }, [getUserDedupKey, scoreUserRecord]);
+  const dedupedUsers = useMemo(
+    () => deduplicateUserRecords(users),
+    [users]
+  );
 
   const getResponsiveWidth = useCallback((desktopWidth, tabletWidth, mobileWidth = '100%') => {
     if (screens.xl || screens.lg) return desktopWidth;
@@ -1465,8 +1382,7 @@ const UserManagement = () => {
   }, [screens]);
 
   const filteredUsers = useMemo(() => {
-    const deduped = deduplicateUsers(users);
-    return deduped.filter(user => {
+    return dedupedUsers.filter(user => {
       if (statusFilter === 'enabled' && !user.isEnabled) return false;
       if (statusFilter === 'disabled' && user.isEnabled) return false;
 
@@ -1488,7 +1404,7 @@ const UserManagement = () => {
 
       return true;
     });
-  }, [users, statusFilter, ouFilter, deduplicateUsers, dateRangeFilter]);
+  }, [dedupedUsers, statusFilter, ouFilter, dateRangeFilter]);
 
   const isFilteredView = useMemo(
     () =>
