@@ -44,11 +44,12 @@ class UserCreate(BaseModel):
     # New fields for enhanced user creation
     ou: Optional[str] = None  # OU DN where user will be created
     groups: Optional[List[str]] = []  # List of group DNs to add user to
-    mustChangePassword: Optional[bool] = False  # User must change password at next logon
-    userCannotChangePassword: Optional[bool] = False  # Prevent user from changing password
-    passwordNeverExpires: Optional[bool] = False  # Password never expires
-    storePasswordUsingReversibleEncryption: Optional[bool] = False  # Store password using reversible encryption
     accountDisabled: Optional[bool] = False  # Create account as disabled
+    # Account options
+    passwordMustChange: Optional[bool] = False  # User must change password at next logon
+    userCannotChangePassword: Optional[bool] = False  # User cannot change password
+    passwordNeverExpires: Optional[bool] = False  # Password never expires
+    storePasswordReversible: Optional[bool] = False  # Store password using reversible encryption
 
 class UserUpdate(BaseModel):
     cn: Optional[str] = None
@@ -70,12 +71,11 @@ class UserUpdate(BaseModel):
     postalCode: Optional[str] = None
     co: Optional[str] = None  # country in AD
     description: Optional[str] = None
-
-class AccountOptionsResponse(BaseModel):
-    mustChangePassword: bool = False
-    userCannotChangePassword: bool = False
-    passwordNeverExpires: bool = False
-    storePasswordUsingReversibleEncryption: bool = False
+    # Account options
+    passwordMustChange: Optional[bool] = None  # User must change password at next logon
+    userCannotChangePassword: Optional[bool] = None  # User cannot change password
+    passwordNeverExpires: Optional[bool] = None  # Password never expires
+    storePasswordReversible: Optional[bool] = None  # Store password using reversible encryption
 
 
 class UserResponse(BaseModel):
@@ -102,11 +102,15 @@ class UserResponse(BaseModel):
     userAccountControl: int
     memberOf: List[str]
     isEnabled: bool
-    accountOptions: AccountOptionsResponse = AccountOptionsResponse()
     whenCreated: Optional[str] = None
     whenChanged: Optional[str] = None
     lastLogon: Optional[str] = None
     pwdLastSet: Optional[str] = None
+    # Account options (parsed from userAccountControl)
+    passwordMustChange: Optional[bool] = False
+    userCannotChangePassword: Optional[bool] = False
+    passwordNeverExpires: Optional[bool] = False
+    storePasswordReversible: Optional[bool] = False
 
 class UserStatsResponse(BaseModel):
     total_users: int
@@ -134,10 +138,64 @@ def is_account_disabled(user_account_control: int) -> bool:
     """Check if user account is disabled"""
     return bool(user_account_control & 0x2)
 
+def parse_account_options(user_account_control: int) -> Dict[str, bool]:
+    """Parse userAccountControl flags into account options dictionary"""
+    return {
+        "passwordMustChange": bool(user_account_control & 0x80000),  # PASSWORD_EXPIRED
+        "userCannotChangePassword": bool(user_account_control & 0x40),  # PASSWD_CANT_CHANGE
+        "passwordNeverExpires": bool(user_account_control & 0x10000),  # DONT_EXPIRE_PASSWD
+        "storePasswordReversible": bool(user_account_control & 0x80),  # ENCRYPTED_TEXT_PASSWORD_ALLOWED
+    }
+
+def build_user_account_control(base_uac: int, options: Optional[Dict[str, bool]] = None) -> int:
+    """Build userAccountControl value from base UAC and account options"""
+    if options is None:
+        return base_uac
+    
+    uac = base_uac
+    
+    # PASSWORD_EXPIRED (0x80000) - User must change password at next logon
+    if options.get("passwordMustChange", False):
+        uac |= 0x80000
+    else:
+        uac &= ~0x80000
+    
+    # PASSWD_CANT_CHANGE (0x40) - User cannot change password
+    if options.get("userCannotChangePassword", False):
+        uac |= 0x40
+    else:
+        uac &= ~0x40
+    
+    # DONT_EXPIRE_PASSWD (0x10000) - Password never expires
+    if options.get("passwordNeverExpires", False):
+        uac |= 0x10000
+    else:
+        uac &= ~0x10000
+    
+    # ENCRYPTED_TEXT_PASSWORD_ALLOWED (0x80) - Store password using reversible encryption
+    if options.get("storePasswordReversible", False):
+        uac |= 0x80
+    else:
+        uac &= ~0x80
+    
+    return uac
+
 def ensure_timezone(dt: datetime) -> datetime:
     if dt.tzinfo is None:
         dt = dt.replace(tzinfo=timezone.utc)
     return dt.astimezone(THAILAND_TZ)
+
+def datetime_to_filetime(dt: datetime) -> str:
+    """Convert datetime to Windows FILETIME format (100-nanosecond intervals since January 1, 1601)"""
+    if dt.tzinfo is None:
+        dt = dt.replace(tzinfo=timezone.utc)
+    # Convert to UTC
+    dt_utc = dt.astimezone(timezone.utc)
+    # Calculate seconds since Unix epoch
+    unix_timestamp = dt_utc.timestamp()
+    # Convert to Windows FILETIME (100-nanosecond intervals since January 1, 1601)
+    filetime = int((unix_timestamp + WINDOWS_EPOCH_OFFSET_SECONDS) * 10_000_000)
+    return str(filetime)
 
 def ad_timestamp_to_datetime(value: Optional[str]) -> Optional[datetime]:
     """Convert Windows FILETIME string or ISO datetime to timezone-aware datetime"""
@@ -266,17 +324,9 @@ def format_user_data(entry: tuple, full_details: bool = True) -> Dict[str, Any]:
     
     user_account_control = int(attrs.get("userAccountControl", ["0"])[0]) if attrs.get("userAccountControl") else 0
     
-    pwd_last_set_raw = (attrs.get("pwdLastSet", [None]) or [None])[0]
-    pwd_last_set_dt = ad_timestamp_to_datetime(pwd_last_set_raw)
-    must_change_password = pwd_last_set_raw in ("0", 0)
-
-    account_options = {
-        "mustChangePassword": must_change_password,
-        "userCannotChangePassword": bool(user_account_control & 0x40),
-        "passwordNeverExpires": bool(user_account_control & 0x10000),
-        "storePasswordUsingReversibleEncryption": bool(user_account_control & 0x80),
-    }
-
+    # Parse account options from userAccountControl
+    account_options = parse_account_options(user_account_control)
+    
     # Always include basic info
     result = {
         "dn": dn,
@@ -291,14 +341,22 @@ def format_user_data(entry: tuple, full_details: bool = True) -> Dict[str, Any]:
         "description": get_attr("description") or None,
         "userAccountControl": user_account_control,
         "isEnabled": not is_account_disabled(user_account_control),
-        "accountOptions": account_options,
+        # Account options
+        "passwordMustChange": account_options["passwordMustChange"],
+        "userCannotChangePassword": account_options["userCannotChangePassword"],
+        "passwordNeverExpires": account_options["passwordNeverExpires"],
+        "storePasswordReversible": account_options["storePasswordReversible"],
     }
+    
     
     # Only include full details when requested (single user view)
     if full_details:
         last_logon_raw = get_attr("lastLogon") or None
         last_logon_ts_raw = get_attr("lastLogonTimestamp") or None
         last_logon_dt = ad_timestamp_to_datetime(last_logon_raw) or ad_timestamp_to_datetime(last_logon_ts_raw)
+        
+        pwd_last_set_raw = get_attr("pwdLastSet") or None
+        pwd_last_set_dt = ad_timestamp_to_datetime(pwd_last_set_raw) if pwd_last_set_raw and pwd_last_set_raw != "0" else None
 
         result.update({
             "givenName": get_attr("givenName") or None,
@@ -418,15 +476,16 @@ async def get_users(
             search_filters.append(f"(physicalDeliveryOfficeName={pattern})")
         
         # Basic search (backward compatible) - OR across common fields
+        # Exclude computer accounts (sAMAccountName ending with $)
         if q and not search_filters:
             s = apply_search_mode(q, search_mode)
-            base_filter = f"(&(objectClass=user)(|(cn={s})(sAMAccountName={s})(mail={s})(displayName={s})))"
+            base_filter = f"(&(objectClass=user)(!(sAMAccountName=*$))(|(cn={s})(sAMAccountName={s})(mail={s})(displayName={s})))"
         elif search_filters:
             # Advanced search - AND all specified fields
             combined_filters = "".join(search_filters)
-            base_filter = f"(&(objectClass=user){combined_filters})"
+            base_filter = f"(&(objectClass=user)(!(sAMAccountName=*$)){combined_filters})"
         else:
-            base_filter = "(objectClass=user)"
+            base_filter = "(&(objectClass=user)(!(sAMAccountName=*$)))"
 
         # Legacy department filter (for backward compatibility)
         if department:
@@ -451,6 +510,7 @@ async def get_users(
                 "physicalDeliveryOfficeName",
                 "description",
                 "userAccountControl",
+                "pwdLastSet",
                 "givenName",
                 "sn",
                 "telephoneNumber",
@@ -471,7 +531,20 @@ async def get_users(
         logger.info(f"✅ LDAP returned {len(results)} raw results from AD")
         
         # ⚡ PERFORMANCE: Use lightweight format (faster processing!)
-        users_all = [format_user_data(entry, full_details=False) for entry in results]
+        # Filter out computer accounts (safety check - already filtered in LDAP query)
+        users_all = []
+        for entry in results:
+            dn, attrs = entry
+            username = (attrs.get("sAMAccountName") or [None])[0]
+            display_name = (attrs.get("displayName") or attrs.get("cn") or [None])[0]
+            email = (attrs.get("mail") or [None])[0]
+            # Skip computer accounts (username ending with $)
+            if username and username.endswith("$"):
+                continue
+            # Additional safety check using is_likely_system_account
+            if is_likely_system_account(username, display_name, email):
+                continue
+            users_all.append(format_user_data(entry, full_details=False))
         
         # ⚡ Sort by whenCreated (newest first)
         users_all.sort(key=lambda u: u.get('whenCreated') or '', reverse=True)
@@ -497,7 +570,7 @@ async def get_user_stats(token: str = Depends(verify_token)):
     try:
         results = ldap_conn.search(
             settings.LDAP_BASE_DN,
-            "(&(objectCategory=person)(objectClass=user))",
+            "(&(objectCategory=person)(objectClass=user)(!(sAMAccountName=*$)))",
             ["userAccountControl"]
         )
 
@@ -640,10 +713,10 @@ async def get_departments(token: str = Depends(verify_token)):
     """Return unique list of departments found in AD users"""
     ldap_conn = get_ldap_connection()
     try:
-        # Optimized: Only fetch users with department attribute
+        # Optimized: Only fetch users with department attribute (exclude computer accounts)
         results = ldap_conn.search(
             settings.LDAP_BASE_DN,
-            "(&(objectClass=user)(department=*))",
+            "(&(objectClass=user)(!(sAMAccountName=*$))(department=*))",
             ["department"]
         )
 
@@ -752,7 +825,7 @@ async def get_user(dn: str, token_data = Depends(verify_token)):
              "employeeID", "physicalDeliveryOfficeName", "streetAddress", "l", 
              "st", "postalCode", "co", "description",
              "userAccountControl", "memberOf", "whenCreated", "whenChanged", 
-             "lastLogon", "pwdLastSet"]
+             "lastLogon", "lastLogonTimestamp", "pwdLastSet", "logonCount"]
         )
         
         if not results:
@@ -789,13 +862,12 @@ async def create_user(user_data: UserCreate, request: Request, token_data = Depe
             user_dn = f"CN={user_data.cn},CN=Users,{settings.LDAP_BASE_DN}"
             logger.info(f"📍 Creating user in default location: CN=Users")
         
-        # Determine userAccountControl based on account options
+        # Determine userAccountControl
         # Base: 512 = Normal account
         # +2 = Disabled (ACCOUNTDISABLE)
         # +32 = Password not required (for initial creation)
-        # +65536 = Don't expire password (DONT_EXPIRE_PASSWD)
         
-        uac = 544  # Start with disabled + password not required (512 + 32)
+        base_uac = 544  # Start with disabled + password not required (512 + 32)
         
         if user_data.accountDisabled:
             # Keep disabled
@@ -804,15 +876,19 @@ async def create_user(user_data: UserCreate, request: Request, token_data = Depe
             # Will be enabled after password is set
             logger.info("✅ Account will be ENABLED after password is set")
         
-        if user_data.passwordNeverExpires:
-            uac |= 65536  # Add DONT_EXPIRE_PASSWD flag
-            logger.info("⏳ Password set to NEVER EXPIRE")
-        if user_data.userCannotChangePassword:
-            uac |= 64  # Add PASSWD_CANT_CHANGE flag
-            logger.info("🚫 User will be prevented from changing password")
-        if user_data.storePasswordUsingReversibleEncryption:
-            uac |= 128  # Add ENCRYPTED_TEXT_PWD_ALLOWED flag
-            logger.info("⚠️ Password will be stored using reversible encryption")
+        # Build account options dictionary
+        account_options = {
+            "passwordMustChange": user_data.passwordMustChange or False,
+            "userCannotChangePassword": user_data.userCannotChangePassword or False,
+            "passwordNeverExpires": user_data.passwordNeverExpires or False,
+            "storePasswordReversible": user_data.storePasswordReversible or False,
+        }
+        
+        # Apply account options to UAC
+        uac = build_user_account_control(base_uac, account_options)
+        
+        logger.info(f"📋 Account options: {account_options}")
+        logger.info(f"🔢 Final UAC: {uac}")
         
         # Prepare user attributes
         user_attrs = {
@@ -897,16 +973,7 @@ async def create_user(user_data: UserCreate, request: Request, token_data = Depe
         # Enable account if password was set successfully (unless accountDisabled is True)
         if password_set_success and not user_data.accountDisabled:
             try:
-                # Calculate final UAC value
                 final_uac = 512  # Normal account, enabled
-                
-                if user_data.passwordNeverExpires:
-                    final_uac |= 65536  # Add DONT_EXPIRE_PASSWD
-                if user_data.userCannotChangePassword:
-                    final_uac |= 64  # Add PASSWD_CANT_CHANGE flag
-                if user_data.storePasswordUsingReversibleEncryption:
-                    final_uac |= 128  # Add ENCRYPTED_TEXT_PWD_ALLOWED flag
-                
                 enable_mod = [(MODIFY_REPLACE, "userAccountControl", [str(final_uac)])]
                 if ldap_conn.modify_entry(user_dn, enable_mod):
                     account_enabled = True
@@ -1037,6 +1104,65 @@ async def update_user(dn: str, user_data: UserUpdate, request: Request, token_da
         # Prepare modifications - only for fields that are explicitly set
         user_dict = user_data.dict(exclude_unset=True)
         
+        # Extract account options from user_dict (if any)
+        account_options_fields = ["passwordMustChange", "userCannotChangePassword", "passwordNeverExpires", "storePasswordReversible"]
+        account_options = {}
+        for field in account_options_fields:
+            if field in user_dict:
+                account_options[field] = user_dict.pop(field)
+        
+        # Handle account options update (if any provided)
+        if account_options:
+            # Get current userAccountControl
+            current_user_result = ldap_conn.search(dn, "(objectClass=user)", ["userAccountControl"])
+            if current_user_result and len(current_user_result) > 0:
+                current_uac = int(current_user_result[0][1].get("userAccountControl", ["0"])[0])
+                
+                # Parse current account options
+                current_options = parse_account_options(current_uac)
+                
+                # Merge with new options (only update provided fields)
+                merged_options = current_options.copy()
+                for key, value in account_options.items():
+                    if value is not None:
+                        # Convert field name to match parse_account_options keys
+                        if key == "passwordMustChange":
+                            merged_options["passwordMustChange"] = value
+                        elif key == "userCannotChangePassword":
+                            merged_options["userCannotChangePassword"] = value
+                        elif key == "passwordNeverExpires":
+                            merged_options["passwordNeverExpires"] = value
+                        elif key == "storePasswordReversible":
+                            merged_options["storePasswordReversible"] = value
+                
+                # Build new UAC (preserve base flags like ACCOUNTDISABLE)
+                # Start with current UAC and clear only the account options flags
+                base_uac = current_uac
+                # Clear account options flags (we'll set them via build_user_account_control)
+                base_uac &= ~0x80000  # Clear PASSWORD_EXPIRED
+                base_uac &= ~0x40     # Clear PASSWD_CANT_CHANGE
+                base_uac &= ~0x10000  # Clear DONT_EXPIRE_PASSWD
+                base_uac &= ~0x80     # Clear ENCRYPTED_TEXT_PASSWORD_ALLOWED
+                
+                new_uac = build_user_account_control(base_uac, merged_options)
+                
+                # Add UAC modification
+                modifications.append((MODIFY_REPLACE, "userAccountControl", [str(new_uac)]))
+                logger.info(f"📋 Account options updated: {merged_options}")
+                logger.info(f"🔢 UAC changed from {current_uac} to {new_uac}")
+                
+                # Track changes
+                for key, value in account_options.items():
+                    if value is not None:
+                        # Map field name to parse_account_options key
+                        option_key = key
+                        old_value = current_options.get(option_key, False)
+                        changes.append({
+                            "field": key,
+                            "old_value": old_value,
+                            "new_value": value
+                        })
+        
         # Handle CN rename before other modifications
         renamed_dn = None
         if "cn" in user_dict:
@@ -1070,6 +1196,7 @@ async def update_user(dn: str, user_data: UserUpdate, request: Request, token_da
             if field == "password":
                 password_changed = True
                 continue
+            
             
             if isinstance(value, str) and value.strip() == "":
                 modifications.append((MODIFY_REPLACE, field, []))
@@ -1481,7 +1608,7 @@ async def get_login_history(dn: str, token_data = Depends(verify_token)):
             ]
         )
         
-        if not results:
+        if not results or len(results) == 0:
             # Return friendly message instead of 404
             return [{
                 "id": 1,
@@ -1490,6 +1617,18 @@ async def get_login_history(dn: str, token_data = Depends(verify_token)):
                 "status": "info",
                 "source": "-",
                 "note": "ไม่พบข้อมูลผู้ใช้ในระบบ AD"
+            }]
+        
+        # Safety check: ensure results[0] exists and is a tuple
+        if len(results) == 0 or not isinstance(results[0], tuple) or len(results[0]) < 2:
+            logger.warning(f"Invalid LDAP result format for {dn}: {results}")
+            return [{
+                "id": 1,
+                "loginTime": datetime.now().isoformat(),
+                "ipAddress": "-",
+                "status": "info",
+                "source": "-",
+                "note": "ไม่พบข้อมูลผู้ใช้ในระบบ AD (รูปแบบข้อมูลไม่ถูกต้อง)"
             }]
         
         _, attrs = results[0]
@@ -1524,7 +1663,8 @@ async def get_login_history(dn: str, token_data = Depends(verify_token)):
         # AD does not store IP addresses - they're only in Security Event Logs
         
         # Try workstation name from AD
-        workstations = attrs.get("userWorkstations", [None])[0]
+        workstations_list = attrs.get("userWorkstations", [])
+        workstations = workstations_list[0] if workstations_list and len(workstations_list) > 0 else None
         if workstations:
             ip_info = f"Workstation: {workstations}"
             ip_source = "AD"

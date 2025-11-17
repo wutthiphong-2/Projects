@@ -34,7 +34,9 @@ import {
   Progress,
   Alert,
   DatePicker,
-  Collapse
+  Collapse,
+  Checkbox,
+  Radio
 } from 'antd';
 import {
   EditOutlined,
@@ -63,7 +65,8 @@ import {
   QuestionCircleOutlined,
   InfoCircleOutlined,
   TagOutlined,
-  MoreOutlined
+  MoreOutlined,
+  SettingOutlined
 } from '@ant-design/icons';
 import dayjs from 'dayjs';
 import axios from 'axios';
@@ -88,6 +91,58 @@ const { Step } = Steps;
 const { useBreakpoint } = Grid;
 const { RangePicker } = DatePicker;
 
+// Helper functions for Account Options
+const parseAccountOptions = (userAccountControl) => {
+  if (!userAccountControl) return {
+    passwordMustChange: false,
+    userCannotChangePassword: false,
+    passwordNeverExpires: false,
+    storePasswordReversible: false,
+  };
+  
+  const uac = parseInt(userAccountControl, 10);
+  return {
+    passwordMustChange: !!(uac & 0x80000),  // PASSWORD_EXPIRED
+    userCannotChangePassword: !!(uac & 0x40),  // PASSWD_CANT_CHANGE
+    passwordNeverExpires: !!(uac & 0x10000),  // DONT_EXPIRE_PASSWD
+    storePasswordReversible: !!(uac & 0x80),  // ENCRYPTED_TEXT_PASSWORD_ALLOWED
+  };
+};
+
+const buildAccountControl = (baseUac, options) => {
+  let uac = baseUac || 512;  // Default to normal account
+  
+  // PASSWORD_EXPIRED (0x80000) - User must change password at next logon
+  if (options.passwordMustChange) {
+    uac |= 0x80000;
+  } else {
+    uac &= ~0x80000;
+  }
+  
+  // PASSWD_CANT_CHANGE (0x40) - User cannot change password
+  if (options.userCannotChangePassword) {
+    uac |= 0x40;
+  } else {
+    uac &= ~0x40;
+  }
+  
+  // DONT_EXPIRE_PASSWD (0x10000) - Password never expires
+  if (options.passwordNeverExpires) {
+    uac |= 0x10000;
+  } else {
+    uac &= ~0x10000;
+  }
+  
+  // ENCRYPTED_TEXT_PASSWORD_ALLOWED (0x80) - Store password using reversible encryption
+  if (options.storePasswordReversible) {
+    uac |= 0x80;
+  } else {
+    uac &= ~0x80;
+  }
+  
+  return uac;
+};
+
 const UserManagement = () => {
   // ==================== STATES ====================
   const [users, setUsers] = useState([]);
@@ -111,12 +166,6 @@ const UserManagement = () => {
   const [categorizedGroups, setCategorizedGroups] = useState({});
   const [selectedGroups, setSelectedGroups] = useState([]);
   const [currentTab, setCurrentTab] = useState('1');
-  const [accountOptions, setAccountOptions] = useState({
-    mustChangePassword: false,
-    userCannotChangePassword: false,
-    passwordNeverExpires: false,
-    storePasswordUsingReversibleEncryption: false
-  });
   const [suggestedGroupsData, setSuggestedGroupsData] = useState(null); // Stores analysis results
   
   // Step wizard states
@@ -194,43 +243,6 @@ const UserManagement = () => {
   const [userPermissions, setUserPermissions] = useState([]);
   const [loginHistory, setLoginHistory] = useState([]);
   const [passwordExpiry, setPasswordExpiry] = useState(null);
-  const accountOptionDetails = useMemo(() => {
-    const options = selectedUser?.accountOptions || {};
-    return [
-      {
-        key: 'mustChangePassword',
-        label: 'User must change password at next logon',
-        description: 'Forces password change on first login',
-        icon: <CheckCircleOutlined style={{ color: '#10b981' }} />,
-        inactiveIcon: <CloseCircleOutlined style={{ color: '#d1d5db' }} />,
-        active: Boolean(options.mustChangePassword)
-      },
-      {
-        key: 'userCannotChangePassword',
-        label: 'User cannot change password',
-        description: 'Locks the password change option for this account',
-        icon: <LockOutlined style={{ color: '#f59e0b' }} />,
-        inactiveIcon: <UnlockOutlined style={{ color: '#d1d5db' }} />,
-        active: Boolean(options.userCannotChangePassword)
-      },
-      {
-        key: 'passwordNeverExpires',
-        label: 'Password never expires',
-        description: 'User will not be required to change password',
-        icon: <ClockCircleOutlined style={{ color: '#3b82f6' }} />,
-        inactiveIcon: <ClockCircleOutlined style={{ color: '#d1d5db' }} />,
-        active: Boolean(options.passwordNeverExpires)
-      },
-      {
-        key: 'storePasswordUsingReversibleEncryption',
-        label: 'Store password using reversible encryption',
-        description: 'Only needed for legacy protocols requiring clear-text access',
-        icon: <InfoCircleOutlined style={{ color: '#6366f1' }} />,
-        inactiveIcon: <InfoCircleOutlined style={{ color: '#d1d5db' }} />,
-        active: Boolean(options.storePasswordUsingReversibleEncryption)
-      }
-    ];
-  }, [selectedUser]);
   
   const [createForm] = Form.useForm();
   const [editForm] = Form.useForm();
@@ -397,6 +409,8 @@ const UserManagement = () => {
       });
 
       const firstPageData = firstPageResponse.data || [];
+      
+      
       setUsers(firstPageData);
       await fetchDirectoryCounts();
 
@@ -631,12 +645,6 @@ const UserManagement = () => {
     setCurrentStep(0); // Reset to step 1
     setStep1Valid(false);
     setStep2Valid(true);
-    setAccountOptions({
-      mustChangePassword: false,
-      userCannotChangePassword: false,
-      passwordNeverExpires: false,
-      storePasswordUsingReversibleEncryption: false
-    });
     setIsCreateModalVisible(true);
   };
 
@@ -775,29 +783,74 @@ const UserManagement = () => {
     }
   };
 
-  const handleEditUser = (user) => {
-    setEditingUser(user);
+  const handleEditUser = async (user) => {
+    // ==================== EDIT USER - ดึงข้อมูลจาก AD จริง ====================
+    // Fetch fresh user details from backend
+    let freshUser = user;
+    try {
+      const userDetailsRes = await axios.get(
+        `${config.apiUrl}/api/users/${encodeURIComponent(user.dn)}`,
+        { headers: getAuthHeaders() }
+      );
+      
+      if (userDetailsRes.data) {
+        freshUser = userDetailsRes.data;
+      }
+    } catch (error) {
+      console.warn('⚠️ Could not fetch fresh user details, using cached data:', error);
+    }
+    
+    // Set editing user with fresh data
+    setEditingUser(freshUser);
+    
+    // Parse account options from userAccountControl
+    const accountOptions = freshUser.passwordMustChange !== undefined 
+      ? {
+          passwordMustChange: freshUser.passwordMustChange || false,
+          userCannotChangePassword: freshUser.userCannotChangePassword || false,
+          passwordNeverExpires: freshUser.passwordNeverExpires || false,
+          storePasswordReversible: freshUser.storePasswordReversible || false,
+        }
+      : parseAccountOptions(freshUser.userAccountControl);
+    
+    // Determine which account option is selected (only one can be true)
+    let selectedAccountOption = 'none';
+    if (accountOptions.passwordMustChange) {
+      selectedAccountOption = 'passwordMustChange';
+    } else if (accountOptions.userCannotChangePassword) {
+      selectedAccountOption = 'userCannotChangePassword';
+    } else if (accountOptions.passwordNeverExpires) {
+      selectedAccountOption = 'passwordNeverExpires';
+    } else if (accountOptions.storePasswordReversible) {
+      selectedAccountOption = 'storePasswordReversible';
+    }
+    
+    // Set form values with fresh user data
     editForm.setFieldsValue({
-      cn: user.cn,
-      sAMAccountName: user.sAMAccountName,
-      mail: user.mail,
-      displayName: user.displayName,
-      givenName: user.givenName,
-      sn: user.sn,
-      title: user.title,
-      telephoneNumber: user.telephoneNumber,
-      mobile: user.mobile,
-      department: user.department,
-      company: user.company,
-      employeeID: user.employeeID,
-      physicalDeliveryOfficeName: user.physicalDeliveryOfficeName,
-      streetAddress: user.streetAddress,
-      l: user.l,
-      st: user.st,
-      postalCode: user.postalCode,
-      co: user.co,
-      description: user.description
+      cn: freshUser.cn,
+      sAMAccountName: freshUser.sAMAccountName,
+      mail: freshUser.mail,
+      displayName: freshUser.displayName,
+      givenName: freshUser.givenName,
+      sn: freshUser.sn,
+      title: freshUser.title,
+      telephoneNumber: freshUser.telephoneNumber,
+      mobile: freshUser.mobile,
+      department: freshUser.department,
+      company: freshUser.company,
+      employeeID: freshUser.employeeID,
+      physicalDeliveryOfficeName: freshUser.physicalDeliveryOfficeName,
+      streetAddress: freshUser.streetAddress,
+      l: freshUser.l,
+      st: freshUser.st,
+      postalCode: freshUser.postalCode,
+      co: freshUser.co,
+      description: freshUser.description,
+      // Account option (single selection)
+      accountOption: selectedAccountOption,
     });
+    
+    // Show modal AFTER data is loaded
     setIsEditModalVisible(true);
   };
 
@@ -1079,23 +1132,26 @@ const UserManagement = () => {
         password: '***HIDDEN***', // Hide password in logs for security
         ou: selectedOU,
         groups: selectedGroups.length,
-        accountOptions: accountOptions
       });
       
-      // Remove confirmPassword before sending to backend
-      const { confirmPassword: _, ...dataToSend } = formValues;
+      // Remove confirmPassword and accountOption before sending to backend
+      const { confirmPassword: _, accountOption, ...dataToSend } = formValues;
       
-      // Add OU, groups, and account options to data
+      // Convert accountOption (single selection) to individual boolean fields
+      if (accountOption !== undefined && accountOption !== 'none') {
+        dataToSend.passwordMustChange = accountOption === 'passwordMustChange';
+        dataToSend.userCannotChangePassword = accountOption === 'userCannotChangePassword';
+        dataToSend.passwordNeverExpires = accountOption === 'passwordNeverExpires';
+        dataToSend.storePasswordReversible = accountOption === 'storePasswordReversible';
+      }
+      
+      // Add OU and groups to data
       if (selectedOU) {
         dataToSend.ou = selectedOU;
       }
       if (selectedGroups && selectedGroups.length > 0) {
         dataToSend.groups = selectedGroups;
       }
-      dataToSend.mustChangePassword = accountOptions.mustChangePassword;
-      dataToSend.userCannotChangePassword = accountOptions.userCannotChangePassword;
-      dataToSend.passwordNeverExpires = accountOptions.passwordNeverExpires;
-      dataToSend.storePasswordUsingReversibleEncryption = accountOptions.storePasswordUsingReversibleEncryption;
       
       const response = await axios.post(`${config.apiUrl}/api/users/`, dataToSend, {
         headers: getAuthHeaders()
@@ -1136,24 +1192,16 @@ const UserManagement = () => {
         });
       }
       
-      // ⚡ Optimistic UI: Invalidate cache immediately and refresh (reduced delay)
+      // ⚡ Optimistic UI: Invalidate cache immediately and refresh
       console.log('🗑️ Invalidating cache after user creation...');
       apiCache.invalidate('/api/users');
       
-      console.log('⏳ Brief wait for AD replication...');
-      await new Promise(resolve => setTimeout(resolve, 500)); // ⚡ Reduced from 2000ms to 500ms
+      // Wait for AD replication
+      await new Promise(resolve => setTimeout(resolve, 1500));
       
+      // Refresh user list
       const oldUserCount = users.length;
-      console.log(`📊 Current user count BEFORE refresh: ${oldUserCount}`);
-      
-      console.log('🔄 Force refreshing user list (ignoring all filters)...');
-      
-      // Fetch with ignoreFilters = true to get ALL users
       const result = await fetchUsers(true, true);
-      
-      console.log('✅ User list refreshed. Result:', result);
-      console.log(`📊 User count AFTER refresh: ${result.count}`);
-      console.log(`📈 Change: ${oldUserCount} → ${result.count} (${result.count > oldUserCount ? '+' : ''}${result.count - oldUserCount})`);
       
       // Show detailed success message
       message.success({
@@ -1250,23 +1298,31 @@ const UserManagement = () => {
     try {
       formValues = await editForm.validateFields();
       
-      console.log('📝 Editing user:', editingUser.dn);
-      console.log('📝 Form values:', formValues);
-      
-      // Remove fields that shouldn't be updated or are empty
+      // ==================== UPDATE USER - ส่งข้อมูลอัพเดตไปยัง AD ====================
+      // Prepare update data
       const updateData = {};
       Object.keys(formValues).forEach(key => {
         if (formValues[key] !== undefined && formValues[key] !== null) {
-          // Skip sAMAccountName and password as they're not editable
           if (key !== 'sAMAccountName' && key !== 'password') {
             updateData[key] = formValues[key];
           }
         }
       });
       
-      console.log('📤 Update data:', updateData);
+      // Convert accountOption (single selection) to individual boolean fields
+      if (formValues.accountOption !== undefined) {
+        const accountOption = formValues.accountOption;
+        updateData.passwordMustChange = accountOption === 'passwordMustChange';
+        updateData.userCannotChangePassword = accountOption === 'userCannotChangePassword';
+        updateData.passwordNeverExpires = accountOption === 'passwordNeverExpires';
+        updateData.storePasswordReversible = accountOption === 'storePasswordReversible';
+      }
       
-      if (Object.keys(updateData).length === 0) {
+      // Check if there are any changes
+      const hasChanges = Object.keys(updateData).length > 0 && 
+        Object.keys(formValues).some(key => formValues[key] !== undefined && formValues[key] !== null && key !== 'sAMAccountName' && key !== 'password');
+      
+      if (!hasChanges) {
         message.warning('ไม่มีข้อมูลที่ต้องแก้ไข');
         return;
       }
@@ -1283,11 +1339,37 @@ const UserManagement = () => {
       
       const updatedDn = response.data?.dn || editingUser.dn;
       const oldDn = editingUser.dn;
-      const refreshedUser = response.data?.user ? response.data.user : {
-        ...editingUser,
-        ...updateData,
-        dn: updatedDn
-      };
+      
+      // Fetch fresh user details from backend
+      let refreshedUser = response.data?.user;
+      if (!refreshedUser) {
+        try {
+          console.log('📥 Fetching fresh user details after update:', updatedDn);
+          const freshUserRes = await axios.get(
+            `${config.apiUrl}/api/users/${encodeURIComponent(updatedDn)}`,
+            { headers: getAuthHeaders() }
+          );
+          if (freshUserRes.data) {
+            refreshedUser = freshUserRes.data;
+          }
+        } catch (error) {
+          console.warn('⚠️ Could not fetch fresh user details after update, using response data:', error);
+          refreshedUser = response.data?.user || {
+            ...editingUser,
+            ...updateData,
+            dn: updatedDn
+          };
+        }
+      }
+      
+      // Fallback if still no refreshedUser
+      if (!refreshedUser) {
+        refreshedUser = {
+          ...editingUser,
+          ...updateData,
+          dn: updatedDn
+        };
+      }
       
       setUsers(prev => {
         let replaced = false;
@@ -1624,6 +1706,7 @@ const UserManagement = () => {
       {isEnabled ? 'Active' : 'Disabled'}
     </Tag>
   ), []);
+
 
   const renderActionsCell = useCallback((_, record) => (
     <div className="actions-cell">
@@ -2297,6 +2380,131 @@ const UserManagement = () => {
                         </Col>
                       </Row>
 
+                      <Divider style={{ margin: '24px 0' }} />
+
+                      {/* Account Options Section */}
+                      <Card
+                        title={
+                          <Space>
+                            <div style={{
+                              background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
+                              borderRadius: 8,
+                              padding: 8,
+                              display: 'flex',
+                              alignItems: 'center',
+                              justifyContent: 'center'
+                            }}>
+                              <SettingOutlined style={{ fontSize: 16, color: '#fff' }} />
+                            </div>
+                            <div>
+                              <Text strong style={{ fontSize: 14, color: '#1f2937' }}>Account Options</Text>
+                              <div style={{ fontSize: 11, color: '#6b7280', fontWeight: 400, marginTop: 2 }}>
+                                Select one password policy option
+                              </div>
+                            </div>
+                          </Space>
+                        }
+                        size="small"
+                        style={{
+                          marginBottom: 16,
+                          background: 'linear-gradient(to bottom, #ffffff, #f8fafc)',
+                          border: '1px solid #e2e8f0',
+                          borderRadius: 12,
+                          boxShadow: '0 2px 8px rgba(0, 0, 0, 0.04)'
+                        }}
+                        bodyStyle={{ padding: '16px' }}
+                      >
+                        <Form.Item
+                          name="accountOption"
+                          rules={[{ required: false }]}
+                          style={{ marginBottom: 0 }}
+                        >
+                          <Radio.Group>
+                            <Space direction="vertical" style={{ width: '100%' }} size="middle">
+                              <Radio value="passwordMustChange" style={{ 
+                                padding: '12px 16px',
+                                borderRadius: 8,
+                                border: '1px solid #e5e7eb',
+                                background: '#ffffff',
+                                transition: 'all 0.2s',
+                                width: '100%',
+                                margin: 0
+                              }}>
+                                <Space>
+                                  <LockOutlined style={{ color: '#3b82f6', fontSize: 14 }} />
+                                  <Text strong style={{ fontSize: 13, color: '#374151' }}>User must change password at next logon</Text>
+                                  <Tooltip title="Forces the user to change their password the next time they log in">
+                                    <QuestionCircleOutlined style={{ color: '#9ca3af', fontSize: 11 }} />
+                                  </Tooltip>
+                                </Space>
+                              </Radio>
+                              <Radio value="userCannotChangePassword" style={{ 
+                                padding: '12px 16px',
+                                borderRadius: 8,
+                                border: '1px solid #e5e7eb',
+                                background: '#ffffff',
+                                transition: 'all 0.2s',
+                                width: '100%',
+                                margin: 0
+                              }}>
+                                <Space>
+                                  <UnlockOutlined style={{ color: '#ef4444', fontSize: 14 }} />
+                                  <Text strong style={{ fontSize: 13, color: '#374151' }}>User cannot change password</Text>
+                                  <Tooltip title="Prevents the user from changing their own password">
+                                    <QuestionCircleOutlined style={{ color: '#9ca3af', fontSize: 11 }} />
+                                  </Tooltip>
+                                </Space>
+                              </Radio>
+                              <Radio value="passwordNeverExpires" style={{ 
+                                padding: '12px 16px',
+                                borderRadius: 8,
+                                border: '1px solid #e5e7eb',
+                                background: '#ffffff',
+                                transition: 'all 0.2s',
+                                width: '100%',
+                                margin: 0
+                              }}>
+                                <Space>
+                                  <ClockCircleOutlined style={{ color: '#10b981', fontSize: 14 }} />
+                                  <Text strong style={{ fontSize: 13, color: '#374151' }}>Password never expires</Text>
+                                  <Tooltip title="The password will not expire according to the password policy">
+                                    <QuestionCircleOutlined style={{ color: '#9ca3af', fontSize: 11 }} />
+                                  </Tooltip>
+                                </Space>
+                              </Radio>
+                              <Radio value="storePasswordReversible" style={{ 
+                                padding: '12px 16px',
+                                borderRadius: 8,
+                                border: '1px solid #e5e7eb',
+                                background: '#ffffff',
+                                transition: 'all 0.2s',
+                                width: '100%',
+                                margin: 0
+                              }}>
+                                <Space>
+                                  <SafetyCertificateOutlined style={{ color: '#f59e0b', fontSize: 14 }} />
+                                  <Text strong style={{ fontSize: 13, color: '#374151' }}>Store password using reversible encryption</Text>
+                                  <Tooltip title="Stores the password using reversible encryption (less secure, required for some applications)">
+                                    <QuestionCircleOutlined style={{ color: '#9ca3af', fontSize: 11 }} />
+                                  </Tooltip>
+                                </Space>
+                              </Radio>
+                              <Radio value="none" style={{ 
+                                padding: '12px 16px',
+                                borderRadius: 8,
+                                border: '1px dashed #d1d5db',
+                                background: '#f9fafb',
+                                transition: 'all 0.2s',
+                                width: '100%',
+                                margin: 0
+                              }}>
+                                <Text type="secondary" style={{ fontSize: 13, fontStyle: 'italic' }}>None (default settings)</Text>
+                              </Radio>
+                            </Space>
+                          </Radio.Group>
+                        </Form.Item>
+                      </Card>
+
                       <Row gutter={16}>
                         <Col xs={24} md={12}>
                           <Form.Item
@@ -2504,59 +2712,6 @@ const UserManagement = () => {
                 showIcon
                 style={{ marginBottom: 24 }}
               />
-
-              {/* Account Options */}
-              <Card
-                size="small"
-                title={<Text strong>Account Options</Text>}
-                style={{ marginBottom: 16 }}
-              >
-                <Space direction="vertical" size="middle" style={{ width: '100%' }}>
-                  <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-                    <div>
-                      <Text strong>User must change password at next logon</Text>
-                      <div><Text type="secondary" style={{ fontSize: 12 }}>Forces password change on first login</Text></div>
-                    </div>
-                    <Switch
-                      checked={accountOptions.mustChangePassword}
-                      onChange={(checked) => setAccountOptions({...accountOptions, mustChangePassword: checked})}
-                    />
-                  </div>
-                  <Divider style={{ margin: '8px 0' }} />
-                  <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-                    <div>
-                      <Text strong>User cannot change password</Text>
-                      <div><Text type="secondary" style={{ fontSize: 12 }}>Locks the password change option for this account</Text></div>
-                    </div>
-                    <Switch
-                      checked={accountOptions.userCannotChangePassword}
-                      onChange={(checked) => setAccountOptions({...accountOptions, userCannotChangePassword: checked})}
-                    />
-                  </div>
-                  <Divider style={{ margin: '8px 0' }} />
-                  <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-                    <div>
-                      <Text strong>Password never expires</Text>
-                      <div><Text type="secondary" style={{ fontSize: 12 }}>User won't need to change password</Text></div>
-                    </div>
-                    <Switch
-                      checked={accountOptions.passwordNeverExpires}
-                      onChange={(checked) => setAccountOptions({...accountOptions, passwordNeverExpires: checked})}
-                    />
-                  </div>
-                  <Divider style={{ margin: '8px 0' }} />
-                  <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-                    <div>
-                      <Text strong>Store password using reversible encryption</Text>
-                      <div><Text type="secondary" style={{ fontSize: 12 }}>Required only for legacy protocols that need clear-text password access</Text></div>
-                    </div>
-                    <Switch
-                      checked={accountOptions.storePasswordUsingReversibleEncryption}
-                      onChange={(checked) => setAccountOptions({...accountOptions, storePasswordUsingReversibleEncryption: checked})}
-                    />
-                  </div>
-                </Space>
-              </Card>
 
               <Divider orientation="left">
                 <Text strong>Group Membership ({selectedGroups.length} selected)</Text>
@@ -2865,41 +3020,14 @@ const UserManagement = () => {
                     </div>
                   </Descriptions.Item>
                   <Descriptions.Item 
-                    label={<Text strong>Account Options</Text>}
+                    label={<Text strong>Status</Text>}
                     labelStyle={{ background: '#f8fafc' }}
                   >
                     <Space direction="vertical" size={4}>
-                      {accountOptions.mustChangePassword && (
-                        <Text style={{ fontSize: 12 }}>
-                          <CheckCircleOutlined style={{ color: '#10b981', marginRight: 6 }} />
-                          Must change password at next logon
-                        </Text>
-                      )}
-                      {accountOptions.userCannotChangePassword && (
-                        <Text style={{ fontSize: 12 }}>
-                          <LockOutlined style={{ color: '#f59e0b', marginRight: 6 }} />
-                          User cannot change password
-                        </Text>
-                      )}
-                      {accountOptions.passwordNeverExpires && (
-                        <Text style={{ fontSize: 12 }}>
-                          <CheckCircleOutlined style={{ color: '#10b981', marginRight: 6 }} />
-                          Password never expires
-                        </Text>
-                      )}
-                      {accountOptions.storePasswordUsingReversibleEncryption && (
-                        <Text style={{ fontSize: 12 }}>
-                          <InfoCircleOutlined style={{ color: '#3b82f6', marginRight: 6 }} />
-                          Store password using reversible encryption
-                        </Text>
-                      )}
-                      {!accountOptions.mustChangePassword
-                        && !accountOptions.userCannotChangePassword
-                        && !accountOptions.passwordNeverExpires
-                        && !accountOptions.storePasswordUsingReversibleEncryption && (
-                        <Text type="secondary" style={{ fontSize: 12 }}>
-                          Standard settings
-                        </Text>
+                      {editingUser?.isEnabled ? (
+                        <Tag color="success">Active</Tag>
+                      ) : (
+                        <Tag color="default">Disabled</Tag>
                       )}
                     </Space>
                   </Descriptions.Item>
@@ -2954,8 +3082,8 @@ const UserManagement = () => {
         open={isEditModalVisible}
         onOk={handleEditModalOk}
         onCancel={() => {
-          setIsEditModalVisible(false);
-          setEditingUser(null);
+        setIsEditModalVisible(false);
+        setEditingUser(null);
         }}
         width={getResponsiveWidth(800, 600, '95%')}
         okText="Update User"
@@ -2981,134 +3109,305 @@ const UserManagement = () => {
             layout="vertical"
             name="editUserForm"
           >
-            <Row gutter={16}>
-              <Col span={12}>
-                <Form.Item
-                  name="cn"
-                  label={<Text strong style={{ fontSize: 13 }}>Common Name (CN)</Text>}
-                >
-                  <Input placeholder="Enter common name" size="large" />
-                </Form.Item>
-              </Col>
-              <Col span={12}>
-                <Form.Item
-                  name="sAMAccountName"
-                  label={<Text strong style={{ fontSize: 13 }}>Username (sAMAccountName)</Text>}
-                >
-                  <Input placeholder="Enter username" size="large" disabled />
-                </Form.Item>
-              </Col>
-            </Row>
+            <Tabs
+              defaultActiveKey="1"
+              type="card"
+              style={{
+                background: '#ffffff',
+                borderRadius: 8,
+                padding: '0 4px'
+              }}
+              items={[
+                {
+                  key: '1',
+                  label: (
+                    <Space>
+                      <IdcardOutlined />
+                      <span>Basic Info</span>
+                    </Space>
+                  ),
+                  children: (
+                    <div style={{ padding: '16px 0' }}>
+                      <Row gutter={16}>
+                        <Col span={12}>
+                          <Form.Item
+                            name="cn"
+                            label={<Text strong style={{ fontSize: 13 }}>Common Name (CN)</Text>}
+                          >
+                            <Input placeholder="Enter common name" size="large" />
+                          </Form.Item>
+                        </Col>
+                        <Col span={12}>
+                          <Form.Item
+                            name="sAMAccountName"
+                            label={<Text strong style={{ fontSize: 13 }}>Username (sAMAccountName)</Text>}
+                          >
+                            <Input placeholder="Enter username" size="large" disabled />
+                          </Form.Item>
+                        </Col>
+                      </Row>
 
-            <Form.Item
-              name="mail"
-              label={<Text strong style={{ fontSize: 13 }}>Email</Text>}
-            >
-              <Input placeholder="user@example.com" size="large" />
-            </Form.Item>
+                      <Form.Item
+                        name="mail"
+                        label={<Text strong style={{ fontSize: 13 }}>Email</Text>}
+                      >
+                        <Input placeholder="user@example.com" size="large" />
+                      </Form.Item>
 
-            <Row gutter={16}>
-              <Col span={12}>
-                <Form.Item
-                  name="givenName"
-                  label={<Text strong style={{ fontSize: 13 }}>First Name</Text>}
-                >
-                  <Input placeholder="Enter first name" size="large" />
-                </Form.Item>
-              </Col>
-              <Col span={12}>
-                <Form.Item
-                  name="sn"
-                  label={<Text strong style={{ fontSize: 13 }}>Last Name</Text>}
-                >
-                  <Input placeholder="Enter last name" size="large" />
-                </Form.Item>
-              </Col>
-            </Row>
+                      <Row gutter={16}>
+                        <Col span={12}>
+                          <Form.Item
+                            name="givenName"
+                            label={<Text strong style={{ fontSize: 13 }}>First Name</Text>}
+                          >
+                            <Input placeholder="Enter first name" size="large" />
+                          </Form.Item>
+                        </Col>
+                        <Col span={12}>
+                          <Form.Item
+                            name="sn"
+                            label={<Text strong style={{ fontSize: 13 }}>Last Name</Text>}
+                          >
+                            <Input placeholder="Enter last name" size="large" />
+                          </Form.Item>
+                        </Col>
+                      </Row>
 
-            <Form.Item
-              name="displayName"
-              label={<Text strong style={{ fontSize: 13 }}>Display Name</Text>}
-            >
-              <Input placeholder="Enter display name" size="large" />
-            </Form.Item>
+                      <Form.Item
+                        name="displayName"
+                        label={<Text strong style={{ fontSize: 13 }}>Display Name</Text>}
+                      >
+                        <Input placeholder="Enter display name" size="large" />
+                      </Form.Item>
 
-            <Row gutter={16}>
-              <Col span={12}>
-                <Form.Item
-                  name="title"
-                  label={<Text strong style={{ fontSize: 13 }}>Job Title</Text>}
-                >
-                  <Input placeholder="Enter job title" size="large" />
-                </Form.Item>
-              </Col>
-              <Col span={12}>
-                <Form.Item
-                  name="department"
-                  label={<Text strong style={{ fontSize: 13 }}>Department</Text>}
-                >
-                  <Input 
-                    placeholder="Enter department name" 
-                    size="large"
-                  />
-                </Form.Item>
-              </Col>
-            </Row>
+                      <Row gutter={16}>
+                        <Col span={12}>
+                          <Form.Item
+                            name="title"
+                            label={<Text strong style={{ fontSize: 13 }}>Job Title</Text>}
+                          >
+                            <Input placeholder="Enter job title" size="large" />
+                          </Form.Item>
+                        </Col>
+                        <Col span={12}>
+                          <Form.Item
+                            name="department"
+                            label={<Text strong style={{ fontSize: 13 }}>Department</Text>}
+                          >
+                            <Input 
+                              placeholder="Enter department name" 
+                              size="large"
+                            />
+                          </Form.Item>
+                        </Col>
+                      </Row>
 
-            <Row gutter={16}>
-              <Col span={12}>
-                <Form.Item
-                  name="telephoneNumber"
-                  label={<Text strong style={{ fontSize: 13 }}>Phone</Text>}
-                >
-                  <Input placeholder="Enter phone number" size="large" />
-                </Form.Item>
-              </Col>
-              <Col span={12}>
-                <Form.Item
-                  name="mobile"
-                  label={<Text strong style={{ fontSize: 13 }}>Mobile</Text>}
-                >
-                  <Input placeholder="Enter mobile number" size="large" />
-                </Form.Item>
-              </Col>
-            </Row>
+                      <Row gutter={16}>
+                        <Col span={12}>
+                          <Form.Item
+                            name="company"
+                            label={<Text strong style={{ fontSize: 13 }}>Company</Text>}
+                          >
+                            <Input placeholder="Enter company name" size="large" />
+                          </Form.Item>
+                        </Col>
+                        <Col span={12}>
+                          <Form.Item
+                            name="employeeID"
+                            label={<Text strong style={{ fontSize: 13 }}>Employee ID</Text>}
+                          >
+                            <Input placeholder="Enter employee ID" size="large" />
+                          </Form.Item>
+                        </Col>
+                      </Row>
 
-            <Row gutter={16}>
-              <Col span={12}>
-                <Form.Item
-                  name="company"
-                  label={<Text strong style={{ fontSize: 13 }}>Company</Text>}
-                >
-                  <Input placeholder="Enter company name" size="large" />
-                </Form.Item>
-              </Col>
-              <Col span={12}>
-                <Form.Item
-                  name="employeeID"
-                  label={<Text strong style={{ fontSize: 13 }}>Employee ID</Text>}
-                >
-                  <Input placeholder="Enter employee ID" size="large" />
-                </Form.Item>
-              </Col>
-            </Row>
+                      <Form.Item
+                        name="description"
+                        label={<Text strong style={{ fontSize: 13 }}>Description</Text>}
+                      >
+                        <Input.TextArea
+                          placeholder="Enter description (optional)"
+                          rows={3}
+                        />
+                      </Form.Item>
+                    </div>
+                  )
+                },
+                {
+                  key: '2',
+                  label: (
+                    <Space>
+                      <PhoneOutlined />
+                      <span>Contact & Location</span>
+                    </Space>
+                  ),
+                  children: (
+                    <div style={{ padding: '16px 0' }}>
+                      <Row gutter={16}>
+                        <Col span={12}>
+                          <Form.Item
+                            name="telephoneNumber"
+                            label={<Text strong style={{ fontSize: 13 }}>Phone</Text>}
+                          >
+                            <Input placeholder="Enter phone number" size="large" />
+                          </Form.Item>
+                        </Col>
+                        <Col span={12}>
+                          <Form.Item
+                            name="mobile"
+                            label={<Text strong style={{ fontSize: 13 }}>Mobile</Text>}
+                          >
+                            <Input placeholder="Enter mobile number" size="large" />
+                          </Form.Item>
+                        </Col>
+                      </Row>
 
-            <Form.Item
-              name="physicalDeliveryOfficeName"
-              label={<Text strong style={{ fontSize: 13 }}>Office Location</Text>}
-            >
-              <Input placeholder="Enter office location" size="large" />
-            </Form.Item>
-
-            <Form.Item
-              name="description"
-              label={<Text strong style={{ fontSize: 13 }}>Description</Text>}
-            >
-              <Input.TextArea
-                placeholder="Enter description (optional)"
-                rows={3}
-              />
-            </Form.Item>
+                      <Form.Item
+                        name="physicalDeliveryOfficeName"
+                        label={<Text strong style={{ fontSize: 13 }}>Office Location</Text>}
+                      >
+                        <Input placeholder="Enter office location" size="large" />
+                      </Form.Item>
+                    </div>
+                  )
+                },
+                {
+                  key: '3',
+                  label: (
+                    <Space>
+                      <SettingOutlined />
+                      <span>Account Settings</span>
+                    </Space>
+                  ),
+                  children: (
+                    <div style={{ padding: '16px 0' }}>
+                      {/* Account Options Section */}
+                      <Card
+                        title={
+                          <Space>
+                            <div style={{
+                              background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
+                              borderRadius: 8,
+                              padding: 8,
+                              display: 'flex',
+                              alignItems: 'center',
+                              justifyContent: 'center'
+                            }}>
+                              <SettingOutlined style={{ fontSize: 16, color: '#fff' }} />
+                            </div>
+                            <div>
+                              <Text strong style={{ fontSize: 16, color: '#1f2937', fontWeight: 600 }}>Account Options</Text>
+                              <div style={{ fontSize: 12, color: '#6b7280', fontWeight: 400, marginTop: 4, letterSpacing: '0.3px' }}>
+                                Select one password policy option
+                              </div>
+                            </div>
+                          </Space>
+                        }
+                        size="small"
+                        style={{
+                          marginTop: 8,
+                          background: 'linear-gradient(to bottom, #ffffff, #f8fafc)',
+                          border: '1px solid #e2e8f0',
+                          borderRadius: 12,
+                          boxShadow: '0 2px 8px rgba(0, 0, 0, 0.04)'
+                        }}
+                        bodyStyle={{ padding: '20px' }}
+                      >
+                        <Form.Item
+                          name="accountOption"
+                          rules={[{ required: false }]}
+                          style={{ marginBottom: 0 }}
+                        >
+                          <Radio.Group>
+                            <Space direction="vertical" style={{ width: '100%' }} size="middle">
+                              <Radio value="passwordMustChange" style={{ 
+                                padding: '14px 18px',
+                                borderRadius: 8,
+                                border: '1px solid #e5e7eb',
+                                background: '#ffffff',
+                                transition: 'all 0.2s',
+                                width: '100%',
+                                margin: 0
+                              }}>
+                                <Space size="small">
+                                  <LockOutlined style={{ color: '#3b82f6', fontSize: 16 }} />
+                                  <Text style={{ fontSize: 14, color: '#1f2937', fontWeight: 500, letterSpacing: '0.2px' }}>User must change password at next logon</Text>
+                                  <Tooltip title="Forces the user to change their password the next time they log in">
+                                    <QuestionCircleOutlined style={{ color: '#9ca3af', fontSize: 13 }} />
+                                  </Tooltip>
+                                </Space>
+                              </Radio>
+                              <Radio value="userCannotChangePassword" style={{ 
+                                padding: '14px 18px',
+                                borderRadius: 8,
+                                border: '1px solid #e5e7eb',
+                                background: '#ffffff',
+                                transition: 'all 0.2s',
+                                width: '100%',
+                                margin: 0
+                              }}>
+                                <Space size="small">
+                                  <UnlockOutlined style={{ color: '#ef4444', fontSize: 16 }} />
+                                  <Text style={{ fontSize: 14, color: '#1f2937', fontWeight: 500, letterSpacing: '0.2px' }}>User cannot change password</Text>
+                                  <Tooltip title="Prevents the user from changing their own password">
+                                    <QuestionCircleOutlined style={{ color: '#9ca3af', fontSize: 13 }} />
+                                  </Tooltip>
+                                </Space>
+                              </Radio>
+                              <Radio value="passwordNeverExpires" style={{ 
+                                padding: '14px 18px',
+                                borderRadius: 8,
+                                border: '1px solid #e5e7eb',
+                                background: '#ffffff',
+                                transition: 'all 0.2s',
+                                width: '100%',
+                                margin: 0
+                              }}>
+                                <Space size="small">
+                                  <ClockCircleOutlined style={{ color: '#10b981', fontSize: 16 }} />
+                                  <Text style={{ fontSize: 14, color: '#1f2937', fontWeight: 500, letterSpacing: '0.2px' }}>Password never expires</Text>
+                                  <Tooltip title="The password will not expire according to the password policy">
+                                    <QuestionCircleOutlined style={{ color: '#9ca3af', fontSize: 13 }} />
+                                  </Tooltip>
+                                </Space>
+                              </Radio>
+                              <Radio value="storePasswordReversible" style={{ 
+                                padding: '14px 18px',
+                                borderRadius: 8,
+                                border: '1px solid #e5e7eb',
+                                background: '#ffffff',
+                                transition: 'all 0.2s',
+                                width: '100%',
+                                margin: 0
+                              }}>
+                                <Space size="small">
+                                  <SafetyCertificateOutlined style={{ color: '#f59e0b', fontSize: 16 }} />
+                                  <Text style={{ fontSize: 14, color: '#1f2937', fontWeight: 500, letterSpacing: '0.2px' }}>Store password using reversible encryption</Text>
+                                  <Tooltip title="Stores the password using reversible encryption (less secure, required for some applications)">
+                                    <QuestionCircleOutlined style={{ color: '#9ca3af', fontSize: 13 }} />
+                                  </Tooltip>
+                                </Space>
+                              </Radio>
+                              <Radio value="none" style={{ 
+                                padding: '14px 18px',
+                                borderRadius: 8,
+                                border: '1px dashed #d1d5db',
+                                background: '#f9fafb',
+                                transition: 'all 0.2s',
+                                width: '100%',
+                                margin: 0
+                              }}>
+                                <Text style={{ fontSize: 14, color: '#6b7280', fontWeight: 400, fontStyle: 'italic' }}>None (default settings)</Text>
+                              </Radio>
+                            </Space>
+                          </Radio.Group>
+                        </Form.Item>
+                      </Card>
+                    </div>
+                  )
+                }
+              ]}
+            />
           </Form>
         </div>
       </Modal>
@@ -3568,6 +3867,7 @@ const UserManagement = () => {
                   </Descriptions.Item>
                 </Descriptions>
               </Card>
+
 
             </TabPane>
 
