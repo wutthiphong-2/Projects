@@ -1,5 +1,3 @@
-import dayjs from 'dayjs';
-
 export const formatCount = (value) => {
   if (typeof value === 'number') {
     return value.toLocaleString();
@@ -8,13 +6,6 @@ export const formatCount = (value) => {
     return value;
   }
   return '0';
-};
-
-export const formatDateTime = (value, fallback = '-') => {
-  if (!value) return fallback;
-  const parsed = dayjs(value);
-  if (!parsed.isValid()) return fallback;
-  return parsed.format('DD MMM YYYY HH:mm');
 };
 
 export const resolveOuLabel = (dn, availableOUs = []) => {
@@ -52,7 +43,8 @@ export const formatErrorDetail = (detail) => {
   return String(detail);
 };
 
-export const scoreUserRecord = (user = {}) => {
+// Internal helper functions (not exported)
+const scoreUserRecord = (user = {}) => {
   if (!user) return 0;
   let score = 0;
   if (user.mail) score += 4;
@@ -75,7 +67,7 @@ export const scoreUserRecord = (user = {}) => {
   return score;
 };
 
-export const getUserDedupKey = (user = {}) => {
+const getUserDedupKey = (user = {}) => {
   const displayKey = (user.cn || user.displayName || '').toString().trim().toLowerCase();
   if (displayKey) return displayKey;
   const usernameKey = (user.sAMAccountName || user.userPrincipalName || '')

@@ -52,6 +52,7 @@ import axios from 'axios';
 import config from '../config';
 import { useAuth } from '../contexts/AuthContext';
 import { useNotification } from '../contexts/NotificationContext';
+import { formatErrorDetail } from '../utils/userManagementHelpers';
 import './GroupManagement.css';
 
 const { Title, Text } = Typography;
@@ -96,36 +97,6 @@ const GroupManagement = () => {
   const [form] = Form.useForm();
   const { getAuthHeaders } = useAuth();
   const { notifyError } = useNotification();
-
-  // ==================== HELPER FUNCTIONS ====================
-  
-  /**
-   * Convert error detail to string for display
-   * Handles FastAPI validation errors (array of objects), strings, and objects
-   */
-  const formatErrorDetail = (detail) => {
-    if (!detail) return null;
-    
-    // Handle FastAPI validation errors (array of objects)
-    if (Array.isArray(detail)) {
-      return detail.map(err => {
-        const field = err.loc?.join(' > ') || 'Unknown field';
-        return `• ${field}: ${err.msg}`;
-      }).join('\n');
-    }
-    
-    // Handle string errors
-    if (typeof detail === 'string') {
-      return detail;
-    }
-    
-    // Handle object errors
-    if (typeof detail === 'object') {
-      return JSON.stringify(detail, null, 2);
-    }
-    
-    return String(detail);
-  };
 
   // ==================== NOTIFICATIONS ====================
   
