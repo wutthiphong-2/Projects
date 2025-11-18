@@ -1,1 +1,13 @@
 node_modules/
+venv/
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+.Python
+*.db
+*.exe
+build/
+dist/
+.env
+*.log
