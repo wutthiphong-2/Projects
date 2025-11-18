@@ -1,5 +1,5 @@
 import React, { createContext, useState, useContext, useCallback } from 'react';
-import { notification as antNotification } from 'antd';
+import { App } from 'antd';
 import {
   CheckCircleOutlined,
   ExclamationCircleOutlined,
@@ -22,6 +22,7 @@ export const useNotification = () => {
 
 export const NotificationProvider = ({ children }) => {
   const [notifications, setNotifications] = useState([]);
+  const { notification } = App.useApp();
 
   // ฟังก์ชันสำหรับเพิ่ม notification ใหม่
   const addNotification = useCallback((type, title, message, details = {}) => {
@@ -51,14 +52,15 @@ export const NotificationProvider = ({ children }) => {
       ou: <FolderOutlined style={{ color: '#fa8c16' }} />
     };
 
-    antNotification[type === 'user' || type === 'group' || type === 'ou' ? 'info' : type]({
+    const notificationType = type === 'user' || type === 'group' || type === 'ou' ? 'info' : type;
+    notification[notificationType]({
       message: title,
       description: message,
       icon: icons[type] || icons.info,
       duration,
       placement: 'topRight'
     });
-  }, []);
+  }, [notification]);
 
   // Notification helpers สำหรับ User operations
   const notifyUserCreated = useCallback((userName, userEmail) => {

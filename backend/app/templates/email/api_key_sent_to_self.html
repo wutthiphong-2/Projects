@@ -1,0 +1,44 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="UTF-8">
+    <style>
+        body { font-family: Arial, sans-serif; line-height: 1.6; color: #333; }
+        .container { max-width: 600px; margin: 0 auto; padding: 20px; }
+        .header { background: #10b981; color: white; padding: 20px; text-align: center; border-radius: 5px 5px 0 0; }
+        .content { background: #f9fafb; padding: 20px; border: 1px solid #e5e7eb; border-top: none; }
+        .api-key { background: #1f2937; color: #10b981; padding: 15px; border-radius: 5px; font-family: monospace; word-break: break-all; margin: 15px 0; }
+        .warning { background: #fef3c7; border-left: 4px solid #f59e0b; padding: 15px; margin: 15px 0; }
+        .footer { text-align: center; color: #6b7280; font-size: 12px; margin-top: 20px; }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h1>📧 Your API Key</h1>
+        </div>
+        <div class="content">
+            <p>Hello,</p>
+            <p>This is a copy of your API key <strong>{{ api_key_name }}</strong> that you requested to be sent to your email.</p>
+            
+            <div class="api-key">
+                {{ api_key }}
+            </div>
+            
+            {% if message %}
+            <p><strong>Note:</strong> {{ message }}</p>
+            {% endif %}
+            
+            <div class="warning">
+                <strong>⚠️ Security Warning:</strong> Keep this email secure. This API key provides access to your account. Do not share this email with others.
+            </div>
+            
+            <p>You can use this API key to authenticate your requests to the API.</p>
+        </div>
+        <div class="footer">
+            <p>This is an automated email. Please do not reply.</p>
+        </div>
+    </div>
+</body>
+</html>
+

@@ -6,7 +6,7 @@ import {
   Space,
   Modal,
   Form,
-  message,
+  App,
   Popconfirm,
   Card,
   Typography,
@@ -97,6 +97,7 @@ const GroupManagement = () => {
   const [form] = Form.useForm();
   const { getAuthHeaders } = useAuth();
   const { notifyError } = useNotification();
+  const { message } = App.useApp();
 
   // ==================== NOTIFICATIONS ====================
   
@@ -857,7 +858,7 @@ const GroupManagement = () => {
           margin: 0,
           width: '100%'
         }}
-        bodyStyle={{ padding: '36px 40px 40px 40px', margin: 0 }}
+        styles={{ body: { padding: '36px 40px 40px 40px', margin: 0 } }}
       >
         <Row justify="space-between" align="middle" style={{ marginBottom: 24 }}>
           <Col>
@@ -1749,14 +1750,16 @@ const GroupManagement = () => {
         onClose={() => setIsDetailsDrawerVisible(false)}
         open={isDetailsDrawerVisible}
         width={700}
-        headerStyle={{
-          background: 'linear-gradient(to right, #f8fafc, #ffffff)',
-          borderBottom: 'none',
-          padding: '24px 24px 0'
-        }}
-        bodyStyle={{
-          background: '#fafbfc',
-          padding: 24
+        styles={{
+          header: {
+            background: 'linear-gradient(to right, #f8fafc, #ffffff)',
+            borderBottom: 'none',
+            padding: '24px 24px 0'
+          },
+          body: {
+            background: '#fafbfc',
+            padding: 24
+          }
         }}
       >
         {selectedGroup && (
@@ -1778,7 +1781,7 @@ const GroupManagement = () => {
                   border: '1px solid #e5e7eb',
                   borderRadius: 8
                 }}
-                bodyStyle={{ padding: 0 }}
+                styles={{ body: { padding: 0 } }}
               >
                 <Descriptions
                   column={1}
@@ -1929,7 +1932,7 @@ const GroupManagement = () => {
                   border: '1px solid #e5e7eb',
                   borderRadius: 8
                 }}
-                bodyStyle={{ padding: '16px' }}
+                styles={{ body: { padding: '16px' } }}
               >
                 <Space style={{ width: '100%', marginBottom: 16 }}>
                   <Button

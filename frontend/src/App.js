@@ -1,6 +1,6 @@
 import React from 'react';
 import { Routes, Route, Navigate } from 'react-router-dom';
-import { Layout, Spin, Breadcrumb } from 'antd';
+import { Layout, Spin, Breadcrumb, App as AntApp } from 'antd';
 import { LoadingOutlined, HomeOutlined } from '@ant-design/icons';
 import { useLocation } from 'react-router-dom';
 import Login from './components/Login';
@@ -9,6 +9,7 @@ import UserManagement from './components/UserManagement';
 import GroupManagement from './components/GroupManagement';
 import OUManagement from './components/OUManagement';
 import ActivityLog from './components/ActivityLog';
+import ApiManagement from './components/ApiManagement';
 import Sidebar from './components/Sidebar';
 import { AuthProvider, useAuth } from './contexts/AuthContext';
 import { NotificationProvider } from './contexts/NotificationContext';
@@ -26,7 +27,8 @@ function AppContent() {
     '/users': 'จัดการผู้ใช้',
     '/groups': 'จัดการกลุ่ม',
     '/ous': 'จัดการ OU',
-    '/activity-log': 'Activity Log'
+    '/activity-log': 'Activity Log',
+    '/api-management': 'API Management'
   };
 
   const getBreadcrumbItems = () => {
@@ -83,6 +85,7 @@ function AppContent() {
                 <Route path="/groups" element={<GroupManagement />} />
                 <Route path="/ous" element={<OUManagement />} />
                 <Route path="/activity-log" element={<ActivityLog />} />
+                <Route path="/api-management" element={<ApiManagement />} />
               </Routes>
             </div>
           </div>
@@ -94,11 +97,13 @@ function AppContent() {
 
 function App() {
   return (
-    <AuthProvider>
-      <NotificationProvider>
-        <AppContent />
-      </NotificationProvider>
-    </AuthProvider>
+    <AntApp>
+      <AuthProvider>
+        <NotificationProvider>
+          <AppContent />
+        </NotificationProvider>
+      </AuthProvider>
+    </AntApp>
   );
 }
 

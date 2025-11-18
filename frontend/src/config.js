@@ -28,25 +28,39 @@ const getApiUrl = () => {
     }
     
     // 2. ตรวจสอบ window config (สำหรับ runtime override)
-    if (window.__API_URL__) {
+    if (typeof window !== 'undefined' && window.__API_URL__) {
         return window.__API_URL__;
     }
 
     // 3. ตรวจสอบ localStorage (ช่วยให้ override ผ่าน developer console ได้)
     if (typeof window !== 'undefined' && window.localStorage) {
         const stored = window.localStorage.getItem('API_URL');
-        if (stored) {
-            return stored;
+        if (stored && stored.trim()) {
+            return stored.trim();
         }
     }
     
     // 4. Default: พยายาม resolve ตาม hostname/port ปัจจุบัน
-    return resolveDefaultUrl();
+    const url = resolveDefaultUrl();
+    
+    // 5. Fallback: ถ้ายังไม่สามารถ resolve ได้ ให้ใช้ localhost:8000
+    if (!url || url.trim() === '' || url === 'undefined' || url === 'null') {
+        return 'http://localhost:8000';
+    }
+    
+    return url;
 };
 
+const apiUrl = getApiUrl();
+
+// Debug: Log API URL for debugging (only in development)
+if (process.env.NODE_ENV === 'development' && typeof window !== 'undefined') {
+    console.log('🔧 API URL:', apiUrl);
+}
+
 const config = {
-    apiUrl: getApiUrl(),
-    API_BASE_URL: getApiUrl(),
+    apiUrl: apiUrl,
+    API_BASE_URL: apiUrl,
     timeout: 5000
 };
 

@@ -11,7 +11,8 @@ import {
   ChevronRight,
   Bell,
   Search,
-  Activity
+  Activity,
+  Key
 } from 'lucide-react';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
@@ -63,6 +64,12 @@ const Sidebar = () => {
       key: '/activity-log', 
       icon: <Activity size={20} />, 
       label: 'Activity Log',
+      badge: null
+    },
+    { 
+      key: '/api-management', 
+      icon: <Key size={20} />, 
+      label: 'API Management',
       badge: null
     },
   ];

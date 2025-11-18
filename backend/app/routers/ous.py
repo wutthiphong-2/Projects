@@ -6,8 +6,8 @@ import logging
 
 from app.core.config import settings
 from app.core.database import get_ldap_connection
-from app.routers.auth import verify_token, get_client_ip
-from app.core.activity_log import activity_logger
+from app.routers.auth import verify_token, verify_token_or_api_key, get_client_ip
+from app.core.activity_log import activity_log_manager
 from app.core.cache import cached_response, invalidate_cache
 
 router = APIRouter()
@@ -41,7 +41,7 @@ def format_ou_data(entry: tuple) -> Dict[str, Any]:
 @router.get("/", response_model=List[OUResponse])
 @cached_response(ttl_seconds=600)  # ⚡ Cache for 10 minutes
 async def get_ous(
-    token_data = Depends(verify_token),
+    token_data = Depends(verify_token_or_api_key),
     q: str | None = Query(default=None, description="Search text for ou/description"),
     page: int = Query(default=1, ge=1),
     page_size: int = Query(default=50, ge=1, le=50000),  # Increased to support large OU lists
@@ -169,7 +169,7 @@ async def get_user_ous(token_data = Depends(verify_token)):
 async def get_suggested_groups_for_ou(
     dn: str, 
     threshold: float = Query(default=0.6, ge=0.0, le=1.0, description="Minimum percentage threshold (0.0-1.0)"),
-    token_data = Depends(verify_token)
+    token_data = Depends(verify_token_or_api_key)
 ):
     """
     Analyze users in an OU and suggest groups based on what majority of users have.
@@ -307,7 +307,7 @@ async def create_ou(ou_data: OUCreate, request: Request, token_data = Depends(ve
         invalidate_cache("get_ous")
         
         # Log activity
-        activity_logger.log_activity(
+        activity_log_manager.log_activity(
             user_id=token_data.username,
             action_type="ou_create",
             target_type="ou",
@@ -354,7 +354,7 @@ async def update_ou(dn: str, ou_data: OUUpdate, request: Request, token_data = D
         
         # Log activity
         ou_name = dn.split(',')[0].replace('OU=', '')
-        activity_logger.log_activity(
+        activity_log_manager.log_activity(
             user_id=token_data.username,
             action_type="ou_update",
             target_type="ou",
@@ -389,7 +389,7 @@ async def delete_ou(dn: str, request: Request, token_data = Depends(verify_token
         invalidate_cache("get_ous")
         
         # Log activity
-        activity_logger.log_activity(
+        activity_log_manager.log_activity(
             user_id=token_data.username,
             action_type="ou_delete",
             target_type="ou",

@@ -4,8 +4,8 @@ from typing import List, Optional, Dict, Any
 from datetime import datetime
 import logging
 
-from app.routers.auth import verify_token
-from app.core.activity_log import activity_logger
+from app.routers.auth import verify_token, verify_token_or_api_key
+from app.core.activity_log import activity_log_manager
 
 router = APIRouter()
 logger = logging.getLogger(__name__)
@@ -60,7 +60,7 @@ async def get_activity_logs(
     date_from: Optional[str] = Query(None, description="Filter from date (ISO format)"),
     date_to: Optional[str] = Query(None, description="Filter to date (ISO format)"),
     search: Optional[str] = Query(None, description="Search in target name and user name"),
-    token_data = Depends(verify_token)
+    token_data = Depends(verify_token_or_api_key)
 ):
     """
     Get activity logs with filtering and pagination
@@ -77,7 +77,7 @@ async def get_activity_logs(
     """
     logger.info(f"📋 Fetching activity logs: page={page}, page_size={page_size}")
     
-    result = activity_logger.get_activities(
+    result = activity_log_manager.get_activities(
         page=page,
         page_size=page_size,
         user_id=user_id,
@@ -94,7 +94,7 @@ async def get_activity_logs(
 @router.get("/recent", response_model=List[ActivityLogResponse])
 async def get_recent_activities(
     limit: int = Query(10, ge=1, le=50, description="Number of recent activities"),
-    token_data = Depends(verify_token)
+    token_data = Depends(verify_token_or_api_key)
 ):
     """
     Get recent activities (for Dashboard display)
@@ -104,14 +104,14 @@ async def get_recent_activities(
     """
     logger.info(f"📋 Fetching {limit} recent activities")
     
-    result = activity_logger.get_activities(page=1, page_size=limit)
+    result = activity_log_manager.get_activities(page=1, page_size=limit)
     
     return result['items']
 
 @router.get("/stats", response_model=StatsResponse)
 async def get_activity_stats(
     days: int = Query(30, ge=1, le=365, description="Number of days to look back"),
-    token_data = Depends(verify_token)
+    token_data = Depends(verify_token_or_api_key)
 ):
     """
     Get activity statistics for the last N days
@@ -128,7 +128,7 @@ async def get_activity_stats(
     """
     logger.info(f"📊 Fetching activity stats for last {days} days")
     
-    stats = activity_logger.get_stats(days=days)
+    stats = activity_log_manager.get_stats(days=days)
     
     logger.info(f"✅ Stats: {stats['total_actions']} total actions")
     return stats
@@ -184,7 +184,7 @@ async def log_from_event(event_data: EventLogData, token_data = Depends(verify_t
         logger.info(f"   Action: {event_data.action_type}")
         
         # Log to activity database
-        result = activity_logger.log_activity(
+        result = activity_log_manager.log_activity(
             user_id=event_data.subject_username,
             user_display_name=event_data.subject_username,
             action_type=event_data.action_type,

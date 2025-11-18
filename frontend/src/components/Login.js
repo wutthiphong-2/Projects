@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { Form, Input, Button, Card, Typography, message, Space } from 'antd';
+import { Form, Input, Button, Card, Typography, App } from 'antd';
 import { UserOutlined, LockOutlined, SafetyOutlined } from '@ant-design/icons';
 import { useAuth } from '../contexts/AuthContext';
 import './Login.css';
@@ -9,6 +9,7 @@ const { Title, Text } = Typography;
 const Login = () => {
   const [loading, setLoading] = useState(false);
   const { login } = useAuth();
+  const { message } = App.useApp();
 
   const onFinish = async (values) => {
     setLoading(true);

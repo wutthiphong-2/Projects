@@ -23,6 +23,10 @@ class RateLimitMiddleware(BaseHTTPMiddleware):
         if request.url.path in skip_paths:
             return await call_next(request)
         
+        # Skip rate limiting for OPTIONS requests (CORS preflight)
+        if request.method == "OPTIONS":
+            return await call_next(request)
+        
         # Only apply rate limiting to API paths
         if not request.url.path.startswith("/api/"):
             return await call_next(request)
@@ -36,7 +40,7 @@ class RateLimitMiddleware(BaseHTTPMiddleware):
             # Validate API key and get rate limit settings
             api_key_info = api_key_manager.validate_key(api_key)
             if api_key_info:
-                # Check API key rate limit
+                # Check API key rate limit (skip IP-based rate limiting if API key is valid)
                 allowed, usage_info = check_api_key_rate_limit(
                     api_key_info["id"],
                     api_key_info["rate_limit_per_minute"],
@@ -59,13 +63,16 @@ class RateLimitMiddleware(BaseHTTPMiddleware):
                             "Retry-After": str(usage_info.get("reset_in", 60))
                         }
                     )
+                # Skip IP-based rate limiting if API key is valid
+                return await call_next(request)
         
         # For requests without API key, apply IP-based rate limiting (more lenient)
         # This helps prevent abuse but doesn't block legitimate JWT token users
+        # Increased limits to support frontend that makes multiple parallel requests
         allowed, usage_info = check_ip_rate_limit(
             client_ip,
-            limit_per_minute=120,  # Higher limit for IP-based
-            limit_per_hour=2000
+            limit_per_minute=300,  # Increased from 120 to 300 for frontend parallel requests
+            limit_per_hour=5000    # Increased from 2000 to 5000 for frontend parallel requests
         )
         
         if not allowed:
@@ -109,7 +116,7 @@ class PermissionMiddleware(BaseHTTPMiddleware):
             api_key_info = api_key_manager.validate_key(api_key)
             if api_key_info:
                 api_key_permissions = api_key_info.get("permissions", [])
-                path = request.url.path
+                path = request.url.path.rstrip("/")  # Normalize path (remove trailing slash)
                 method = request.method
                 
                 # Check if API key has required permission

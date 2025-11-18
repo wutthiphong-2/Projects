@@ -7,7 +7,7 @@ import {
   Space,
   Modal,
   Form,
-  message,
+  App,
   Popconfirm,
   Card,
   Typography,
@@ -249,6 +249,7 @@ const UserManagement = () => {
   const [passwordForm] = Form.useForm();
   const [filterForm] = Form.useForm();
   const { getAuthHeaders } = useAuth();
+  const { message } = App.useApp();
   const {
     notifyUserCreated,
     notifyUserUpdated,
@@ -2079,7 +2080,7 @@ const UserManagement = () => {
           </div>
         )}
       </section>
-      <Card className="umx-table-card" bodyStyle={{ padding: 0 }}>
+      <Card className="umx-table-card" styles={{ body: { padding: 0 } }}>
         <div className="umx-table-head">
           <div>
             <div className="umx-table-title">รายชื่อผู้ใช้</div>
@@ -2295,7 +2296,7 @@ const UserManagement = () => {
                     className="umx-form-card"
                     title="Account Basics"
                     extra={<Tag color="blue">Required</Tag>}
-                    bodyStyle={{ padding: 0 }}
+                    styles={{ body: { padding: 0 } }}
                   >
                     <div className="umx-form-card-body">
                       <Row gutter={16}>
@@ -2412,7 +2413,7 @@ const UserManagement = () => {
                           borderRadius: 12,
                           boxShadow: '0 2px 8px rgba(0, 0, 0, 0.04)'
                         }}
-                        bodyStyle={{ padding: '16px' }}
+                        styles={{ body: { padding: '16px' } }}
                       >
                         <Form.Item
                           name="accountOption"
@@ -2540,7 +2541,7 @@ const UserManagement = () => {
                   <Card
                     className="umx-form-card"
                     title="Profile & Contact"
-                    bodyStyle={{ padding: 0 }}
+                    styles={{ body: { padding: 0 } }}
                   >
                     <div className="umx-form-card-body">
                       <Collapse
@@ -2652,7 +2653,7 @@ const UserManagement = () => {
                   <Card
                     className="umx-form-card"
                     title="Organizational Placement"
-                    bodyStyle={{ padding: 0 }}
+                    styles={{ body: { padding: 0 } }}
                   >
                     <div className="umx-form-card-body">
                       <Form.Item
@@ -2846,7 +2847,7 @@ const UserManagement = () => {
                   border: '2px solid #e5e7eb',
                   borderRadius: 12
                 }}
-                bodyStyle={{ padding: '20px' }}
+                styles={{ body: { padding: '20px' } }}
               >
                 <Descriptions column={1} bordered size="middle">
                   <Descriptions.Item 
@@ -3311,7 +3312,7 @@ const UserManagement = () => {
                           borderRadius: 12,
                           boxShadow: '0 2px 8px rgba(0, 0, 0, 0.04)'
                         }}
-                        bodyStyle={{ padding: '20px' }}
+                        styles={{ body: { padding: '20px' } }}
                       >
                         <Form.Item
                           name="accountOption"
@@ -3547,14 +3548,16 @@ const UserManagement = () => {
         onClose={() => setIsDetailsDrawerVisible(false)}
         open={isDetailsDrawerVisible}
         width={getResponsiveWidth(700, 560, '100%')}
-        headerStyle={{
-          background: 'linear-gradient(to right, #f8fafc, #ffffff)',
-          borderBottom: 'none',
-          padding: '24px 24px 0'
-        }}
-        bodyStyle={{
-          background: '#fafbfc',
-          padding: 24
+        styles={{
+          header: {
+            background: 'linear-gradient(to right, #f8fafc, #ffffff)',
+            borderBottom: 'none',
+            padding: '24px 24px 0'
+          },
+          body: {
+            background: '#fafbfc',
+            padding: 24
+          }
         }}
       >
         {selectedUser && (
@@ -3576,7 +3579,7 @@ const UserManagement = () => {
                   border: '1px solid #e5e7eb',
                   borderRadius: 8
                 }}
-                bodyStyle={{ padding: 0 }}
+                styles={{ body: { padding: 0 } }}
               >
                 <Descriptions
                   column={1}
@@ -3810,7 +3813,7 @@ const UserManagement = () => {
                   background: '#f8fafc',
                   borderBottom: '1px solid #e5e7eb'
                 }}
-                bodyStyle={{ padding: 0 }}
+                styles={{ body: { padding: 0 } }}
               >
                 <Descriptions
                   column={1}
@@ -4071,7 +4074,7 @@ const UserManagement = () => {
                             cursor: 'pointer',
                             padding: '12px 16px'
                           }}
-                          bodyStyle={{ padding: categoryGroupsInUser.length > 0 ? '12px' : '0' }}
+                          styles={{ body: { padding: categoryGroupsInUser.length > 0 ? '12px' : '0' } }}
                           title={
                             <div
                               style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}
@@ -4199,7 +4202,7 @@ const UserManagement = () => {
                   border: '1px solid #e5e7eb',
                   borderRadius: 8
                 }}
-                bodyStyle={{ padding: '12px' }}
+                styles={{ body: { padding: '12px' } }}
               >
                 {userPermissions.length > 0 ? (
                   <List
@@ -4277,7 +4280,7 @@ const UserManagement = () => {
                     border: '1px solid #e5e7eb',
                     borderRadius: 8
                   }}
-                  bodyStyle={{ padding: '16px' }}
+                  styles={{ body: { padding: '16px' } }}
                 >
                   <div style={{ marginBottom: 12 }}>
                     <Text strong style={{ fontSize: 14, color: '#1f2937' }}>
@@ -4345,7 +4348,7 @@ const UserManagement = () => {
                   border: '1px solid #e5e7eb',
                   borderRadius: 8
                 }}
-                bodyStyle={{ padding: '12px' }}
+                styles={{ body: { padding: '12px' } }}
               >
                 <div style={{ marginBottom: 12, padding: '0 8px' }}>
                   <Text strong style={{ fontSize: 14, color: '#1f2937' }}>

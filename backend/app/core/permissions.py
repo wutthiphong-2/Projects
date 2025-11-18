@@ -199,8 +199,8 @@ def get_required_scope(path: str, method: str) -> Optional[str]:
     Returns:
         Required scope string or None if no permission required
     """
-    # Normalize path (remove query string)
-    path = path.split("?")[0]
+    # Normalize path (remove query string and trailing slash)
+    path = path.split("?")[0].rstrip("/")
     
     # Check exact matches first
     for (pattern, pattern_method), scope in ENDPOINT_SCOPE_MAP.items():

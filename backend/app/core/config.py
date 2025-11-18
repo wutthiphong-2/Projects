@@ -34,6 +34,15 @@ class Settings(BaseSettings):
     WINRM_PORT: int = 5985  # WinRM HTTP port (5985) or HTTPS (5986)
     WINRM_TRANSPORT: str = "ntlm"  # Authentication: ntlm, kerberos, ssl
     
+    # Email Configuration (for SMTP)
+    SMTP_HOST: str = "localhost"
+    SMTP_PORT: int = 587
+    SMTP_USERNAME: str = ""
+    SMTP_PASSWORD: str = ""
+    SMTP_USE_TLS: bool = True
+    SMTP_FROM_EMAIL: str = "noreply@example.com"
+    SMTP_FROM_NAME: str = "API Management"
+    
     # Pydantic v2 uses model_config; keep empty Config for backward compatibility in code references
     # Remove legacy Config to avoid conflicts with Pydantic v2
 

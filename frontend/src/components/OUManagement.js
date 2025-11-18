@@ -19,7 +19,7 @@ import {
   Badge,
   Divider,
   Descriptions,
-  message,
+  App,
   Drawer,
   Empty
 } from 'antd';
@@ -67,6 +67,7 @@ const OUManagement = () => {
   });
 
   const { getAuthHeaders } = useAuth();
+  const { message } = App.useApp();
 
   // ==================== ICON MAPPING ====================
   
@@ -618,7 +619,7 @@ const OUManagement = () => {
           border: 'none',
           boxShadow: '0 4px 12px rgba(30, 58, 138, 0.15)'
         }}
-        bodyStyle={{ padding: '36px 40px' }}
+        styles={{ body: { padding: '36px 40px' } }}
       >
         <Row align="middle" justify="space-between" style={{ marginBottom: 32 }}>
           <Col>
@@ -811,7 +812,7 @@ const OUManagement = () => {
                     cursor: 'pointer',
                     background: '#ffffff'
                   }}
-                  bodyStyle={{ padding: '18px' }}
+                  styles={{ body: { padding: '18px' } }}
                   hoverable
                   onClick={() => {
                     const keys = ['root'];
@@ -895,7 +896,7 @@ const OUManagement = () => {
           boxShadow: '0 2px 8px rgba(0,0,0,0.06)',
           border: '1px solid #e5e7eb'
         }}
-        bodyStyle={{ padding: 0 }}
+        styles={{ body: { padding: 0 } }}
       >
         {/* Professional Search Header */}
         <div style={{ 
@@ -1031,14 +1032,16 @@ const OUManagement = () => {
         onClose={() => setDrawerVisible(false)}
         open={drawerVisible}
         width={650}
-        headerStyle={{
-          background: 'linear-gradient(to right, #f8fafc, #ffffff)',
-          borderBottom: 'none',
-          padding: '24px 24px 0'
-        }}
-        bodyStyle={{
-          background: '#fafbfc',
-          padding: 24
+        styles={{
+          header: {
+            background: 'linear-gradient(to right, #f8fafc, #ffffff)',
+            borderBottom: 'none',
+            padding: '24px 24px 0'
+          },
+          body: {
+            background: '#fafbfc',
+            padding: 24
+          }
         }}
       >
         {/* OU Details */}
@@ -1052,7 +1055,7 @@ const OUManagement = () => {
                 border: '1px solid #e5e7eb',
                 borderRadius: 8
               }}
-              bodyStyle={{ padding: 0 }}
+              styles={{ body: { padding: 0 } }}
             >
               <Descriptions 
                 column={1} 
@@ -1101,7 +1104,7 @@ const OUManagement = () => {
                     border: '2px solid #86efac',
                     borderRadius: 8
                   }}
-                  bodyStyle={{ padding: '16px 12px' }}
+                  styles={{ body: { padding: '16px 12px' } }}
                 >
                   <div style={{ fontSize: 28, fontWeight: 700, color: '#10b981', marginBottom: 4 }}>
                     {selectedNode.stats?.users || 0}
@@ -1125,7 +1128,7 @@ const OUManagement = () => {
                     border: '2px solid #fcd34d',
                     borderRadius: 8
                   }}
-                  bodyStyle={{ padding: '16px 12px' }}
+                  styles={{ body: { padding: '16px 12px' } }}
                 >
                   <div style={{ fontSize: 28, fontWeight: 700, color: '#f59e0b', marginBottom: 4 }}>
                     {selectedNode.stats?.groups || 0}
@@ -1149,7 +1152,7 @@ const OUManagement = () => {
                     border: '2px solid #93c5fd',
                     borderRadius: 8
                   }}
-                  bodyStyle={{ padding: '16px 12px' }}
+                  styles={{ body: { padding: '16px 12px' } }}
                 >
                   <div style={{ fontSize: 28, fontWeight: 700, color: '#3b82f6', marginBottom: 4 }}>
                     {selectedNode.stats?.subOUs || 0}
@@ -1175,7 +1178,7 @@ const OUManagement = () => {
               border: '1px solid #e5e7eb',
               borderRadius: 8
             }}
-            bodyStyle={{ padding: 0 }}
+            styles={{ body: { padding: 0 } }}
           >
             <Descriptions 
               column={1} 
@@ -1235,7 +1238,7 @@ const OUManagement = () => {
                 border: '1px solid #e5e7eb',
                 borderRadius: 8
               }}
-              bodyStyle={{ padding: 0 }}
+              styles={{ body: { padding: 0 } }}
             >
               <Descriptions 
                 column={1} 

@@ -9,8 +9,8 @@ from pathlib import Path
 
 from app.core.config import settings
 from app.core.database import get_ldap_connection
-from app.routers.auth import verify_token, get_client_ip
-from app.core.activity_log import activity_logger
+from app.routers.auth import verify_token, verify_token_or_api_key, get_client_ip
+from app.core.activity_log import activity_log_manager
 from app.core.cache import cached_response, invalidate_cache
 
 router = APIRouter()
@@ -172,7 +172,7 @@ def format_user_data(entry: tuple) -> Dict[str, Any]:
 @router.get("/", response_model=List[GroupResponse])
 @cached_response(ttl_seconds=600)  # ⚡ Cache for 10 minutes
 async def get_groups(
-    token_data = Depends(verify_token),
+    token_data = Depends(verify_token_or_api_key),
     q: str | None = Query(default=None, description="Search text for cn/description"),
     page: int = Query(default=1, ge=1),
     page_size: int = Query(default=50, ge=1, le=50000),  # Increased to 50000
@@ -348,7 +348,7 @@ async def get_group(dn: str, token_data = Depends(verify_token)):
         raise HTTPException(status_code=500, detail="Failed to retrieve group")
 
 @router.post("/", response_model=Dict[str, Any])
-async def create_group(group_data: GroupCreate, token_data = Depends(verify_token)):
+async def create_group(group_data: GroupCreate, token_data = Depends(verify_token_or_api_key)):
     """Create new group in Active Directory with full AD support"""
     ldap_conn = get_ldap_connection()
     
@@ -644,7 +644,7 @@ async def add_group_member(group_dn: str, member_data: GroupMemberAdd, request: 
         
         # Log activity
         group_cn = group_dn.split(',')[0].replace('CN=', '')
-        activity_logger.log_activity(
+        activity_log_manager.log_activity(
             user_id=token_data.username,
             action_type="group_member_add",
             target_type="group",
@@ -727,7 +727,7 @@ async def remove_group_member(group_dn: str, member_data: GroupMemberRemove, req
         
         # Log activity
         group_cn = group_dn.split(',')[0].replace('CN=', '')
-        activity_logger.log_activity(
+        activity_log_manager.log_activity(
             user_id=token_data.username,
             action_type="group_member_remove",
             target_type="group",

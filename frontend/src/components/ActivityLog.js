@@ -14,7 +14,7 @@ import {
   Statistic,
   Empty,
   Spin,
-  message,
+  App,
   Tooltip,
   Descriptions,
   Alert,
@@ -72,6 +72,7 @@ const ActivityLog = () => {
   const [stats, setStats] = useState(null);
   const [actionTypes, setActionTypes] = useState([]);
   const { getAuthHeaders } = useAuth();
+  const { message } = App.useApp();
 
   // Action type icons and colors mapping
   const ACTION_CONFIG = {
@@ -111,7 +112,7 @@ const ActivityLog = () => {
         })
       };
 
-      const response = await axios.get(`${config.apiUrl}/api/activity-logs`, {
+      const response = await axios.get(`${config.apiUrl}/api/activity-logs/`, {
         headers: getAuthHeaders(),
         params
       });
@@ -403,7 +404,7 @@ const ActivityLog = () => {
           boxShadow: '0 4px 16px rgba(0,0,0,0.1)',
           overflow: 'hidden'
         }}
-        bodyStyle={{ padding: 0 }}
+        styles={{ body: { padding: 0 } }}
       >
         {/* Header Section with Gradient */}
         <div style={{
