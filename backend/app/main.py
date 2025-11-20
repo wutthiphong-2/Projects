@@ -8,15 +8,16 @@ import asyncio
 from dotenv import load_dotenv
 from app.core.config import settings
 from app.core.database import init_ldap_connection
+from app.core.exceptions import APIException
 from app.routers import auth as auth_router
 from app.routers import users as users_router
 from app.routers import groups as groups_router
 from app.routers import ous as ous_router
 from app.routers import activity_logs as activity_logs_router
 from app.routers import api_keys as api_keys_router
-from app.routers import api_usage as api_usage_router
-from app.routers import api_endpoints as api_endpoints_router
-from app.core.middleware import RateLimitMiddleware, PermissionMiddleware, APIUsageLoggingMiddleware
+from app.routers import api_docs as api_docs_router
+from app.core.rate_limit_middleware import RateLimitMiddleware
+from app.core.api_logging_middleware import APILoggingMiddleware
 import logging
 
 # Setup logging
@@ -71,43 +72,91 @@ app = FastAPI(
     lifespan=lifespan
 )
 
+# Exception handler for API exceptions
+@app.exception_handler(APIException)
+async def api_exception_handler(request: Request, exc: APIException):
+    """Handle custom API exceptions with standardized error response"""
+    logger.error(f"❌ API Exception: {exc.error_code} - {exc.detail}")
+    logger.error(f"   URL: {request.url}")
+    logger.error(f"   Method: {request.method}")
+    
+    return JSONResponse(
+        status_code=exc.status_code,
+        content={
+            "success": False,
+            "error_code": exc.error_code,
+            "message": exc.detail,
+            "details": exc.details
+        }
+    )
+
 # Exception handler for validation errors
 @app.exception_handler(RequestValidationError)
 async def validation_exception_handler(request: Request, exc: RequestValidationError):
-    """Log and return validation errors in detail"""
+    """Log and return validation errors in standardized format"""
     logger.error("❌ Validation Error:")
     logger.error(f"   URL: {request.url}")
     logger.error(f"   Method: {request.method}")
     
     # Log each validation error
+    errors = []
     for error in exc.errors():
-        logger.error(f"   Field: {' > '.join(str(loc) for loc in error['loc'])}")
+        field_path = " > ".join(str(loc) for loc in error['loc'])
+        logger.error(f"   Field: {field_path}")
         logger.error(f"   Message: {error['msg']}")
         logger.error(f"   Type: {error['type']}")
-        if 'input' in error:
-            logger.error(f"   Input: {error['input']}")
+        errors.append({
+            "field": field_path,
+            "message": error['msg'],
+            "type": error['type']
+        })
     
-    # Return the default FastAPI validation error response
+    # Return standardized error response
     return JSONResponse(
         status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
-        content={"detail": exc.errors()}
+        content={
+            "success": False,
+            "error_code": "VALIDATION_ERROR",
+            "message": "Request validation failed",
+            "details": {"errors": errors}
+        }
     )
 
-# CORS middleware - Allow all origins for development
+# Exception handler for general exceptions
+@app.exception_handler(Exception)
+async def general_exception_handler(request: Request, exc: Exception):
+    """Handle unexpected exceptions"""
+    logger.error(f"❌ Unexpected Exception: {type(exc).__name__} - {str(exc)}")
+    logger.error(f"   URL: {request.url}")
+    logger.error(f"   Method: {request.method}")
+    import traceback
+    logger.error(traceback.format_exc())
+    
+    return JSONResponse(
+        status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+        content={
+            "success": False,
+            "error_code": "INTERNAL_ERROR",
+            "message": "An unexpected error occurred",
+            "details": {"error_type": type(exc).__name__} if settings.DEBUG else None
+        }
+    )
+
+# CORS middleware - Use settings for allowed origins
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],  # Allow all origins
-    allow_credentials=False,  # Must be False when allow_origins is "*"
+    allow_origins=settings.CORS_ORIGINS if settings.CORS_ORIGINS else ["http://localhost:3000"],
+    allow_credentials=True,
     allow_methods=["GET", "POST", "PUT", "DELETE", "PATCH", "OPTIONS"],
     allow_headers=["*"],
-    expose_headers=["*"]
+    expose_headers=["*", "X-RateLimit-Limit", "X-RateLimit-Remaining", "X-RateLimit-Reset", "X-Request-ID"]
 )
 
-# Add API key authentication and rate limiting middlewares
-# Order matters: rate limit -> permission -> usage logging
+# API Logging Middleware - Log detailed request/response
+app.add_middleware(APILoggingMiddleware)
+
+# Rate Limit Middleware - Add rate limit headers
 app.add_middleware(RateLimitMiddleware)
-app.add_middleware(PermissionMiddleware)
-app.add_middleware(APIUsageLoggingMiddleware)
 
 # Routers
 app.include_router(auth_router.router, prefix="/api/auth", tags=["auth"])
@@ -116,8 +165,13 @@ app.include_router(groups_router.router, prefix="/api/groups", tags=["groups"])
 app.include_router(ous_router.router, prefix="/api/ous", tags=["ous"])
 app.include_router(activity_logs_router.router, prefix="/api/activity-logs", tags=["activity-logs"])
 app.include_router(api_keys_router.router, prefix="/api/api-keys", tags=["api-keys"])
-app.include_router(api_usage_router.router, prefix="/api/api-usage", tags=["api-usage"])
-app.include_router(api_endpoints_router.router, prefix="/api/api-endpoints", tags=["api-endpoints"])
+app.include_router(api_docs_router.router, prefix="/api/docs", tags=["api-docs"])
+
+# API Versioning - Add versioned routes
+# v1 routes (current)
+app.include_router(users_router.router, prefix="/api/v1/users", tags=["users-v1"])
+app.include_router(groups_router.router, prefix="/api/v1/groups", tags=["groups-v1"])
+app.include_router(ous_router.router, prefix="/api/v1/ous", tags=["ous-v1"])
 
 @app.get("/")
 async def root():

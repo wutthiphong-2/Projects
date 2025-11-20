@@ -13,7 +13,8 @@ class Settings(BaseSettings):
     # Server Configuration
     HOST: str = "0.0.0.0"
     PORT: int = 8000
-    DEBUG: bool = True
+    # ⚠️ IMPORTANT: Set to False in production to avoid exposing sensitive information
+    DEBUG: bool = True  # ⚠️ MUST BE False IN PRODUCTION
     
     # JWT Configuration
     JWT_SECRET_KEY: str = "your-secret-key"
@@ -21,6 +22,8 @@ class Settings(BaseSettings):
     ACCESS_TOKEN_EXPIRE_MINUTES: int = 480  # 8 hours (was 30 minutes)
     
     # CORS Configuration
+    # For production, set specific origins in .env file
+    # Example: CORS_ORIGINS=["https://yourdomain.com", "https://www.yourdomain.com"]
     CORS_ORIGINS: List[str] = ["http://localhost:3000", "http://127.0.0.1:3000"]
     
     # Logging
@@ -41,7 +44,7 @@ class Settings(BaseSettings):
     SMTP_PASSWORD: str = ""
     SMTP_USE_TLS: bool = True
     SMTP_FROM_EMAIL: str = "noreply@example.com"
-    SMTP_FROM_NAME: str = "API Management"
+    SMTP_FROM_NAME: str = "AD Management System"
     
     # Pydantic v2 uses model_config; keep empty Config for backward compatibility in code references
     # Remove legacy Config to avoid conflicts with Pydantic v2

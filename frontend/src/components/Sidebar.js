@@ -5,7 +5,6 @@ import {
   Users,
   UsersRound,
   FolderTree,
-  Settings,
   LogOut,
   ChevronLeft,
   ChevronRight,
@@ -170,11 +169,6 @@ const Sidebar = () => {
                   <Badge count={3} size="small">
                     <Bell size={18} />
                   </Badge>
-                </div>
-              </Tooltip>
-              <Tooltip title="Settings">
-                <div className="footer-action">
-                  <Settings size={18} />
                 </div>
               </Tooltip>
             </>

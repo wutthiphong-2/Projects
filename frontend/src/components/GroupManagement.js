@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, useMemo } from 'react';
 import {
   Table,
   Button,
@@ -48,16 +48,17 @@ import {
   GlobalOutlined,
   ApartmentOutlined
 } from '@ant-design/icons';
-import axios from 'axios';
-import config from '../config';
-import { useAuth } from '../contexts/AuthContext';
+import { useGroups } from '../hooks/useGroups';
+import { useOUs } from '../hooks/useOUs';
+import { groupService } from '../services/groupService';
+import { ouService } from '../services/ouService';
+import { userService } from '../services/userService';
 import { useNotification } from '../contexts/NotificationContext';
 import { formatErrorDetail } from '../utils/userManagementHelpers';
 import './GroupManagement.css';
 
 const { Title, Text } = Typography;
 const { Search } = Input;
-const { TabPane } = Tabs;
 const { Option } = Select;
 
 const GroupManagement = () => {
@@ -95,51 +96,22 @@ const GroupManagement = () => {
   const [ouTreeData, setOuTreeData] = useState([]);
   
   const [form] = Form.useForm();
-  const { getAuthHeaders } = useAuth();
-  const { notifyError } = useNotification();
   const { message } = App.useApp();
+  
+  // Hooks
+  const { 
+    fetchGroups: fetchGroupsHook, 
+    fetchGroupMembers: fetchGroupMembersHook,
+    deleteGroup: deleteGroupHook,
+    createGroup: createGroupHook,
+    updateGroup: updateGroupHook,
+    loading: groupsLoading 
+  } = useGroups();
+  const { fetchUserOUs } = useOUs();
+  const { notifyError, notifyGroupCreated, notifyGroupUpdated, notifyGroupDeleted, notifyMemberAdded, notifyMemberRemoved } = useNotification();
 
   // ==================== NOTIFICATIONS ====================
-  
-  const notifyGroupCreated = (groupName) => {
-    message.success({
-      content: `Group "${groupName}" created successfully!`,
-      duration: 4,
-      icon: <CheckCircleOutlined style={{ color: '#10b981' }} />
-    });
-  };
-
-  const notifyGroupUpdated = (groupName) => {
-    message.success({
-      content: `Group "${groupName}" updated successfully!`,
-      duration: 3,
-      icon: <CheckCircleOutlined style={{ color: '#3b82f6' }} />
-    });
-  };
-
-  const notifyGroupDeleted = (groupName) => {
-    message.success({
-      content: `Group "${groupName}" deleted successfully!`,
-      duration: 3,
-      icon: <CheckCircleOutlined style={{ color: '#ef4444' }} />
-    });
-  };
-
-  const notifyMemberAdded = (userName, groupName) => {
-    message.success({
-      content: `User "${userName}" added to group "${groupName}"`,
-      duration: 4,
-      icon: <UserAddOutlined style={{ color: '#10b981' }} />
-    });
-  };
-
-  const notifyMemberRemoved = (userName, groupName) => {
-    message.success({
-      content: `User "${userName}" removed from group "${groupName}"`,
-      duration: 3,
-      icon: <UserDeleteOutlined style={{ color: '#f59e0b' }} />
-    });
-  };
+  // Using notifications from useNotification hook
 
   // Handler for auto-refresh toggle
   const handleAutoRefreshToggle = (checked) => {
@@ -171,18 +143,17 @@ const GroupManagement = () => {
       
       console.log('📤 Request params:', params);
       
-      const response = await axios.get(`${config.apiUrl}/api/groups/`, {
-        headers: getAuthHeaders(),
-        params
-      });
+      const result = await fetchGroupsHook(params);
       
-      console.log('✅ Groups fetched:', response.data.length);
-      console.log('📊 Sample group:', response.data[0]);
-      
-      setGroups(response.data);
-      setLastRefreshTime(new Date());
-      
-      return { success: true, count: response.data.length };
+      if (result.success) {
+        console.log('✅ Groups fetched:', result.data.length);
+        console.log('📊 Sample group:', result.data[0]);
+        setGroups(result.data);
+        setLastRefreshTime(new Date());
+        return { success: true, count: result.data.length };
+      } else {
+        throw new Error(result.error);
+      }
     } catch (error) {
       const detail = error?.response?.data?.detail || error?.message || 'Unknown error';
       message.error(`Failed to load groups: ${detail}`);
@@ -191,22 +162,22 @@ const GroupManagement = () => {
     } finally {
       setLoading(false);
     }
-  }, [searchText, getAuthHeaders]);
+  }, [searchText, fetchGroupsHook]);
 
   const fetchGroupMembers = async (groupDn) => {
     setLoadingMembers(true);
     try {
       console.log('👥 Fetching members for group:', groupDn);
       
-      const response = await axios.get(
-        `${config.apiUrl}/api/groups/${encodeURIComponent(groupDn)}/members`,
-        { headers: getAuthHeaders() }
-      );
+      const result = await fetchGroupMembersHook(groupDn);
       
-      console.log('✅ Members fetched:', response.data.length);
-      setGroupMembers(response.data);
-      
-      return response.data;
+      if (result.success) {
+        console.log('✅ Members fetched:', result.data.length);
+        setGroupMembers(result.data);
+        return result.data;
+      } else {
+        throw new Error(result.error);
+      }
     } catch (error) {
       console.error('❌ Error fetching members:', error);
       message.warning('Failed to load group members');
@@ -221,15 +192,15 @@ const GroupManagement = () => {
     try {
       console.log('👥 Fetching available users for group:', groupDn);
       
-      const response = await axios.get(
-        `${config.apiUrl}/api/groups/${encodeURIComponent(groupDn)}/available-users`,
-        { headers: getAuthHeaders() }
-      );
+      // Get all users and filter out current members
+      const allUsersData = await userService.getUsers({ page_size: 10000 });
+      const currentMembers = groupMembers.map(m => m.dn);
+      const available = allUsersData.filter(u => !currentMembers.includes(u.dn));
       
-      console.log('✅ Available users:', response.data.length);
-      setAvailableUsers(response.data);
+      console.log('✅ Available users:', available.length);
+      setAvailableUsers(available);
       
-      return response.data;
+      return available;
     } catch (error) {
       console.error('❌ Error fetching available users:', error);
       message.warning('Failed to load available users');
@@ -244,19 +215,20 @@ const GroupManagement = () => {
     try {
       console.log('📁 Fetching OUs for group creation...');
       
-      const response = await axios.get(`${config.apiUrl}/api/ous/`, {
-        headers: getAuthHeaders(),
-        params: { page_size: 10000 }
-      });
+      const result = await fetchUserOUs();
       
-      console.log('✅ OUs fetched:', response.data.length);
-      setAvailableOUs(response.data);
-      
-      // Build tree structure for TreeSelect
-      const treeData = buildOUTreeData(response.data);
-      setOuTreeData(treeData);
-      
-      return response.data;
+      if (result.success) {
+        console.log('✅ OUs fetched:', result.data.length);
+        setAvailableOUs(result.data);
+        
+        // Build tree structure for TreeSelect
+        const treeData = buildOUTreeData(result.data);
+        setOuTreeData(treeData);
+        
+        return result.data;
+      } else {
+        throw new Error(result.error);
+      }
     } catch (error) {
       console.error('❌ Error fetching OUs:', error);
       message.warning('Failed to load OUs');
@@ -273,15 +245,12 @@ const GroupManagement = () => {
     try {
       console.log('👥 Fetching all users for managedBy...');
       
-      const response = await axios.get(`${config.apiUrl}/api/users/`, {
-        headers: getAuthHeaders(),
-        params: { page_size: 10000 }
-      });
+      const data = await userService.getUsers({ page_size: 10000 });
       
-      console.log('✅ Users fetched:', response.data.length);
-      setAllUsers(response.data);
+      console.log('✅ Users fetched:', data.length);
+      setAllUsers(data);
       
-      return response.data;
+      return data;
     } catch (error) {
       console.error('❌ Error fetching users:', error);
       setAllUsers([]);
@@ -426,9 +395,7 @@ const GroupManagement = () => {
       
       console.log('🗑️ Deleting group:', groupDn);
       
-      await axios.delete(`${config.apiUrl}/api/groups/${encodeURIComponent(groupDn)}`, {
-        headers: getAuthHeaders()
-      });
+      await groupService.deleteGroup(groupDn);
       
       console.log('✅ Group deleted successfully');
       
@@ -448,11 +415,13 @@ const GroupManagement = () => {
       
       console.log('📤 Creating group with data:', values);
       
-      const response = await axios.post(`${config.apiUrl}/api/groups/`, values, {
-        headers: getAuthHeaders()
-      });
+      const result = await createGroupHook(values);
       
-      console.log('✅ Group created successfully:', response.data);
+      if (!result.success) {
+        throw new Error(result.error);
+      }
+      
+      console.log('✅ Group created successfully:', result.data);
       
       setIsCreateModalVisible(false);
       form.resetFields();
@@ -498,11 +467,11 @@ const GroupManagement = () => {
         return;
       }
       
-      await axios.put(
-        `${config.apiUrl}/api/groups/${encodeURIComponent(editingGroup.dn)}`,
-        updateData,
-        { headers: getAuthHeaders() }
-      );
+      const result = await updateGroupHook(editingGroup.dn, updateData);
+      
+      if (!result.success) {
+        throw new Error(result.error);
+      }
       
       console.log('✅ Group updated');
       
@@ -540,11 +509,7 @@ const GroupManagement = () => {
         const user = availableUsers.find(u => u.dn === userDn);
         const userName = user?.cn || userDn;
         
-        await axios.post(
-          `${config.apiUrl}/api/groups/${encodeURIComponent(selectedGroup.dn)}/members`,
-          { user_dn: userDn },
-          { headers: getAuthHeaders() }
-        );
+        await groupService.addGroupMember(selectedGroup.dn, userDn);
         
         console.log(`✅ Added: ${userName}`);
       }
@@ -577,13 +542,7 @@ const GroupManagement = () => {
       
       console.log('👥 Removing member:', memberName);
       
-      await axios.delete(
-        `${config.apiUrl}/api/groups/${encodeURIComponent(selectedGroup.dn)}/members`,
-        {
-          data: { user_dn: memberDn },
-          headers: getAuthHeaders()
-        }
-      );
+      await groupService.removeGroupMember(selectedGroup.dn, memberDn);
       
       console.log('✅ Member removed');
       
@@ -622,6 +581,303 @@ const GroupManagement = () => {
       ? Math.round(groups.reduce((sum, g) => sum + (g.memberCount || 0), 0) / groups.length)
       : 0
   };
+
+  // ==================== TABS ITEMS ====================
+  
+  const groupDetailsTabsItems = useMemo(() => {
+    if (!selectedGroup) return [];
+
+    return [
+      {
+        key: '1',
+        label: (
+          <span>
+            <TeamOutlined />
+            Basic Info
+          </span>
+        ),
+        children: (
+          <>
+            <Card
+              size="small"
+              style={{
+                marginBottom: 16,
+                background: '#ffffff',
+                border: '1px solid #e5e7eb',
+                borderRadius: 8
+              }}
+              styles={{ body: { padding: 0 } }}
+            >
+              <Descriptions
+                column={1}
+                bordered
+                size="middle"
+                styles={{
+                  label: {
+                    background: '#f8fafc',
+                    color: '#374151',
+                    fontWeight: 600,
+                    fontSize: 13,
+                    width: '35%'
+                  },
+                  content: {
+                    background: '#ffffff',
+                    color: '#1f2937'
+                  }
+                }}
+              >
+                <Descriptions.Item label="Group Name">
+                  <Text strong style={{ fontSize: 14 }}>
+                    {selectedGroup.cn}
+                  </Text>
+                </Descriptions.Item>
+                <Descriptions.Item label="Description">
+                  {selectedGroup.description ? (
+                    <Text style={{ fontSize: 13 }}>{selectedGroup.description}</Text>
+                  ) : (
+                    <Text type="secondary">No description</Text>
+                  )}
+                </Descriptions.Item>
+                <Descriptions.Item label="Member Count">
+                  <Badge
+                    count={selectedGroup.memberCount || 0}
+                    showZero
+                    style={{
+                      backgroundColor: selectedGroup.memberCount > 0 ? '#10b981' : '#94a3b8',
+                      fontSize: 14,
+                      fontWeight: 700,
+                      padding: '0 14px',
+                      height: 28
+                    }}
+                  />
+                </Descriptions.Item>
+                <Descriptions.Item label="Group Type">
+                  <Tag
+                    style={{
+                      background: selectedGroup.groupType === 'Security' ? '#fef2f2' : '#eff6ff',
+                      color: selectedGroup.groupType === 'Security' ? '#991b1b' : '#1e40af',
+                      border: `2px solid ${selectedGroup.groupType === 'Security' ? '#fca5a5' : '#bfdbfe'}`,
+                      padding: '6px 14px',
+                      fontSize: 13,
+                      fontWeight: 700
+                    }}
+                  >
+                    {selectedGroup.groupType || 'Unknown'}
+                  </Tag>
+                </Descriptions.Item>
+                <Descriptions.Item label="Group Scope">
+                  <Tag
+                    style={{
+                      background: '#eff6ff',
+                      color: '#1e40af',
+                      border: '2px solid #bfdbfe',
+                      padding: '6px 14px',
+                      fontSize: 13,
+                      fontWeight: 700
+                    }}
+                  >
+                    {selectedGroup.groupScope || 'Unknown'}
+                  </Tag>
+                </Descriptions.Item>
+                <Descriptions.Item label="Location (OU)">
+                  <Text style={{ fontSize: 13 }}>
+                    <FolderOutlined style={{ marginRight: 6, color: '#3b82f6' }} />
+                    {selectedGroup.parentOU || 'Root'}
+                  </Text>
+                </Descriptions.Item>
+                {selectedGroup.ouPath && selectedGroup.ouPath !== selectedGroup.parentOU && (
+                  <Descriptions.Item label="Full Path">
+                    <Text style={{ fontSize: 12, color: '#6b7280' }}>
+                      {selectedGroup.ouPath}
+                    </Text>
+                  </Descriptions.Item>
+                )}
+                {selectedGroup.managedBy && (
+                  <Descriptions.Item label="Managed By">
+                    <Text style={{ fontSize: 13 }}>
+                      <UserOutlined style={{ marginRight: 6, color: '#10b981' }} />
+                      {selectedGroup.managedBy}
+                    </Text>
+                  </Descriptions.Item>
+                )}
+                <Descriptions.Item label="Distinguished Name">
+                  <Text
+                    copyable
+                    code
+                    style={{
+                      fontSize: 11,
+                      wordBreak: 'break-all',
+                      background: '#f3f4f6',
+                      padding: '4px 8px',
+                      borderRadius: 4,
+                      display: 'block'
+                    }}
+                  >
+                    {selectedGroup.dn}
+                  </Text>
+                </Descriptions.Item>
+              </Descriptions>
+            </Card>
+
+            <Space direction="vertical" style={{ width: '100%' }} size="middle">
+              <Button
+                type="primary"
+                icon={<EditOutlined />}
+                onClick={() => {
+                  setIsDetailsDrawerVisible(false);
+                  handleEditGroup(selectedGroup);
+                }}
+                size="large"
+                style={{
+                  width: '100%',
+                  background: 'linear-gradient(135deg, #3b82f6, #2563eb)',
+                  border: 'none',
+                  fontWeight: 600,
+                  borderRadius: 8,
+                  height: 44
+                }}
+              >
+                Edit Group
+              </Button>
+            </Space>
+          </>
+        )
+      },
+      {
+        key: '2',
+        label: (
+          <span>
+            <UserOutlined />
+            Members ({groupMembers.length})
+          </span>
+        ),
+        children: (
+          <Card
+            size="small"
+            style={{
+              marginBottom: 16,
+              background: '#ffffff',
+              border: '1px solid #e5e7eb',
+              borderRadius: 8
+            }}
+            styles={{ body: { padding: '16px' } }}
+          >
+            <Space style={{ width: '100%', marginBottom: 16 }}>
+              <Button
+                type="primary"
+                icon={<UserAddOutlined />}
+                onClick={() => {
+                  handleAddMember(selectedGroup);
+                }}
+                style={{
+                  background: 'linear-gradient(135deg, #10b981, #059669)',
+                  border: 'none',
+                  fontWeight: 600
+                }}
+              >
+                Add Members
+              </Button>
+              <Button
+                icon={<ReloadOutlined />}
+                onClick={() => fetchGroupMembers(selectedGroup.dn)}
+                loading={loadingMembers}
+              >
+                Refresh
+              </Button>
+            </Space>
+
+            {loadingMembers ? (
+              <div style={{ textAlign: 'center', padding: '40px 0' }}>
+                <Empty description="Loading members..." />
+              </div>
+            ) : groupMembers.length > 0 ? (
+              <List
+                dataSource={groupMembers}
+                renderItem={(member) => (
+                  <List.Item
+                    style={{ borderBottom: '1px solid #f3f4f6', padding: '12px 8px' }}
+                    actions={[
+                      <Popconfirm
+                        title="Remove this user from group?"
+                        onConfirm={() => handleRemoveMember(member.dn)}
+                        okText="Yes"
+                        cancelText="No"
+                      >
+                        <Button
+                          danger
+                          size="small"
+                          icon={<UserDeleteOutlined />}
+                        >
+                          Remove
+                        </Button>
+                      </Popconfirm>
+                    ]}
+                  >
+                    <List.Item.Meta
+                      avatar={
+                        <Avatar
+                          icon={<UserOutlined />}
+                          style={{
+                            background: member.isEnabled
+                              ? 'linear-gradient(135deg, #10b981, #059669)'
+                              : 'linear-gradient(135deg, #94a3b8, #64748b)'
+                          }}
+                        >
+                          {member.cn ? member.cn.charAt(0).toUpperCase() : 'U'}
+                        </Avatar>
+                      }
+                      title={
+                        <div>
+                          <Text strong style={{ fontSize: 13 }}>
+                            {member.cn || member.sAMAccountName}
+                          </Text>
+                          {!member.isEnabled && (
+                            <Tag
+                              color="error"
+                              style={{ marginLeft: 8, fontSize: 11 }}
+                            >
+                              Disabled
+                            </Tag>
+                          )}
+                        </div>
+                      }
+                      description={
+                        <div>
+                          {member.mail && (
+                            <div style={{ fontSize: 12, color: '#6b7280' }}>
+                              {member.mail}
+                            </div>
+                          )}
+                          {member.department && (
+                            <Tag
+                              style={{
+                                fontSize: 11,
+                                marginTop: 4,
+                                background: '#eff6ff',
+                                color: '#1e40af',
+                                border: '1px solid #bfdbfe'
+                              }}
+                            >
+                              {member.department}
+                            </Tag>
+                          )}
+                        </div>
+                      }
+                    />
+                  </List.Item>
+                )}
+              />
+            ) : (
+              <Empty
+                description={<Text style={{ color: '#6b7280' }}>No members in this group</Text>}
+                style={{ padding: '40px 0' }}
+              />
+            )}
+          </Card>
+        )
+      }
+    ];
+  }, [selectedGroup, groupMembers, loadingMembers, handleEditGroup, handleAddMember, fetchGroupMembers, handleRemoveMember]);
 
   // ==================== TABLE COLUMNS ====================
   
@@ -1417,6 +1673,7 @@ const GroupManagement = () => {
         open={isCreateModalVisible}
         onOk={handleCreateModalOk}
         onCancel={() => setIsCreateModalVisible(false)}
+        destroyOnHidden
         width={700}
         okText="Create Group"
         cancelText="Cancel"
@@ -1589,6 +1846,7 @@ const GroupManagement = () => {
           setIsEditModalVisible(false);
           setEditingGroup(null);
         }}
+        destroyOnHidden
         width={600}
         okText="Update Group"
         cancelText="Cancel"
@@ -1762,293 +2020,7 @@ const GroupManagement = () => {
           }
         }}
       >
-        {selectedGroup && (
-          <Tabs defaultActiveKey="1">
-            <TabPane
-              tab={
-                <span>
-                  <TeamOutlined />
-                  Basic Info
-                </span>
-              }
-              key="1"
-            >
-              <Card
-                size="small"
-                style={{
-                  marginBottom: 16,
-                  background: '#ffffff',
-                  border: '1px solid #e5e7eb',
-                  borderRadius: 8
-                }}
-                styles={{ body: { padding: 0 } }}
-              >
-                <Descriptions
-                  column={1}
-                  bordered
-                  size="middle"
-                  labelStyle={{
-                    background: '#f8fafc',
-                    color: '#374151',
-                    fontWeight: 600,
-                    fontSize: 13,
-                    width: '35%'
-                  }}
-                  contentStyle={{
-                    background: '#ffffff',
-                    color: '#1f2937'
-                  }}
-                >
-                  <Descriptions.Item label="Group Name">
-                    <Text strong style={{ fontSize: 14 }}>
-                      {selectedGroup.cn}
-                    </Text>
-                  </Descriptions.Item>
-                  <Descriptions.Item label="Description">
-                    {selectedGroup.description ? (
-                      <Text style={{ fontSize: 13 }}>{selectedGroup.description}</Text>
-                    ) : (
-                      <Text type="secondary">No description</Text>
-                    )}
-                  </Descriptions.Item>
-                  <Descriptions.Item label="Member Count">
-                    <Badge
-                      count={selectedGroup.memberCount || 0}
-                      showZero
-                      style={{
-                        backgroundColor: selectedGroup.memberCount > 0 ? '#10b981' : '#94a3b8',
-                        fontSize: 14,
-                        fontWeight: 700,
-                        padding: '0 14px',
-                        height: 28
-                      }}
-                    />
-                  </Descriptions.Item>
-                  <Descriptions.Item label="Group Type">
-                    <Tag
-                      style={{
-                        background: selectedGroup.groupType === 'Security' ? '#fef2f2' : '#eff6ff',
-                        color: selectedGroup.groupType === 'Security' ? '#991b1b' : '#1e40af',
-                        border: `2px solid ${selectedGroup.groupType === 'Security' ? '#fca5a5' : '#bfdbfe'}`,
-                        padding: '6px 14px',
-                        fontSize: 13,
-                        fontWeight: 700
-                      }}
-                    >
-                      {selectedGroup.groupType || 'Unknown'}
-                    </Tag>
-                  </Descriptions.Item>
-                  <Descriptions.Item label="Group Scope">
-                    <Tag
-                      style={{
-                        background: '#eff6ff',
-                        color: '#1e40af',
-                        border: '2px solid #bfdbfe',
-                        padding: '6px 14px',
-                        fontSize: 13,
-                        fontWeight: 700
-                      }}
-                    >
-                      {selectedGroup.groupScope || 'Unknown'}
-                    </Tag>
-                  </Descriptions.Item>
-                  <Descriptions.Item label="Location (OU)">
-                    <Text style={{ fontSize: 13 }}>
-                      <FolderOutlined style={{ marginRight: 6, color: '#3b82f6' }} />
-                      {selectedGroup.parentOU || 'Root'}
-                    </Text>
-                  </Descriptions.Item>
-                  {selectedGroup.ouPath && selectedGroup.ouPath !== selectedGroup.parentOU && (
-                    <Descriptions.Item label="Full Path">
-                      <Text style={{ fontSize: 12, color: '#6b7280' }}>
-                        {selectedGroup.ouPath}
-                      </Text>
-                    </Descriptions.Item>
-                  )}
-                  {selectedGroup.managedBy && (
-                    <Descriptions.Item label="Managed By">
-                      <Text style={{ fontSize: 13 }}>
-                        <UserOutlined style={{ marginRight: 6, color: '#10b981' }} />
-                        {selectedGroup.managedBy}
-                      </Text>
-                    </Descriptions.Item>
-                  )}
-                  <Descriptions.Item label="Distinguished Name">
-                    <Text
-                      copyable
-                      code
-                      style={{
-                        fontSize: 11,
-                        wordBreak: 'break-all',
-                        background: '#f3f4f6',
-                        padding: '4px 8px',
-                        borderRadius: 4,
-                        display: 'block'
-                      }}
-                    >
-                      {selectedGroup.dn}
-                    </Text>
-                  </Descriptions.Item>
-                </Descriptions>
-              </Card>
-
-              <Space direction="vertical" style={{ width: '100%' }} size="middle">
-                <Button
-                  type="primary"
-                  icon={<EditOutlined />}
-                  onClick={() => {
-                    setIsDetailsDrawerVisible(false);
-                    handleEditGroup(selectedGroup);
-                  }}
-                  size="large"
-                  style={{
-                    width: '100%',
-                    background: 'linear-gradient(135deg, #3b82f6, #2563eb)',
-                    border: 'none',
-                    fontWeight: 600,
-                    borderRadius: 8,
-                    height: 44
-                  }}
-                >
-                  Edit Group
-                </Button>
-              </Space>
-            </TabPane>
-
-            <TabPane
-              tab={
-                <span>
-                  <UserOutlined />
-                  Members ({groupMembers.length})
-                </span>
-              }
-              key="2"
-            >
-              <Card
-                size="small"
-                style={{
-                  marginBottom: 16,
-                  background: '#ffffff',
-                  border: '1px solid #e5e7eb',
-                  borderRadius: 8
-                }}
-                styles={{ body: { padding: '16px' } }}
-              >
-                <Space style={{ width: '100%', marginBottom: 16 }}>
-                  <Button
-                    type="primary"
-                    icon={<UserAddOutlined />}
-                    onClick={() => {
-                      handleAddMember(selectedGroup);
-                    }}
-                    style={{
-                      background: 'linear-gradient(135deg, #10b981, #059669)',
-                      border: 'none',
-                      fontWeight: 600
-                    }}
-                  >
-                    Add Members
-                  </Button>
-                  <Button
-                    icon={<ReloadOutlined />}
-                    onClick={() => fetchGroupMembers(selectedGroup.dn)}
-                    loading={loadingMembers}
-                  >
-                    Refresh
-                  </Button>
-                </Space>
-
-                {loadingMembers ? (
-                  <div style={{ textAlign: 'center', padding: '40px 0' }}>
-                    <Empty description="Loading members..." />
-                  </div>
-                ) : groupMembers.length > 0 ? (
-                  <List
-                    dataSource={groupMembers}
-                    renderItem={(member) => (
-                      <List.Item
-                        style={{ borderBottom: '1px solid #f3f4f6', padding: '12px 8px' }}
-                        actions={[
-                          <Popconfirm
-                            title="Remove this user from group?"
-                            onConfirm={() => handleRemoveMember(member.dn)}
-                            okText="Yes"
-                            cancelText="No"
-                          >
-                            <Button
-                              danger
-                              size="small"
-                              icon={<UserDeleteOutlined />}
-                            >
-                              Remove
-                            </Button>
-                          </Popconfirm>
-                        ]}
-                      >
-                        <List.Item.Meta
-                          avatar={
-                            <Avatar
-                              icon={<UserOutlined />}
-                              style={{
-                                background: member.isEnabled
-                                  ? 'linear-gradient(135deg, #10b981, #059669)'
-                                  : 'linear-gradient(135deg, #94a3b8, #64748b)'
-                              }}
-                            >
-                              {member.cn ? member.cn.charAt(0).toUpperCase() : 'U'}
-                            </Avatar>
-                          }
-                          title={
-                            <div>
-                              <Text strong style={{ fontSize: 13 }}>
-                                {member.cn || member.sAMAccountName}
-                              </Text>
-                              {!member.isEnabled && (
-                                <Tag
-                                  color="error"
-                                  style={{ marginLeft: 8, fontSize: 11 }}
-                                >
-                                  Disabled
-                                </Tag>
-                              )}
-                            </div>
-                          }
-                          description={
-                            <div>
-                              {member.mail && (
-                                <div style={{ fontSize: 12, color: '#6b7280' }}>
-                                  {member.mail}
-                                </div>
-                              )}
-                              {member.department && (
-                                <Tag
-                                  style={{
-                                    fontSize: 11,
-                                    marginTop: 4,
-                                    background: '#eff6ff',
-                                    color: '#1e40af',
-                                    border: '1px solid #bfdbfe'
-                                  }}
-                                >
-                                  {member.department}
-                                </Tag>
-                              )}
-                            </div>
-                          }
-                        />
-                      </List.Item>
-                    )}
-                  />
-                ) : (
-                  <Empty
-                    description={<Text style={{ color: '#6b7280' }}>No members in this group</Text>}
-                    style={{ padding: '40px 0' }}
-                  />
-                )}
-              </Card>
-            </TabPane>
-          </Tabs>
-        )}
+        {selectedGroup && <Tabs defaultActiveKey="1" items={groupDetailsTabsItems} />}
       </Drawer>
     </div>
   );

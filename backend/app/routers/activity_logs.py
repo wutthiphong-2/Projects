@@ -1,53 +1,16 @@
 from fastapi import APIRouter, Depends, Query
-from pydantic import BaseModel
-from typing import List, Optional, Dict, Any
-from datetime import datetime
+from typing import List, Optional
 import logging
 
-from app.routers.auth import verify_token, verify_token_or_api_key
+from app.routers.auth import verify_token
 from app.core.activity_log import activity_log_manager
+from app.schemas.activity_logs import (
+    EventLogData, ActivityLogResponse, ActivityLogListResponse, 
+    StatsResponse, EventLogResponse, ActionTypeResponse
+)
 
 router = APIRouter()
 logger = logging.getLogger(__name__)
-
-# Pydantic models
-class EventLogData(BaseModel):
-    """Data from PowerShell script (Windows Event Log)"""
-    event_id: int
-    time_generated: str
-    subject_username: str
-    target_username: str
-    target_domain: Optional[str] = None
-    action_type: str
-    details: Optional[Dict[str, Any]] = None
-    ip_address: Optional[str] = "Event Log"
-
-class ActivityLogResponse(BaseModel):
-    id: int
-    timestamp: str
-    user_id: str
-    user_display_name: Optional[str]
-    action_type: str
-    target_type: str
-    target_id: Optional[str]
-    target_name: Optional[str]
-    details: Optional[Dict[str, Any]]
-    ip_address: Optional[str]
-    status: str
-
-class ActivityLogListResponse(BaseModel):
-    items: List[ActivityLogResponse]
-    total: int
-    page: int
-    page_size: int
-    total_pages: int
-
-class StatsResponse(BaseModel):
-    total_actions: int
-    by_action_type: List[Dict[str, Any]]
-    by_user: List[Dict[str, Any]]
-    recent: List[Dict[str, Any]]
-    period_days: int
 
 # Routes
 @router.get("/", response_model=ActivityLogListResponse)
@@ -60,7 +23,7 @@ async def get_activity_logs(
     date_from: Optional[str] = Query(None, description="Filter from date (ISO format)"),
     date_to: Optional[str] = Query(None, description="Filter to date (ISO format)"),
     search: Optional[str] = Query(None, description="Search in target name and user name"),
-    token_data = Depends(verify_token_or_api_key)
+    token_data = Depends(verify_token)
 ):
     """
     Get activity logs with filtering and pagination
@@ -94,7 +57,7 @@ async def get_activity_logs(
 @router.get("/recent", response_model=List[ActivityLogResponse])
 async def get_recent_activities(
     limit: int = Query(10, ge=1, le=50, description="Number of recent activities"),
-    token_data = Depends(verify_token_or_api_key)
+    token_data = Depends(verify_token)
 ):
     """
     Get recent activities (for Dashboard display)
@@ -111,7 +74,7 @@ async def get_recent_activities(
 @router.get("/stats", response_model=StatsResponse)
 async def get_activity_stats(
     days: int = Query(30, ge=1, le=365, description="Number of days to look back"),
-    token_data = Depends(verify_token_or_api_key)
+    token_data = Depends(verify_token)
 ):
     """
     Get activity statistics for the last N days
@@ -133,35 +96,35 @@ async def get_activity_stats(
     logger.info(f"✅ Stats: {stats['total_actions']} total actions")
     return stats
 
-@router.get("/action-types")
+@router.get("/action-types", response_model=List[ActionTypeResponse])
 async def get_action_types(token_data = Depends(verify_token)):
     """
     Get list of all available action types for filtering
     """
     action_types = [
         # Web-based actions
-        {"value": "user_create", "label": "สร้างผู้ใช้ (Web)", "icon": "UserAddOutlined", "color": "#10b981"},
-        {"value": "user_update", "label": "แก้ไขผู้ใช้ (Web)", "icon": "EditOutlined", "color": "#3b82f6"},
-        {"value": "user_delete", "label": "ลบผู้ใช้ (Web)", "icon": "DeleteOutlined", "color": "#ef4444"},
-        {"value": "password_reset", "label": "รีเซ็ตรหัสผ่าน (Web)", "icon": "KeyOutlined", "color": "#f59e0b"},
-        {"value": "user_status_change", "label": "เปลี่ยนสถานะ (Web)", "icon": "SwitchOutlined", "color": "#8b5cf6"},
-        {"value": "group_member_add", "label": "เพิ่มสมาชิกกลุ่ม (Web)", "icon": "UsergroupAddOutlined", "color": "#10b981"},
-        {"value": "group_member_remove", "label": "ลบสมาชิกกลุ่ม (Web)", "icon": "UsergroupDeleteOutlined", "color": "#ef4444"},
-        {"value": "ou_create", "label": "สร้าง OU (Web)", "icon": "FolderAddOutlined", "color": "#10b981"},
-        {"value": "ou_update", "label": "แก้ไข OU (Web)", "icon": "EditOutlined", "color": "#3b82f6"},
-        {"value": "ou_delete", "label": "ลบ OU (Web)", "icon": "FolderOutlined", "color": "#ef4444"},
+        ActionTypeResponse(value="user_create", label="สร้างผู้ใช้ (Web)", icon="UserAddOutlined", color="#10b981"),
+        ActionTypeResponse(value="user_update", label="แก้ไขผู้ใช้ (Web)", icon="EditOutlined", color="#3b82f6"),
+        ActionTypeResponse(value="user_delete", label="ลบผู้ใช้ (Web)", icon="DeleteOutlined", color="#ef4444"),
+        ActionTypeResponse(value="password_reset", label="รีเซ็ตรหัสผ่าน (Web)", icon="KeyOutlined", color="#f59e0b"),
+        ActionTypeResponse(value="user_status_change", label="เปลี่ยนสถานะ (Web)", icon="SwitchOutlined", color="#8b5cf6"),
+        ActionTypeResponse(value="group_member_add", label="เพิ่มสมาชิกกลุ่ม (Web)", icon="UsergroupAddOutlined", color="#10b981"),
+        ActionTypeResponse(value="group_member_remove", label="ลบสมาชิกกลุ่ม (Web)", icon="UsergroupDeleteOutlined", color="#ef4444"),
+        ActionTypeResponse(value="ou_create", label="สร้าง OU (Web)", icon="FolderAddOutlined", color="#10b981"),
+        ActionTypeResponse(value="ou_update", label="แก้ไข OU (Web)", icon="EditOutlined", color="#3b82f6"),
+        ActionTypeResponse(value="ou_delete", label="ลบ OU (Web)", icon="FolderOutlined", color="#ef4444"),
         # AD Event Log actions (from Windows Event Log)
-        {"value": "user_enable", "label": "เปิดใช้งานผู้ใช้ (AD)", "icon": "CheckCircleOutlined", "color": "#10b981"},
-        {"value": "user_disable", "label": "ปิดใช้งานผู้ใช้ (AD)", "icon": "StopOutlined", "color": "#ef4444"},
-        {"value": "password_change_attempt", "label": "เปลี่ยนรหัสผ่าน (AD)", "icon": "KeyOutlined", "color": "#8b5cf6"},
-        {"value": "user_lockout", "label": "ล็อคบัญชี (AD)", "icon": "LockOutlined", "color": "#dc2626"},
-        {"value": "user_unlock", "label": "ปลดล็อคบัญชี (AD)", "icon": "UnlockOutlined", "color": "#10b981"},
-        {"value": "group_member_add_local", "label": "เพิ่มสมาชิก Local Group (AD)", "icon": "UsergroupAddOutlined", "color": "#f59e0b"},
-        {"value": "group_member_remove_local", "label": "ลบสมาชิก Local Group (AD)", "icon": "UsergroupDeleteOutlined", "color": "#f59e0b"},
+        ActionTypeResponse(value="user_enable", label="เปิดใช้งานผู้ใช้ (AD)", icon="CheckCircleOutlined", color="#10b981"),
+        ActionTypeResponse(value="user_disable", label="ปิดใช้งานผู้ใช้ (AD)", icon="StopOutlined", color="#ef4444"),
+        ActionTypeResponse(value="password_change_attempt", label="เปลี่ยนรหัสผ่าน (AD)", icon="KeyOutlined", color="#8b5cf6"),
+        ActionTypeResponse(value="user_lockout", label="ล็อคบัญชี (AD)", icon="LockOutlined", color="#dc2626"),
+        ActionTypeResponse(value="user_unlock", label="ปลดล็อคบัญชี (AD)", icon="UnlockOutlined", color="#10b981"),
+        ActionTypeResponse(value="group_member_add_local", label="เพิ่มสมาชิก Local Group (AD)", icon="UsergroupAddOutlined", color="#f59e0b"),
+        ActionTypeResponse(value="group_member_remove_local", label="ลบสมาชิก Local Group (AD)", icon="UsergroupDeleteOutlined", color="#f59e0b"),
     ]
     return action_types
 
-@router.post("/from-event")
+@router.post("/from-event", response_model=EventLogResponse)
 async def log_from_event(event_data: EventLogData, token_data = Depends(verify_token)):
     """
     Receive and log AD events from PowerShell script running on Domain Controller
@@ -198,26 +161,26 @@ async def log_from_event(event_data: EventLogData, token_data = Depends(verify_t
         
         if result:
             logger.info(f"✅ Event logged successfully")
-            return {
-                "success": True,
-                "message": f"Event {event_data.event_id} logged successfully",
-                "event_id": event_data.event_id
-            }
+            return EventLogResponse(
+                success=True,
+                message=f"Event {event_data.event_id} logged successfully",
+                event_id=event_data.event_id
+            )
         else:
             logger.error(f"❌ Failed to log event")
-            return {
-                "success": False,
-                "message": "Failed to log event",
-                "event_id": event_data.event_id
-            }
+            return EventLogResponse(
+                success=False,
+                message="Failed to log event",
+                event_id=event_data.event_id
+            )
             
     except Exception as e:
         logger.error(f"❌ Error processing event from PowerShell: {e}")
         import traceback
         logger.error(traceback.format_exc())
-        return {
-            "success": False,
-            "message": f"Error: {str(e)}",
-            "event_id": event_data.event_id if hasattr(event_data, 'event_id') else 0
-        }
+        return EventLogResponse(
+            success=False,
+            message=f"Error: {str(e)}",
+            event_id=event_data.event_id if hasattr(event_data, 'event_id') else 0
+        )
 

@@ -10,64 +10,17 @@ logger = logging.getLogger(__name__)
 THAILAND_TZ = timezone(timedelta(hours=7))
 
 # Database file paths
-API_ACTIVITY_DB_PATH = Path(__file__).parent.parent.parent / "api_activity_log.db"
 ACTIVITY_DB_PATH = Path(__file__).parent.parent.parent / "activity_log.db"
 
 
 class ActivityLogManager:
-    """Manage activity logging with SQLite database (supports both API key and general AD activities)"""
+    """Manage activity logging with SQLite database for AD activities"""
     
     def __init__(self):
-        self.api_activity_db_path = API_ACTIVITY_DB_PATH
         self.activity_db_path = ACTIVITY_DB_PATH
         self._init_database()
-        self._init_general_activity_database()
     
     def _init_database(self):
-        """Initialize API activity log database"""
-        try:
-            conn = sqlite3.connect(str(self.api_activity_db_path))
-            cursor = conn.cursor()
-            
-            cursor.execute("""
-                CREATE TABLE IF NOT EXISTS api_activity_log (
-                    id INTEGER PRIMARY KEY AUTOINCREMENT,
-                    timestamp TEXT NOT NULL,
-                    action_type TEXT NOT NULL,
-                    api_key_id TEXT,
-                    api_key_name TEXT,
-                    user TEXT NOT NULL,
-                    details TEXT,
-                    ip_address TEXT
-                )
-            """)
-            
-            # Create indexes for better query performance
-            cursor.execute("""
-                CREATE INDEX IF NOT EXISTS idx_timestamp 
-                ON api_activity_log(timestamp DESC)
-            """)
-            cursor.execute("""
-                CREATE INDEX IF NOT EXISTS idx_api_key_id 
-                ON api_activity_log(api_key_id)
-            """)
-            cursor.execute("""
-                CREATE INDEX IF NOT EXISTS idx_action_type 
-                ON api_activity_log(action_type)
-            """)
-            cursor.execute("""
-                CREATE INDEX IF NOT EXISTS idx_user 
-                ON api_activity_log(user)
-            """)
-            
-            conn.commit()
-            conn.close()
-            logger.info(f"✅ API activity log database initialized at {self.api_activity_db_path}")
-        except Exception as e:
-            logger.error(f"❌ Error initializing API activity log database: {e}")
-            raise
-    
-    def _init_general_activity_database(self):
         """Initialize general activity log database for AD activities"""
         try:
             conn = sqlite3.connect(str(self.activity_db_path))
@@ -118,11 +71,8 @@ class ActivityLogManager:
         self,
         action_type: str = None,
         user: str = None,
-        api_key_id: Optional[str] = None,
-        api_key_name: Optional[str] = None,
         details: Optional[str] = None,
         ip_address: Optional[str] = None,
-        # For general AD activities
         user_id: Optional[str] = None,
         user_display_name: Optional[str] = None,
         target_type: Optional[str] = None,
@@ -130,53 +80,35 @@ class ActivityLogManager:
         target_name: Optional[str] = None,
         status: Optional[str] = None
     ) -> bool:
-        """Log an activity - supports both API key activities and general AD activities"""
+        """Log an AD activity"""
         try:
             timestamp = datetime.now(THAILAND_TZ).isoformat()
             
-            # Determine if this is an API key activity or general AD activity
-            if api_key_id is not None or api_key_name is not None:
-                # API key activity
-                conn = sqlite3.connect(str(self.api_activity_db_path))
-                cursor = conn.cursor()
-                
-                cursor.execute("""
-                    INSERT INTO api_activity_log 
-                    (timestamp, action_type, api_key_id, api_key_name, user, details, ip_address)
-                    VALUES (?, ?, ?, ?, ?, ?, ?)
-                """, (
-                    timestamp, action_type, api_key_id, api_key_name, user, details, ip_address
-                ))
-                
-                conn.commit()
-                conn.close()
-            else:
-                # General AD activity
-                if not action_type:
-                    action_type = "unknown"
-                if not user_id:
-                    user_id = user or "unknown"
-                if not user_display_name:
-                    user_display_name = user or user_id
-                
-                # Convert details to JSON string if it's a dict
-                if isinstance(details, dict):
-                    import json
-                    details = json.dumps(details, ensure_ascii=False)
-                
-                conn = sqlite3.connect(str(self.activity_db_path))
-                cursor = conn.cursor()
-                
-                cursor.execute("""
-                    INSERT INTO activity_log 
-                    (timestamp, user_id, user_display_name, action_type, target_type, target_id, target_name, details, ip_address, status)
-                    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-                """, (
-                    timestamp, user_id, user_display_name, action_type, target_type, target_id, target_name, details, ip_address, status
-                ))
-                
-                conn.commit()
-                conn.close()
+            if not action_type:
+                action_type = "unknown"
+            if not user_id:
+                user_id = user or "unknown"
+            if not user_display_name:
+                user_display_name = user or user_id
+            
+            # Convert details to JSON string if it's a dict
+            if isinstance(details, dict):
+                import json
+                details = json.dumps(details, ensure_ascii=False)
+            
+            conn = sqlite3.connect(str(self.activity_db_path))
+            cursor = conn.cursor()
+            
+            cursor.execute("""
+                INSERT INTO activity_log 
+                (timestamp, user_id, user_display_name, action_type, target_type, target_id, target_name, details, ip_address, status)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            """, (
+                timestamp, user_id, user_display_name, action_type, target_type, target_id, target_name, details, ip_address, status
+            ))
+            
+            conn.commit()
+            conn.close()
             
             return True
         except Exception as e:
@@ -185,87 +117,7 @@ class ActivityLogManager:
             logger.error(traceback.format_exc())
             return False
     
-    def get_activity_log(
-        self,
-        action_type: Optional[str] = None,
-        user: Optional[str] = None,
-        api_key_id: Optional[str] = None,
-        start_date: Optional[str] = None,
-        end_date: Optional[str] = None,
-        limit: int = 100,
-        offset: int = 0
-    ) -> Dict[str, Any]:
-        """Get API key activity log with filters"""
-        try:
-            conn = sqlite3.connect(str(self.api_activity_db_path))
-            conn.row_factory = sqlite3.Row
-            cursor = conn.cursor()
-            
-            query = """
-                SELECT id, timestamp, action_type, api_key_id, api_key_name, user, details, ip_address
-                FROM api_activity_log
-                WHERE 1=1
-            """
-            params = []
-            
-            if action_type:
-                query += " AND action_type = ?"
-                params.append(action_type)
-            
-            if user:
-                query += " AND user = ?"
-                params.append(user)
-            
-            if api_key_id:
-                query += " AND api_key_id = ?"
-                params.append(api_key_id)
-            
-            if start_date:
-                query += " AND timestamp >= ?"
-                params.append(start_date)
-            
-            if end_date:
-                query += " AND timestamp <= ?"
-                params.append(end_date)
-            
-            # Get total count
-            count_query = query.replace(
-                "SELECT id, timestamp, action_type, api_key_id, api_key_name, user, details, ip_address",
-                "SELECT COUNT(*) as count"
-            )
-            cursor.execute(count_query, params)
-            total = cursor.fetchone()["count"]
-            
-            # Get paginated results
-            query += " ORDER BY timestamp DESC LIMIT ? OFFSET ?"
-            params.extend([limit, offset])
-            
-            cursor.execute(query, params)
-            rows = cursor.fetchall()
-            conn.close()
-            
-            activities = []
-            for row in rows:
-                activities.append({
-                    "id": row["id"],
-                    "timestamp": row["timestamp"],
-                    "action_type": row["action_type"],
-                    "api_key_id": row["api_key_id"],
-                    "api_key_name": row["api_key_name"],
-                    "user": row["user"],
-                    "details": row["details"],
-                    "ip_address": row["ip_address"]
-                })
-            
-            return {
-                "activities": activities,
-                "total": total,
-                "limit": limit,
-                "offset": offset
-            }
-        except Exception as e:
-            logger.error(f"❌ Error getting activity log: {e}")
-            raise
+    
     
     def get_activities(
         self,

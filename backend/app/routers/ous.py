@@ -1,30 +1,21 @@
-from fastapi import APIRouter, HTTPException, Depends, status, Query, Request
-from pydantic import BaseModel
+from fastapi import APIRouter, Depends, Query, Request
 from typing import List, Optional, Dict, Any
 from ldap3 import MODIFY_REPLACE
 import logging
 
 from app.core.config import settings
 from app.core.database import get_ldap_connection
+from app.core.exceptions import NotFoundError, InternalServerError, ValidationError
 from app.routers.auth import verify_token, verify_token_or_api_key, get_client_ip
 from app.core.activity_log import activity_log_manager
 from app.core.cache import cached_response, invalidate_cache
+from app.schemas.ous import (
+    OUCreate, OUUpdate, OUResponse, OUCreateResponse, OUUpdateResponse,
+    OUDeleteResponse, UserOUResponse, SuggestedGroupsResponse, DefaultGroupsByOUResponse
+)
 
 router = APIRouter()
 logger = logging.getLogger(__name__)
-
-# Pydantic models
-class OUCreate(BaseModel):
-    name: str
-    description: Optional[str] = None
-
-class OUResponse(BaseModel):
-    dn: str
-    name: str
-    description: str
-
-class OUUpdate(BaseModel):
-    description: Optional[str] = None
 
 # Helper functions
 def format_ou_data(entry: tuple) -> Dict[str, Any]:
@@ -72,7 +63,7 @@ async def get_ous(
         )
         
         if results is None:
-            raise HTTPException(status_code=500, detail="Failed to search OUs")
+            raise InternalServerError("Failed to search OUs")
         
         ous_all = [format_ou_data(entry) for entry in results]
         # Return all OUs if page_size is 1000 or more (frontend requests)
@@ -84,7 +75,7 @@ async def get_ous(
         
     except Exception as e:
         logger.error(f"Error getting OUs: {e}")
-        raise HTTPException(status_code=500, detail="Failed to retrieve OUs")
+        raise InternalServerError("Failed to retrieve OUs")
 
 @router.get("/user-ous", response_model=List[Dict[str, Any]])
 async def get_user_ous(token_data = Depends(verify_token)):
@@ -101,7 +92,7 @@ async def get_user_ous(token_data = Depends(verify_token)):
         )
         
         if results is None:
-            raise HTTPException(status_code=500, detail="Failed to search OUs")
+            raise InternalServerError("Failed to search OUs")
         
         # Whitelist for specific Wifi OUs that should be included
         wifi_whitelist = [
@@ -163,9 +154,9 @@ async def get_user_ous(token_data = Depends(verify_token)):
         
     except Exception as e:
         logger.error(f"Error getting user OUs: {e}")
-        raise HTTPException(status_code=500, detail="Failed to retrieve user OUs")
+        raise InternalServerError("Failed to retrieve user OUs")
 
-@router.get("/{dn}/suggested-groups", response_model=Dict[str, Any])
+@router.get("/{dn}/suggested-groups", response_model=SuggestedGroupsResponse)
 async def get_suggested_groups_for_ou(
     dn: str, 
     threshold: float = Query(default=0.6, ge=0.0, le=1.0, description="Minimum percentage threshold (0.0-1.0)"),
@@ -189,12 +180,13 @@ async def get_suggested_groups_for_ou(
         
         if not user_results or len(user_results) == 0:
             logger.warning(f"⚠️ No users found in OU: {dn}")
-            return {
-                "ou": dn,
-                "totalUsers": 0,
-                "suggestedGroups": [],
-                "message": "No users found in this OU to analyze"
-            }
+            return SuggestedGroupsResponse(
+                ou=dn,
+                totalUsers=0,
+                threshold=threshold,
+                suggestedGroups=[],
+                message="No users found in this OU to analyze"
+            )
         
         total_users = len(user_results)
         logger.info(f"👥 Found {total_users} users in OU")
@@ -249,16 +241,16 @@ async def get_suggested_groups_for_ou(
         
         logger.info(f"✅ Returning {len(suggested_groups)} suggested groups (threshold: {threshold*100}%)")
         
-        return {
-            "ou": dn,
-            "totalUsers": total_users,
-            "threshold": threshold,
-            "suggestedGroups": suggested_groups
-        }
+        return SuggestedGroupsResponse(
+            ou=dn,
+            totalUsers=total_users,
+            threshold=threshold,
+            suggestedGroups=suggested_groups
+        )
         
     except Exception as e:
         logger.error(f"Error analyzing OU {dn}: {e}")
-        raise HTTPException(status_code=500, detail=f"Failed to analyze OU: {str(e)}")
+        raise InternalServerError(f"Failed to analyze OU: {str(e)}")
 
 @router.get("/{dn}", response_model=OUResponse)
 async def get_ou(dn: str, token_data = Depends(verify_token)):
@@ -273,15 +265,15 @@ async def get_ou(dn: str, token_data = Depends(verify_token)):
         )
         
         if not results:
-            raise HTTPException(status_code=404, detail="OU not found")
+            raise NotFoundError("OU", dn)
         
         return format_ou_data(results[0])
         
     except Exception as e:
         logger.error(f"Error getting OU {dn}: {e}")
-        raise HTTPException(status_code=500, detail="Failed to retrieve OU")
+        raise InternalServerError("Failed to retrieve OU")
 
-@router.post("/", response_model=Dict[str, Any])
+@router.post("/", response_model=OUCreateResponse)
 async def create_ou(ou_data: OUCreate, request: Request, token_data = Depends(verify_token)):
     """Create new Organizational Unit in Active Directory"""
     ldap_conn = get_ldap_connection()
@@ -301,7 +293,7 @@ async def create_ou(ou_data: OUCreate, request: Request, token_data = Depends(ve
 
         # Create OU
         if not ldap_conn.add_entry(ou_dn, ou_attrs):
-            raise HTTPException(status_code=500, detail="Failed to create OU")
+            raise InternalServerError("Failed to create OU")
         
         # ⚡ Invalidate cache after creation
         invalidate_cache("get_ous")
@@ -318,21 +310,23 @@ async def create_ou(ou_data: OUCreate, request: Request, token_data = Depends(ve
             status="success"
         )
         
-        return {
-            "success": True,
-            "message": "OU created successfully",
-            "ou": {
+        return OUCreateResponse(
+            success=True,
+            message="OU created successfully",
+            ou={
                 "dn": ou_dn,
                 "name": ou_data.name,
                 "description": ou_data.description or ""
             }
-        }
+        )
         
+    except (NotFoundError, InternalServerError, ValidationError):
+        raise
     except Exception as e:
         logger.error(f"Error creating OU: {e}")
-        raise HTTPException(status_code=500, detail="Failed to create OU")
+        raise InternalServerError("Failed to create OU")
 
-@router.put("/{dn}", response_model=Dict[str, Any])
+@router.put("/{dn}", response_model=OUUpdateResponse)
 async def update_ou(dn: str, ou_data: OUUpdate, request: Request, token_data = Depends(verify_token)):
     """Update Organizational Unit in Active Directory"""
     ldap_conn = get_ldap_connection()
@@ -344,10 +338,10 @@ async def update_ou(dn: str, ou_data: OUUpdate, request: Request, token_data = D
             modifications.append((MODIFY_REPLACE, "description", [ou_data.description]))
 
         if not modifications:
-            raise HTTPException(status_code=400, detail="No fields to update")
+            raise ValidationError("No fields to update")
 
         if not ldap_conn.modify_entry(dn, modifications):
-            raise HTTPException(status_code=500, detail="Failed to update OU")
+            raise InternalServerError("Failed to update OU")
         
         # ⚡ Invalidate cache after update
         invalidate_cache("get_ous")
@@ -365,16 +359,18 @@ async def update_ou(dn: str, ou_data: OUUpdate, request: Request, token_data = D
             status="success"
         )
         
-        return {
-            "success": True,
-            "message": "OU updated successfully"
-        }
+        return OUUpdateResponse(
+            success=True,
+            message="OU updated successfully"
+        )
         
+    except (NotFoundError, InternalServerError, ValidationError):
+        raise
     except Exception as e:
         logger.error(f"Error updating OU {dn}: {e}")
-        raise HTTPException(status_code=500, detail="Failed to update OU")
+        raise InternalServerError("Failed to update OU")
 
-@router.delete("/{dn}", response_model=Dict[str, Any])
+@router.delete("/{dn}", response_model=OUDeleteResponse)
 async def delete_ou(dn: str, request: Request, token_data = Depends(verify_token)):
     """Delete Organizational Unit from Active Directory"""
     ldap_conn = get_ldap_connection()
@@ -383,7 +379,7 @@ async def delete_ou(dn: str, request: Request, token_data = Depends(verify_token
         ou_name = dn.split(',')[0].replace('OU=', '')
         
         if not ldap_conn.delete_entry(dn):
-            raise HTTPException(status_code=500, detail="Failed to delete OU")
+            raise InternalServerError("Failed to delete OU")
         
         # ⚡ Invalidate cache after deletion
         invalidate_cache("get_ous")
@@ -399,11 +395,13 @@ async def delete_ou(dn: str, request: Request, token_data = Depends(verify_token
             status="success"
         )
         
-        return {
-            "success": True,
-            "message": "OU deleted successfully"
-        }
+        return OUDeleteResponse(
+            success=True,
+            message="OU deleted successfully"
+        )
         
+    except (NotFoundError, InternalServerError, ValidationError):
+        raise
     except Exception as e:
         logger.error(f"Error deleting OU {dn}: {e}")
-        raise HTTPException(status_code=500, detail="Failed to delete OU")
+        raise InternalServerError("Failed to delete OU")

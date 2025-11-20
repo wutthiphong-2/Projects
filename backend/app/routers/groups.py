@@ -9,7 +9,7 @@ from pathlib import Path
 from app.core.config import settings
 from app.core.database import get_ldap_connection
 from app.core.exceptions import NotFoundError, InternalServerError, ValidationError
-from app.routers.auth import verify_token, get_client_ip
+from app.routers.auth import verify_token, verify_token_or_api_key, get_client_ip
 from app.core.activity_log import activity_log_manager
 from app.core.cache import cached_response, invalidate_cache
 from datetime import datetime, timedelta, timezone
@@ -155,7 +155,7 @@ def format_user_data(entry: tuple) -> Dict[str, Any]:
 @router.get("/", response_model=List[GroupResponse])
 @cached_response(ttl_seconds=600)  # ⚡ Cache for 10 minutes
 async def get_groups(
-    token_data = Depends(verify_token),
+    token_data = Depends(verify_token_or_api_key),
     q: str | None = Query(default=None, description="Search text for cn/description"),
     page: int = Query(default=1, ge=1),
     page_size: int = Query(default=50, ge=1, le=50000),  # Increased to 50000

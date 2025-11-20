@@ -12,7 +12,7 @@ import base64
 from app.core.config import settings
 from app.core.database import get_ldap_connection
 from app.core.exceptions import NotFoundError, InternalServerError, ValidationError
-from app.routers.auth import verify_token, get_client_ip
+from app.routers.auth import verify_token, verify_token_or_api_key, get_client_ip
 from app.core.cache import cached_response, invalidate_cache
 from app.core.activity_log import activity_log_manager
 from app.schemas.users import (
@@ -367,7 +367,7 @@ async def get_users(
     search_title: Optional[str] = None,
     search_department: Optional[str] = None,
     search_office: Optional[str] = None,
-    token_data = Depends(verify_token)
+    token_data = Depends(verify_token_or_api_key)
 ):
     """Get all users from Active Directory with advanced search support
     
@@ -581,7 +581,7 @@ async def get_user_stats(token: str = Depends(verify_token)):
 @router.get("/login-insights/recent", response_model=List[LoginInsightEntry])
 async def get_recent_logins(
     limit: int = Query(10, ge=1, le=100),
-    token_data = Depends(verify_token)
+    token_data = Depends(verify_token_or_api_key)
 ):
     """Return top N users with the most recent logins"""
     ldap_conn = get_ldap_connection()
@@ -630,7 +630,7 @@ async def get_recent_logins(
 @router.get("/login-insights/never", response_model=List[LoginInsightEntry])
 async def get_users_single_login(
     limit: int = Query(10, ge=1, le=100),
-    token_data = Depends(verify_token)
+    token_data = Depends(verify_token_or_api_key)
 ):
     """Return top N users who have logged in only once (first login with no subsequent logins)"""
     ldap_conn = get_ldap_connection()

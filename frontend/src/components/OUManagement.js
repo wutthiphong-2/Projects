@@ -1061,15 +1061,17 @@ const OUManagement = () => {
                 column={1} 
                 bordered 
                 size="middle"
-                labelStyle={{
-                  background: '#f8fafc',
-                  color: '#374151',
-                  fontWeight: 600,
-                  fontSize: 13
-                }}
-                contentStyle={{
-                  background: '#ffffff',
-                  color: '#1f2937'
+                styles={{
+                  label: {
+                    background: '#f8fafc',
+                    color: '#374151',
+                    fontWeight: 600,
+                    fontSize: 13
+                  },
+                  content: {
+                    background: '#ffffff',
+                    color: '#1f2937'
+                  }
                 }}
               >
                 <Descriptions.Item label="Container Name">
@@ -1244,15 +1246,17 @@ const OUManagement = () => {
                 column={1} 
                 bordered 
                 size="middle"
-                labelStyle={{
-                  background: '#f8fafc',
-                  color: '#374151',
-                  fontWeight: 600,
-                  fontSize: 13
-                }}
-                contentStyle={{
-                  background: '#ffffff',
-                  color: '#1f2937'
+                styles={{
+                  label: {
+                    background: '#f8fafc',
+                    color: '#374151',
+                    fontWeight: 600,
+                    fontSize: 13
+                  },
+                  content: {
+                    background: '#ffffff',
+                    color: '#1f2937'
+                  }
                 }}
               >
                 <Descriptions.Item label="Group Name">
@@ -1292,9 +1296,11 @@ const OUManagement = () => {
                   border: '1px solid #e5e7eb',
                   borderRadius: 8
                 }}
-                headStyle={{
-                  background: '#f8fafc',
-                  borderBottom: '1px solid #e5e7eb'
+                styles={{
+                  header: {
+                    background: '#f8fafc',
+                    borderBottom: '1px solid #e5e7eb'
+                  }
                 }}
               >
                 <Paragraph style={{ margin: 0, fontSize: 13, color: '#374151' }}>

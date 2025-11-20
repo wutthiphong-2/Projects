@@ -45,10 +45,9 @@ import {
   LockOutlined,
   UnlockOutlined
 } from '@ant-design/icons';
-import axios from 'axios';
-import config from '../config';
-import { useAuth } from '../contexts/AuthContext';
 import moment from 'moment';
+import { useActivityLogs } from '../hooks/useActivityLogs';
+import { useNotification } from '../contexts/NotificationContext';
 import 'moment/locale/th';  // Thai locale
 import './ActivityLog.css';
 
@@ -61,7 +60,6 @@ const { RangePicker } = DatePicker;
 
 const ActivityLog = () => {
   const [activities, setActivities] = useState([]);
-  const [loading, setLoading] = useState(false);
   const [pagination, setPagination] = useState({ current: 1, pageSize: 20, total: 0 });
   const [filters, setFilters] = useState({
     search: '',
@@ -71,7 +69,13 @@ const ActivityLog = () => {
   });
   const [stats, setStats] = useState(null);
   const [actionTypes, setActionTypes] = useState([]);
-  const { getAuthHeaders } = useAuth();
+  const { 
+    loading, 
+    fetchActivityLogs, 
+    fetchStats, 
+    fetchActionTypes 
+  } = useActivityLogs();
+  const { notifyError } = useNotification();
   const { message } = App.useApp();
 
   // Action type icons and colors mapping
@@ -98,7 +102,6 @@ const ActivityLog = () => {
 
   // Fetch activities
   const fetchActivities = useCallback(async (page = 1, pageSize = 20) => {
-    setLoading(true);
     try {
       const params = {
         page,
@@ -112,55 +115,53 @@ const ActivityLog = () => {
         })
       };
 
-      const response = await axios.get(`${config.apiUrl}/api/activity-logs/`, {
-        headers: getAuthHeaders(),
-        params
-      });
+      const result = await fetchActivityLogs(params);
 
-      setActivities(response.data.items);
+      if (result.success) {
+        setActivities(result.data.items || result.data);
       setPagination({
         current: page,
         pageSize,
-        total: response.data.total
+          total: result.data.total || result.data.length || 0
       });
+      } else {
+        notifyError('ไม่สามารถโหลดข้อมูล Activity Log ได้', result.error);
+      }
     } catch (error) {
       console.error('Error fetching activities:', error);
-      message.error('ไม่สามารถโหลดข้อมูล Activity Log ได้');
-    } finally {
-      setLoading(false);
+      notifyError('ไม่สามารถโหลดข้อมูล Activity Log ได้', error.message);
     }
-  }, [filters, getAuthHeaders]);
+  }, [filters, fetchActivityLogs, notifyError]);
 
   // Fetch stats
-  const fetchStats = useCallback(async () => {
+  const loadStats = useCallback(async () => {
     try {
-      const response = await axios.get(`${config.apiUrl}/api/activity-logs/stats`, {
-        headers: getAuthHeaders(),
-        params: { days: 30 }
-      });
-      setStats(response.data);
+      const result = await fetchStats({ days: 30 });
+      if (result.success) {
+        setStats(result.data);
+      }
     } catch (error) {
       console.error('Error fetching stats:', error);
     }
-  }, [getAuthHeaders]);
+  }, [fetchStats]);
 
   // Fetch action types
-  const fetchActionTypes = useCallback(async () => {
+  const loadActionTypes = useCallback(async () => {
     try {
-      const response = await axios.get(`${config.apiUrl}/api/activity-logs/action-types`, {
-        headers: getAuthHeaders()
-      });
-      setActionTypes(response.data);
+      const result = await fetchActionTypes();
+      if (result.success) {
+        setActionTypes(result.data);
+      }
     } catch (error) {
       console.error('Error fetching action types:', error);
     }
-  }, [getAuthHeaders]);
+  }, [fetchActionTypes]);
 
   useEffect(() => {
     fetchActivities();
-    fetchStats();
-    fetchActionTypes();
-  }, [fetchActivities, fetchStats, fetchActionTypes]);
+    loadStats();
+    loadActionTypes();
+  }, [fetchActivities, loadStats, loadActionTypes]);
 
   // Force hide Quick Jumper after render
   useEffect(() => {

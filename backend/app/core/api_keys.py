@@ -1,312 +1,383 @@
+"""
+API Key Management System
+Manages API keys for external API access
+"""
 import sqlite3
 import secrets
 import hashlib
-import json
+import uuid
 from datetime import datetime, timezone, timedelta
 from pathlib import Path
-from typing import Optional, Dict, Any, List
+from typing import List, Dict, Any, Optional
 import logging
-
-from app.core.permissions import DEFAULT_PERMISSIONS, validate_scopes
-from app.core.cache import SimpleCache
+import json
 
 logger = logging.getLogger(__name__)
 
-# Thailand timezone (UTC+7)
-THAILAND_TZ = timezone(timedelta(hours=7))
-
 # Database file path
-DB_PATH = Path(__file__).parent.parent.parent / "api_keys.db"
+API_KEYS_DB_PATH = Path(__file__).parent.parent.parent / "api_keys.db"
 
 
 class APIKeyManager:
-    """Manage API keys with SQLite database"""
+    """Manage API keys for external API access"""
     
     def __init__(self):
-        self.db_path = DB_PATH
+        self.db_path = API_KEYS_DB_PATH
         self._init_database()
-        # Temporary storage for API keys (for email sending after creation/regeneration)
-        self._temp_key_storage = SimpleCache()
     
     def _init_database(self):
-        """Initialize database and create tables if not exists"""
+        """Initialize API keys database"""
         try:
             conn = sqlite3.connect(str(self.db_path))
             cursor = conn.cursor()
             
+            # API Keys table
             cursor.execute("""
                 CREATE TABLE IF NOT EXISTS api_keys (
                     id TEXT PRIMARY KEY,
-                    key_hash TEXT UNIQUE NOT NULL,
                     name TEXT NOT NULL,
-                    description TEXT,
+                    key_hash TEXT NOT NULL UNIQUE,
+                    key_prefix TEXT NOT NULL,
                     created_by TEXT NOT NULL,
                     created_at TEXT NOT NULL,
-                    last_used_at TEXT,
                     expires_at TEXT,
-                    rate_limit_per_minute INTEGER DEFAULT 60,
-                    rate_limit_per_hour INTEGER DEFAULT 1000,
+                    permissions TEXT,
+                    rate_limit INTEGER DEFAULT 100,
                     is_active INTEGER DEFAULT 1,
-                    permissions TEXT DEFAULT '[]'
+                    last_used_at TEXT,
+                    usage_count INTEGER DEFAULT 0,
+                    ip_whitelist TEXT,
+                    description TEXT
                 )
             """)
             
-            # Migration: Add permissions column if it doesn't exist
-            try:
-                cursor.execute("ALTER TABLE api_keys ADD COLUMN permissions TEXT DEFAULT '[]'")
-                # Migrate existing keys to have default permissions
-                default_perms_json = json.dumps(DEFAULT_PERMISSIONS)
-                cursor.execute("""
-                    UPDATE api_keys 
-                    SET permissions = ? 
-                    WHERE permissions IS NULL OR permissions = ''
-                """, (default_perms_json,))
-                conn.commit()
-                logger.info("✅ Migrated existing API keys to include permissions")
-            except sqlite3.OperationalError:
-                # Column already exists, skip migration
-                pass
-            
-            # Migration: Add expires_at column if it doesn't exist
-            try:
-                cursor.execute("ALTER TABLE api_keys ADD COLUMN expires_at TEXT")
-                conn.commit()
-                logger.info("✅ Migrated existing API keys to include expires_at")
-            except sqlite3.OperationalError:
-                # Column already exists, skip migration
-                pass
-            
-            # Create indexes for better query performance
+            # API Key Usage tracking table
             cursor.execute("""
-                CREATE INDEX IF NOT EXISTS idx_key_hash 
+                CREATE TABLE IF NOT EXISTS api_key_usage (
+                    id INTEGER PRIMARY KEY AUTOINCREMENT,
+                    api_key_id TEXT NOT NULL,
+                    endpoint TEXT NOT NULL,
+                    method TEXT NOT NULL,
+                    status_code INTEGER,
+                    response_time_ms INTEGER,
+                    ip_address TEXT,
+                    timestamp TEXT NOT NULL,
+                    FOREIGN KEY (api_key_id) REFERENCES api_keys(id)
+                )
+            """)
+            
+            # API Request/Response Logging table (detailed logs)
+            cursor.execute("""
+                CREATE TABLE IF NOT EXISTS api_request_logs (
+                    id INTEGER PRIMARY KEY AUTOINCREMENT,
+                    api_key_id TEXT,
+                    endpoint TEXT NOT NULL,
+                    method TEXT NOT NULL,
+                    request_headers TEXT,
+                    request_body TEXT,
+                    response_status INTEGER,
+                    response_headers TEXT,
+                    response_body TEXT,
+                    response_time_ms INTEGER,
+                    ip_address TEXT,
+                    user_agent TEXT,
+                    error_message TEXT,
+                    timestamp TEXT NOT NULL,
+                    FOREIGN KEY (api_key_id) REFERENCES api_keys(id)
+                )
+            """)
+            
+            # Create indexes
+            cursor.execute("""
+                CREATE INDEX IF NOT EXISTS idx_api_key_hash 
                 ON api_keys(key_hash)
             """)
             cursor.execute("""
-                CREATE INDEX IF NOT EXISTS idx_created_by 
-                ON api_keys(created_by)
+                CREATE INDEX IF NOT EXISTS idx_api_key_active 
+                ON api_keys(is_active)
             """)
             cursor.execute("""
-                CREATE INDEX IF NOT EXISTS idx_is_active 
-                ON api_keys(is_active)
+                CREATE INDEX IF NOT EXISTS idx_usage_key 
+                ON api_key_usage(api_key_id)
+            """)
+            cursor.execute("""
+                CREATE INDEX IF NOT EXISTS idx_usage_timestamp 
+                ON api_key_usage(timestamp DESC)
+            """)
+            cursor.execute("""
+                CREATE INDEX IF NOT EXISTS idx_request_logs_key 
+                ON api_request_logs(api_key_id)
+            """)
+            cursor.execute("""
+                CREATE INDEX IF NOT EXISTS idx_request_logs_timestamp 
+                ON api_request_logs(timestamp DESC)
+            """)
+            cursor.execute("""
+                CREATE INDEX IF NOT EXISTS idx_request_logs_endpoint 
+                ON api_request_logs(endpoint)
+            """)
+            cursor.execute("""
+                CREATE INDEX IF NOT EXISTS idx_usage_timestamp 
+                ON api_key_usage(timestamp DESC)
             """)
             
             conn.commit()
             conn.close()
-            logger.info(f"✅ API keys database initialized at {self.db_path}")
+            logger.info("✅ API Keys database initialized")
         except Exception as e:
             logger.error(f"❌ Error initializing API keys database: {e}")
             raise
     
-    def _hash_key(self, key: str) -> str:
-        """Hash API key using SHA-256"""
-        return hashlib.sha256(key.encode()).hexdigest()
+    def generate_api_key(self) -> tuple[str, str]:
+        """
+        Generate a new API key
+        Returns: (api_key, key_hash)
+        """
+        # Generate random key: tbkk_ prefix + 32 random hex chars
+        random_part = secrets.token_hex(32)
+        api_key = f"tbkk_{random_part}"
+        
+        # Hash the key for storage
+        key_hash = hashlib.sha256(api_key.encode()).hexdigest()
+        
+        return api_key, key_hash
     
-    def _generate_key_id(self) -> str:
-        """Generate unique key ID"""
-        return secrets.token_urlsafe(16)
-    
-    def _generate_api_key(self) -> str:
-        """Generate a new API key"""
-        # Generate a secure random key (64 characters)
-        return f"ak_{secrets.token_urlsafe(48)}"
-    
-    def create_key(
+    def create_api_key(
         self,
         name: str,
         created_by: str,
-        description: Optional[str] = None,
-        rate_limit_per_minute: int = 60,
-        rate_limit_per_hour: int = 1000,
         permissions: Optional[List[str]] = None,
-        expires_at: Optional[str] = None
+        rate_limit: int = 100,
+        expires_at: Optional[datetime] = None,
+        ip_whitelist: Optional[List[str]] = None,
+        description: Optional[str] = None
     ) -> Dict[str, Any]:
         """Create a new API key"""
         try:
-            # Validate permissions
-            if permissions is None:
-                permissions = DEFAULT_PERMISSIONS.copy()
+            key_id = str(uuid.uuid4())
+            api_key, key_hash = self.generate_api_key()
+            key_prefix = api_key[:12]  # tbkk_xxxxx for display
             
-            is_valid, error_msg = validate_scopes(permissions)
-            if not is_valid:
-                raise ValueError(error_msg)
+            now = datetime.now(timezone.utc).isoformat()
+            expires_at_str = expires_at.isoformat() if expires_at else None
             
-            key_id = self._generate_key_id()
-            api_key = self._generate_api_key()
-            key_hash = self._hash_key(api_key)
-            created_at = datetime.now(THAILAND_TZ).isoformat()
-            permissions_json = json.dumps(permissions)
+            permissions_json = json.dumps(permissions or [])
+            ip_whitelist_json = json.dumps(ip_whitelist or [])
             
             conn = sqlite3.connect(str(self.db_path))
             cursor = conn.cursor()
             
             cursor.execute("""
                 INSERT INTO api_keys 
-                (id, key_hash, name, description, created_by, created_at, expires_at,
-                 rate_limit_per_minute, rate_limit_per_hour, is_active, permissions)
+                (id, name, key_hash, key_prefix, created_by, created_at, expires_at, 
+                 permissions, rate_limit, ip_whitelist, description)
                 VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
             """, (
-                key_id, key_hash, name, description, created_by, created_at, expires_at,
-                rate_limit_per_minute, rate_limit_per_hour, 1, permissions_json
+                key_id, name, key_hash, key_prefix, created_by, now, expires_at_str,
+                permissions_json, rate_limit, ip_whitelist_json, description
             ))
             
             conn.commit()
             conn.close()
             
-            logger.info(f"✅ API key created: {key_id} by {created_by} with permissions: {permissions}")
-            
-            # Store API key temporarily for email sending (expires in 1 hour)
-            self._temp_key_storage.set(f"api_key_{key_id}", api_key, ttl_seconds=3600)
+            logger.info(f"✅ API Key created: {name} by {created_by}")
             
             return {
                 "id": key_id,
-                "api_key": api_key,  # Return plain key only once
                 "name": name,
-                "description": description,
+                "api_key": api_key,  # Only returned once!
+                "key_prefix": key_prefix,
                 "created_by": created_by,
-                "created_at": created_at,
-                "rate_limit_per_minute": rate_limit_per_minute,
-                "rate_limit_per_hour": rate_limit_per_hour,
-                "is_active": True,
-                "permissions": permissions,
-                "expires_at": expires_at
+                "created_at": now,
+                "expires_at": expires_at_str,
+                "permissions": permissions or [],
+                "rate_limit": rate_limit,
+                "ip_whitelist": ip_whitelist or [],
+                "description": description
             }
         except Exception as e:
             logger.error(f"❌ Error creating API key: {e}")
             raise
     
-    def get_key(self, key_id: str) -> Optional[Dict[str, Any]]:
-        """Get API key by ID (without the actual key)"""
+    def verify_api_key(self, api_key: str) -> Optional[Dict[str, Any]]:
+        """
+        Verify API key and return key info
+        Returns dict with key info if valid, None if invalid, or raises exception if expired
+        """
         try:
+            key_hash = hashlib.sha256(api_key.encode()).hexdigest()
+            
             conn = sqlite3.connect(str(self.db_path))
-            conn.row_factory = sqlite3.Row
             cursor = conn.cursor()
             
             cursor.execute("""
-                SELECT id, name, description, created_by, created_at, last_used_at, expires_at,
-                       rate_limit_per_minute, rate_limit_per_hour, is_active, permissions
+                SELECT id, name, key_prefix, created_by, created_at, expires_at,
+                       permissions, rate_limit, is_active, ip_whitelist
+                FROM api_keys
+                WHERE key_hash = ? AND is_active = 1
+            """, (key_hash,))
+            
+            row = cursor.fetchone()
+            conn.close()
+            
+            if not row:
+                return None
+            
+            # Check expiration
+            if row[5]:  # expires_at
+                expires_at = datetime.fromisoformat(row[5].replace('Z', '+00:00'))
+                if datetime.now(timezone.utc) > expires_at:
+                    logger.warning(f"API key expired: {row[1]} (expired at {expires_at})")
+                    # Return special dict to indicate expiration
+                    return {
+                        "expired": True,
+                        "name": row[1],
+                        "expires_at": row[5]
+                    }
+            
+            return {
+                "id": row[0],
+                "name": row[1],
+                "key_prefix": row[2],
+                "created_by": row[3],
+                "created_at": row[4],
+                "expires_at": row[5],
+                "permissions": json.loads(row[6] or "[]"),
+                "rate_limit": row[7],
+                "is_active": bool(row[8]),
+                "ip_whitelist": json.loads(row[9] or "[]")
+            }
+        except Exception as e:
+            logger.error(f"❌ Error verifying API key: {e}")
+            return None
+    
+    def get_api_keys(self, created_by: Optional[str] = None) -> List[Dict[str, Any]]:
+        """Get all API keys (optionally filtered by creator)"""
+        try:
+            conn = sqlite3.connect(str(self.db_path))
+            cursor = conn.cursor()
+            
+            if created_by:
+                cursor.execute("""
+                    SELECT id, name, key_prefix, created_by, created_at, expires_at,
+                           permissions, rate_limit, is_active, last_used_at, usage_count, ip_whitelist, description
+                    FROM api_keys
+                    WHERE created_by = ?
+                    ORDER BY created_at DESC
+                """, (created_by,))
+            else:
+                cursor.execute("""
+                    SELECT id, name, key_prefix, created_by, created_at, expires_at,
+                           permissions, rate_limit, is_active, last_used_at, usage_count, ip_whitelist, description
+                    FROM api_keys
+                    ORDER BY created_at DESC
+                """)
+            
+            rows = cursor.fetchall()
+            conn.close()
+            
+            keys = []
+            for row in rows:
+                # Parse JSON fields safely
+                try:
+                    permissions = json.loads(row[6] or "[]") if row[6] else []
+                except:
+                    permissions = []
+                
+                try:
+                    ip_whitelist = json.loads(row[11] or "[]") if len(row) > 11 and row[11] else []
+                except:
+                    ip_whitelist = []
+                
+                keys.append({
+                    "id": row[0],
+                    "name": row[1],
+                    "key_prefix": row[2],  # Only show prefix, not full key
+                    "created_by": row[3],
+                    "created_at": row[4],
+                    "expires_at": row[5],
+                    "permissions": permissions,
+                    "rate_limit": row[7],
+                    "is_active": bool(row[8]),
+                    "last_used_at": row[9],
+                    "usage_count": row[10] or 0,
+                    "ip_whitelist": ip_whitelist,
+                    "description": row[12] if len(row) > 12 else None
+                })
+            
+            return keys
+        except Exception as e:
+            logger.error(f"❌ Error getting API keys: {e}")
+            return []
+    
+    def get_api_key(self, key_id: str) -> Optional[Dict[str, Any]]:
+        """Get API key by ID"""
+        try:
+            conn = sqlite3.connect(str(self.db_path))
+            cursor = conn.cursor()
+            
+            cursor.execute("""
+                SELECT id, name, key_prefix, created_by, created_at, expires_at,
+                       permissions, rate_limit, is_active, last_used_at, usage_count,
+                       ip_whitelist, description
                 FROM api_keys
                 WHERE id = ?
             """, (key_id,))
             
             row = cursor.fetchone()
+            
+            if not row:
+                conn.close()
+                return None
+            
+            # Parse JSON fields safely
+            try:
+                permissions = json.loads(row[6] or "[]") if row[6] else []
+            except Exception as e:
+                logger.warning(f"Failed to parse permissions for key {key_id}: {e}")
+                permissions = []
+            
+            try:
+                ip_whitelist = json.loads(row[11] or "[]") if len(row) > 11 and row[11] else []
+            except Exception as e:
+                logger.warning(f"Failed to parse ip_whitelist for key {key_id}: {e}")
+                ip_whitelist = []
+            
+            result = {
+                "id": row[0],
+                "name": row[1],
+                "key_prefix": row[2],
+                "created_by": row[3],
+                "created_at": row[4],
+                "expires_at": row[5],
+                "permissions": permissions,
+                "rate_limit": row[7],
+                "is_active": bool(row[8]),
+                "last_used_at": row[9],
+                "usage_count": row[10] or 0,
+                "ip_whitelist": ip_whitelist,
+                "description": row[12] if len(row) > 12 else None
+            }
+            
             conn.close()
-            
-            if row:
-                # Parse permissions JSON
-                # sqlite3.Row uses indexing, not .get() method
-                permissions_json = row["permissions"] if "permissions" in row.keys() else "[]"
-                if not permissions_json:
-                    permissions_json = "[]"
-                try:
-                    permissions = json.loads(permissions_json)
-                except (json.JSONDecodeError, TypeError):
-                    permissions = DEFAULT_PERMISSIONS.copy()
-                
-                expires_at = row["expires_at"] if "expires_at" in row.keys() else None
-                
-                return {
-                    "id": row["id"],
-                    "name": row["name"],
-                    "description": row["description"],
-                    "created_by": row["created_by"],
-                    "created_at": row["created_at"],
-                    "last_used_at": row["last_used_at"],
-                    "expires_at": expires_at,
-                    "rate_limit_per_minute": row["rate_limit_per_minute"],
-                    "rate_limit_per_hour": row["rate_limit_per_hour"],
-                    "is_active": bool(row["is_active"]),
-                    "permissions": permissions
-                }
-            return None
-        except Exception as e:
-            logger.error(f"❌ Error getting API key: {e}")
-            raise
-    
-    def list_keys(
-        self,
-        created_by: Optional[str] = None,
-        is_active: Optional[bool] = None
-    ) -> List[Dict[str, Any]]:
-        """List all API keys"""
-        try:
-            conn = sqlite3.connect(str(self.db_path))
-            conn.row_factory = sqlite3.Row
-            cursor = conn.cursor()
-            
-            query = """
-                SELECT id, name, description, created_by, created_at, last_used_at, expires_at,
-                       rate_limit_per_minute, rate_limit_per_hour, is_active, permissions
-                FROM api_keys
-                WHERE 1=1
-            """
-            params = []
-            
-            if created_by:
-                query += " AND created_by = ?"
-                params.append(created_by)
-            
-            if is_active is not None:
-                query += " AND is_active = ?"
-                params.append(1 if is_active else 0)
-            
-            query += " ORDER BY created_at DESC"
-            
-            cursor.execute(query, params)
-            rows = cursor.fetchall()
-            conn.close()
-            
-            result = []
-            for row in rows:
-                # Parse permissions JSON
-                # sqlite3.Row uses indexing, not .get() method
-                permissions_json = row["permissions"] if "permissions" in row.keys() else "[]"
-                if not permissions_json:
-                    permissions_json = "[]"
-                try:
-                    permissions = json.loads(permissions_json)
-                except (json.JSONDecodeError, TypeError):
-                    permissions = DEFAULT_PERMISSIONS.copy()
-                
-                expires_at = row["expires_at"] if "expires_at" in row.keys() else None
-                
-                result.append({
-                    "id": row["id"],
-                    "name": row["name"],
-                    "description": row["description"],
-                    "created_by": row["created_by"],
-                    "created_at": row["created_at"],
-                    "last_used_at": row["last_used_at"],
-                    "expires_at": expires_at,
-                    "rate_limit_per_minute": row["rate_limit_per_minute"],
-                    "rate_limit_per_hour": row["rate_limit_per_hour"],
-                    "is_active": bool(row["is_active"]),
-                    "permissions": permissions
-                })
-            
             return result
         except Exception as e:
-            logger.error(f"❌ Error listing API keys: {e}")
-            raise
+            logger.error(f"❌ Error getting API key: {e}")
+            return None
     
-    def update_key(
+    def update_api_key(
         self,
         key_id: str,
         name: Optional[str] = None,
-        description: Optional[str] = None,
-        rate_limit_per_minute: Optional[int] = None,
-        rate_limit_per_hour: Optional[int] = None,
-        is_active: Optional[bool] = None,
         permissions: Optional[List[str]] = None,
-        expires_at: Optional[str] = None
-    ) -> Optional[Dict[str, Any]]:
+        rate_limit: Optional[int] = None,
+        expires_at: Optional[datetime] = None,
+        is_active: Optional[bool] = None,
+        ip_whitelist: Optional[List[str]] = None,
+        description: Optional[str] = None
+    ) -> bool:
         """Update API key"""
         try:
-            # Validate permissions if provided
-            if permissions is not None:
-                is_valid, error_msg = validate_scopes(permissions)
-                if not is_valid:
-                    raise ValueError(error_msg)
-            
             conn = sqlite3.connect(str(self.db_path))
             cursor = conn.cursor()
             
@@ -316,163 +387,331 @@ class APIKeyManager:
             if name is not None:
                 updates.append("name = ?")
                 params.append(name)
-            
+            if permissions is not None:
+                updates.append("permissions = ?")
+                params.append(json.dumps(permissions))
+            if rate_limit is not None:
+                updates.append("rate_limit = ?")
+                params.append(rate_limit)
+            if expires_at is not None:
+                updates.append("expires_at = ?")
+                params.append(expires_at.isoformat())
+            if is_active is not None:
+                updates.append("is_active = ?")
+                params.append(1 if is_active else 0)
+            if ip_whitelist is not None:
+                updates.append("ip_whitelist = ?")
+                params.append(json.dumps(ip_whitelist))
             if description is not None:
                 updates.append("description = ?")
                 params.append(description)
             
-            if rate_limit_per_minute is not None:
-                updates.append("rate_limit_per_minute = ?")
-                params.append(rate_limit_per_minute)
-            
-            if rate_limit_per_hour is not None:
-                updates.append("rate_limit_per_hour = ?")
-                params.append(rate_limit_per_hour)
-            
-            if is_active is not None:
-                updates.append("is_active = ?")
-                params.append(1 if is_active else 0)
-            
-            if permissions is not None:
-                updates.append("permissions = ?")
-                params.append(json.dumps(permissions))
-            
-            if expires_at is not None:
-                updates.append("expires_at = ?")
-                params.append(expires_at)
-            
             if not updates:
-                conn.close()
-                return self.get_key(key_id)
+                return False
             
             params.append(key_id)
-            query = f"UPDATE api_keys SET {', '.join(updates)} WHERE id = ?"
             
-            cursor.execute(query, params)
+            cursor.execute(f"""
+                UPDATE api_keys
+                SET {', '.join(updates)}
+                WHERE id = ?
+            """, params)
+            
             conn.commit()
             conn.close()
             
-            logger.info(f"✅ API key updated: {key_id}")
-            return self.get_key(key_id)
+            logger.info(f"✅ API Key updated: {key_id}")
+            return True
         except Exception as e:
             logger.error(f"❌ Error updating API key: {e}")
-            raise
+            return False
     
-    def delete_key(self, key_id: str) -> bool:
+    def delete_api_key(self, key_id: str) -> bool:
         """Delete API key"""
         try:
             conn = sqlite3.connect(str(self.db_path))
             cursor = conn.cursor()
             
+            # Delete usage records first
+            cursor.execute("DELETE FROM api_key_usage WHERE api_key_id = ?", (key_id,))
+            
+            # Delete API key
             cursor.execute("DELETE FROM api_keys WHERE id = ?", (key_id,))
             
-            deleted = cursor.rowcount > 0
             conn.commit()
             conn.close()
             
-            if deleted:
-                logger.info(f"✅ API key deleted: {key_id}")
-            return deleted
+            logger.info(f"✅ API Key deleted: {key_id}")
+            return True
         except Exception as e:
             logger.error(f"❌ Error deleting API key: {e}")
-            raise
+            return False
     
-    def regenerate_key(self, key_id: str) -> Optional[Dict[str, Any]]:
-        """Regenerate API key (returns new key)"""
+    def record_usage(
+        self,
+        api_key_id: str,
+        endpoint: str,
+        method: str,
+        status_code: int,
+        response_time_ms: int,
+        ip_address: Optional[str] = None
+    ):
+        """Record API key usage"""
         try:
-            # Generate new key
-            new_api_key = self._generate_api_key()
-            new_key_hash = self._hash_key(new_api_key)
+            now = datetime.now(timezone.utc).isoformat()
             
             conn = sqlite3.connect(str(self.db_path))
             cursor = conn.cursor()
             
+            # Insert usage record
             cursor.execute("""
-                UPDATE api_keys 
-                SET key_hash = ?
-                WHERE id = ?
-            """, (new_key_hash, key_id))
+                INSERT INTO api_key_usage 
+                (api_key_id, endpoint, method, status_code, response_time_ms, ip_address, timestamp)
+                VALUES (?, ?, ?, ?, ?, ?, ?)
+            """, (api_key_id, endpoint, method, status_code, response_time_ms, ip_address, now))
             
-            updated = cursor.rowcount > 0
+            # Update last_used_at and usage_count
+            cursor.execute("""
+                UPDATE api_keys
+                SET last_used_at = ?, usage_count = usage_count + 1
+                WHERE id = ?
+            """, (now, api_key_id))
+            
             conn.commit()
             conn.close()
-            
-            if updated:
-                logger.info(f"✅ API key regenerated: {key_id}")
-                # Store API key temporarily for email sending (expires in 1 hour)
-                self._temp_key_storage.set(f"api_key_{key_id}", new_api_key, ttl_seconds=3600)
-                
-                key_data = self.get_key(key_id)
-                if key_data:
-                    key_data["api_key"] = new_api_key  # Return new key only once
-                return key_data
-            return None
         except Exception as e:
-            logger.error(f"❌ Error regenerating API key: {e}")
-            raise
+            logger.error(f"❌ Error recording API key usage: {e}")
     
-    def validate_key(self, api_key: str) -> Optional[Dict[str, Any]]:
-        """Validate API key and return key info if valid"""
+    def get_usage_stats(
+        self,
+        key_id: str,
+        days: int = 30
+    ) -> Dict[str, Any]:
+        """Get usage statistics for an API key"""
         try:
-            key_hash = self._hash_key(api_key)
+            since = (datetime.now(timezone.utc) - timedelta(days=days)).isoformat()
             
             conn = sqlite3.connect(str(self.db_path))
-            conn.row_factory = sqlite3.Row
             cursor = conn.cursor()
             
+            # Total requests
             cursor.execute("""
-                SELECT id, name, rate_limit_per_minute, rate_limit_per_hour, is_active, permissions
-                FROM api_keys
-                WHERE key_hash = ? AND is_active = 1
-            """, (key_hash,))
+                SELECT COUNT(*) FROM api_key_usage
+                WHERE api_key_id = ? AND timestamp >= ?
+            """, (key_id, since))
+            total_requests = cursor.fetchone()[0]
             
-            row = cursor.fetchone()
+            # Requests by endpoint
+            cursor.execute("""
+                SELECT endpoint, COUNT(*) as count
+                FROM api_key_usage
+                WHERE api_key_id = ? AND timestamp >= ?
+                GROUP BY endpoint
+                ORDER BY count DESC
+                LIMIT 10
+            """, (key_id, since))
+            by_endpoint = [{"endpoint": row[0], "count": row[1]} for row in cursor.fetchall()]
             
-            if row:
-                # Update last_used_at
-                last_used_at = datetime.now(THAILAND_TZ).isoformat()
-                cursor.execute("""
-                    UPDATE api_keys 
-                    SET last_used_at = ?
-                    WHERE id = ?
-                """, (last_used_at, row["id"]))
-                conn.commit()
-                
-                # Parse permissions JSON
-                # sqlite3.Row uses indexing, not .get() method
-                permissions_json = row["permissions"] if "permissions" in row.keys() else "[]"
-                if not permissions_json:
-                    permissions_json = "[]"
-                try:
-                    permissions = json.loads(permissions_json)
-                except (json.JSONDecodeError, TypeError):
-                    permissions = DEFAULT_PERMISSIONS.copy()
-            else:
-                permissions = []
+            # Requests by status code
+            cursor.execute("""
+                SELECT status_code, COUNT(*) as count
+                FROM api_key_usage
+                WHERE api_key_id = ? AND timestamp >= ?
+                GROUP BY status_code
+                ORDER BY count DESC
+            """, (key_id, since))
+            by_status = [{"status_code": row[0], "count": row[1]} for row in cursor.fetchall()]
+            
+            # Average response time
+            cursor.execute("""
+                SELECT AVG(response_time_ms) FROM api_key_usage
+                WHERE api_key_id = ? AND timestamp >= ?
+            """, (key_id, since))
+            avg_response_time = cursor.fetchone()[0] or 0
+            
+            # Requests per day
+            cursor.execute("""
+                SELECT DATE(timestamp) as date, COUNT(*) as count
+                FROM api_key_usage
+                WHERE api_key_id = ? AND timestamp >= ?
+                GROUP BY DATE(timestamp)
+                ORDER BY date DESC
+            """, (key_id, since))
+            per_day = [{"date": row[0], "count": row[1]} for row in cursor.fetchall()]
             
             conn.close()
             
-            if row:
-                return {
-                    "id": row["id"],
-                    "name": row["name"],
-                    "rate_limit_per_minute": row["rate_limit_per_minute"],
-                    "rate_limit_per_hour": row["rate_limit_per_hour"],
-                    "is_active": bool(row["is_active"]),
-                    "permissions": permissions
-                }
-            return None
+            return {
+                "total_requests": total_requests,
+                "by_endpoint": by_endpoint,
+                "by_status": by_status,
+                "avg_response_time_ms": round(avg_response_time, 2),
+                "requests_per_day": per_day,
+                "period_days": days
+            }
         except Exception as e:
-            logger.error(f"❌ Error validating API key: {e}")
-            return None
+            logger.error(f"❌ Error getting usage stats: {e}")
+            return {
+                "total_requests": 0,
+                "by_endpoint": [],
+                "by_status": [],
+                "avg_response_time_ms": 0,
+                "requests_per_day": [],
+                "period_days": days
+            }
     
-    def get_temp_key(self, key_id: str) -> Optional[str]:
-        """Get temporarily stored API key (for email sending)"""
+    def log_request_response(
+        self,
+        api_key_id: Optional[str],
+        endpoint: str,
+        method: str,
+        response_status: int,
+        response_time_ms: int,
+        request_headers: Optional[Dict[str, Any]] = None,
+        request_body: Optional[str] = None,
+        response_headers: Optional[Dict[str, Any]] = None,
+        response_body: Optional[str] = None,
+        ip_address: Optional[str] = None,
+        user_agent: Optional[str] = None,
+        error_message: Optional[str] = None
+    ):
+        """Log detailed request/response for debugging and audit"""
         try:
-            return self._temp_key_storage.get(f"api_key_{key_id}")
+            now = datetime.now(timezone.utc).isoformat()
+            
+            # Truncate large bodies (keep first 10KB for debugging)
+            max_body_size = 10240
+            if request_body and len(request_body) > max_body_size:
+                request_body = request_body[:max_body_size] + f"\n... (truncated, {len(request_body)} bytes total)"
+            if response_body and len(response_body) > max_body_size:
+                response_body = response_body[:max_body_size] + f"\n... (truncated, {len(response_body)} bytes total)"
+            
+            conn = sqlite3.connect(str(self.db_path))
+            cursor = conn.cursor()
+            
+            cursor.execute("""
+                INSERT INTO api_request_logs 
+                (api_key_id, endpoint, method, request_headers, request_body, 
+                 response_status, response_headers, response_body, response_time_ms,
+                 ip_address, user_agent, error_message, timestamp)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            """, (
+                api_key_id,
+                endpoint,
+                method,
+                json.dumps(request_headers) if request_headers else None,
+                request_body,
+                response_status,
+                json.dumps(response_headers) if response_headers else None,
+                response_body,
+                response_time_ms,
+                ip_address,
+                user_agent,
+                error_message,
+                now
+            ))
+            
+            conn.commit()
+            conn.close()
         except Exception as e:
-            logger.error(f"❌ Error getting temp API key: {e}")
-            return None
+            logger.error(f"❌ Error logging request/response: {e}")
+    
+    def get_request_logs(
+        self,
+        api_key_id: Optional[str] = None,
+        endpoint: Optional[str] = None,
+        method: Optional[str] = None,
+        status_code: Optional[int] = None,
+        date_from: Optional[str] = None,
+        date_to: Optional[str] = None,
+        page: int = 1,
+        page_size: int = 50
+    ) -> Dict[str, Any]:
+        """Get request logs with filtering and pagination"""
+        try:
+            conn = sqlite3.connect(str(self.db_path))
+            cursor = conn.cursor()
+            
+            # Build WHERE clause
+            conditions = []
+            params = []
+            
+            if api_key_id:
+                conditions.append("api_key_id = ?")
+                params.append(api_key_id)
+            if endpoint:
+                conditions.append("endpoint LIKE ?")
+                params.append(f"%{endpoint}%")
+            if method:
+                conditions.append("method = ?")
+                params.append(method)
+            if status_code:
+                conditions.append("response_status = ?")
+                params.append(status_code)
+            if date_from:
+                conditions.append("timestamp >= ?")
+                params.append(date_from)
+            if date_to:
+                conditions.append("timestamp <= ?")
+                params.append(date_to)
+            
+            where_clause = " AND ".join(conditions) if conditions else "1=1"
+            
+            # Get total count
+            cursor.execute(f"""
+                SELECT COUNT(*) FROM api_request_logs
+                WHERE {where_clause}
+            """, params)
+            total = cursor.fetchone()[0]
+            
+            # Get paginated results
+            offset = (page - 1) * page_size
+            cursor.execute(f"""
+                SELECT id, api_key_id, endpoint, method, request_headers, request_body,
+                       response_status, response_headers, response_body, response_time_ms,
+                       ip_address, user_agent, error_message, timestamp
+                FROM api_request_logs
+                WHERE {where_clause}
+                ORDER BY timestamp DESC
+                LIMIT ? OFFSET ?
+            """, params + [page_size, offset])
+            
+            rows = cursor.fetchall()
+            conn.close()
+            
+            logs = []
+            for row in rows:
+                try:
+                    logs.append({
+                        "id": row[0],
+                        "api_key_id": row[1],
+                        "endpoint": row[2],
+                        "method": row[3],
+                        "request_headers": json.loads(row[4]) if row[4] else None,
+                        "request_body": row[5],
+                        "response_status": row[6],
+                        "response_headers": json.loads(row[7]) if row[7] else None,
+                        "response_body": row[8],
+                        "response_time_ms": row[9],
+                        "ip_address": row[10],
+                        "user_agent": row[11],
+                        "error_message": row[12],
+                        "timestamp": row[13]
+                    })
+                except Exception as e:
+                    logger.warning(f"Error parsing log row: {e}")
+                    continue
+            
+            return {
+                "items": logs,
+                "total": total,
+                "page": page,
+                "page_size": page_size,
+                "total_pages": (total + page_size - 1) // page_size
+            }
+        except Exception as e:
+            logger.error(f"❌ Error getting request logs: {e}")
+            return {"items": [], "total": 0, "page": 1, "page_size": page_size, "total_pages": 0}
 
 
 # Global instance
