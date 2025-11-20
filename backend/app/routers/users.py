@@ -1,5 +1,4 @@
-from fastapi import APIRouter, HTTPException, Depends, status, Query, Request
-from pydantic import BaseModel, EmailStr
+from fastapi import APIRouter, Depends, Query, Request
 from typing import List, Optional, Dict, Any
 from ldap3 import MODIFY_REPLACE, MODIFY_ADD
 import ldap3
@@ -12,122 +11,18 @@ import base64
 
 from app.core.config import settings
 from app.core.database import get_ldap_connection
-from app.routers.auth import verify_token, verify_token_or_api_key, get_client_ip
+from app.core.exceptions import NotFoundError, InternalServerError, ValidationError
+from app.routers.auth import verify_token, get_client_ip
 from app.core.cache import cached_response, invalidate_cache
 from app.core.activity_log import activity_log_manager
+from app.schemas.users import (
+    UserCreate, UserUpdate, UserResponse, UserStatsResponse, LoginInsightEntry,
+    UserCreateResponse, UserUpdateResponse, UserStatusToggleResponse, UserDeleteResponse,
+    PasswordExpiryResponse
+)
 
 router = APIRouter()
 logger = logging.getLogger(__name__)
-
-# Pydantic models
-class UserCreate(BaseModel):
-    cn: str
-    sAMAccountName: str
-    password: str
-    mail: EmailStr
-    displayName: Optional[str] = None
-    givenName: Optional[str] = None
-    sn: Optional[str] = None
-    title: Optional[str] = None
-    telephoneNumber: Optional[str] = None
-    mobile: Optional[str] = None
-    department: Optional[str] = None
-    company: Optional[str] = None
-    employeeID: Optional[str] = None
-    physicalDeliveryOfficeName: Optional[str] = None
-    streetAddress: Optional[str] = None
-    l: Optional[str] = None  # city/locality in AD
-    st: Optional[str] = None  # state in AD
-    postalCode: Optional[str] = None
-    co: Optional[str] = None  # country in AD
-    description: Optional[str] = None
-    # New fields for enhanced user creation
-    ou: Optional[str] = None  # OU DN where user will be created
-    groups: Optional[List[str]] = []  # List of group DNs to add user to
-    accountDisabled: Optional[bool] = False  # Create account as disabled
-    # Account options
-    passwordMustChange: Optional[bool] = False  # User must change password at next logon
-    userCannotChangePassword: Optional[bool] = False  # User cannot change password
-    passwordNeverExpires: Optional[bool] = False  # Password never expires
-    storePasswordReversible: Optional[bool] = False  # Store password using reversible encryption
-
-class UserUpdate(BaseModel):
-    cn: Optional[str] = None
-    password: Optional[str] = None  # For password reset
-    mail: Optional[EmailStr] = None
-    displayName: Optional[str] = None
-    givenName: Optional[str] = None
-    sn: Optional[str] = None
-    title: Optional[str] = None
-    telephoneNumber: Optional[str] = None
-    mobile: Optional[str] = None
-    department: Optional[str] = None
-    company: Optional[str] = None
-    employeeID: Optional[str] = None
-    physicalDeliveryOfficeName: Optional[str] = None
-    streetAddress: Optional[str] = None
-    l: Optional[str] = None  # city/locality in AD
-    st: Optional[str] = None  # state in AD
-    postalCode: Optional[str] = None
-    co: Optional[str] = None  # country in AD
-    description: Optional[str] = None
-    # Account options
-    passwordMustChange: Optional[bool] = None  # User must change password at next logon
-    userCannotChangePassword: Optional[bool] = None  # User cannot change password
-    passwordNeverExpires: Optional[bool] = None  # Password never expires
-    storePasswordReversible: Optional[bool] = None  # Store password using reversible encryption
-
-
-class UserResponse(BaseModel):
-    dn: str
-    cn: str
-    sAMAccountName: str
-    mail: str
-    displayName: str
-    givenName: Optional[str] = None
-    sn: Optional[str] = None
-    title: Optional[str] = None
-    telephoneNumber: Optional[str] = None
-    mobile: Optional[str] = None
-    department: Optional[str] = None
-    company: Optional[str] = None
-    employeeID: Optional[str] = None
-    physicalDeliveryOfficeName: Optional[str] = None
-    streetAddress: Optional[str] = None
-    l: Optional[str] = None  # city/locality in AD
-    st: Optional[str] = None  # state in AD
-    postalCode: Optional[str] = None
-    co: Optional[str] = None  # country in AD
-    description: Optional[str] = None
-    userAccountControl: int
-    memberOf: List[str]
-    isEnabled: bool
-    whenCreated: Optional[str] = None
-    whenChanged: Optional[str] = None
-    lastLogon: Optional[str] = None
-    pwdLastSet: Optional[str] = None
-    # Account options (parsed from userAccountControl)
-    passwordMustChange: Optional[bool] = False
-    userCannotChangePassword: Optional[bool] = False
-    passwordNeverExpires: Optional[bool] = False
-    storePasswordReversible: Optional[bool] = False
-
-class UserStatsResponse(BaseModel):
-    total_users: int
-    enabled_users: int
-    disabled_users: int
-    fetched_at: datetime
-
-class LoginInsightEntry(BaseModel):
-    dn: str
-    display_name: Optional[str] = None
-    username: Optional[str] = None
-    email: Optional[str] = None
-    department: Optional[str] = None
-    last_login: Optional[datetime] = None
-    first_login: Optional[datetime] = None
-    when_created: Optional[datetime] = None
-    logon_count: Optional[int] = None
 
 # Helper functions
 THAILAND_TZ = timezone(timedelta(hours=7))
@@ -327,6 +222,73 @@ def format_user_data(entry: tuple, full_details: bool = True) -> Dict[str, Any]:
     # Parse account options from userAccountControl
     account_options = parse_account_options(user_account_control)
     
+    # Parse timestamps (always needed, even for list view)
+    last_logon_raw = get_attr("lastLogon") or None
+    last_logon_ts_raw = get_attr("lastLogonTimestamp") or None
+    last_logon_dt = ad_timestamp_to_datetime(last_logon_raw) or ad_timestamp_to_datetime(last_logon_ts_raw)
+    
+    pwd_last_set_raw = get_attr("pwdLastSet") or None
+    pwd_last_set_dt = ad_timestamp_to_datetime(pwd_last_set_raw) if pwd_last_set_raw and pwd_last_set_raw != "0" else None
+    
+    when_changed_raw = get_attr("whenChanged") or None
+    when_changed_dt = parse_when_created(when_changed_raw) if when_changed_raw else None
+    
+    # Parse accountExpires (FILETIME format, 0 or MAX_FILETIME means never expires)
+    account_expires_raw = get_attr("accountExpires") or None
+    account_expires_dt = None
+    if account_expires_raw and account_expires_raw != "0":
+        try:
+            account_expires_dt = ad_timestamp_to_datetime(account_expires_raw)
+            # Check if it's MAX_FILETIME (never expires) - MAX_FILETIME converts to year 30828
+            if account_expires_dt and account_expires_dt.year > 9999:
+                account_expires_dt = None  # Never expires
+        except Exception as e:
+            logger.debug(f"Failed to parse accountExpires '{account_expires_raw}': {e}")
+            account_expires_dt = None
+    
+    # ⚡ Auto-calculate accountExpires for users in PSO-OU-90Days group
+    # If user is in PSO-OU-90Days and accountExpires is not set (0 or None), calculate from pwdLastSet
+    member_of = attrs.get("memberOf", [])
+    is_in_pso_90days = any("PSO-OU-90Days" in str(group_dn) for group_dn in member_of)
+    
+    if is_in_pso_90days and (not account_expires_dt or account_expires_raw == "0" or account_expires_raw is None):
+        # User is in PSO-OU-90Days but accountExpires is not set
+        # Calculate from pwdLastSet + 90 days
+        if pwd_last_set_dt:
+            # Calculate expiry: pwdLastSet + 90 days
+            account_expires_dt = pwd_last_set_dt + timedelta(days=90)
+            logger.debug(f"Auto-calculated accountExpires for user in PSO-OU-90Days: {account_expires_dt.isoformat()}")
+            
+            # ⚡ Optionally update AD (async - don't block response)
+            # Note: This will update AD in the background
+            try:
+                expiry_filetime = datetime_to_filetime(account_expires_dt)
+                user_modifications = [(MODIFY_REPLACE, "accountExpires", [expiry_filetime])]
+                # Use a separate connection to avoid blocking
+                import threading
+                def update_account_expires():
+                    try:
+                        update_conn = get_ldap_connection()
+                        if update_conn.modify_entry(dn, user_modifications):
+                            logger.info(f"✅ Auto-updated accountExpires for user in PSO-OU-90Days: {dn}")
+                        else:
+                            logger.warning(f"⚠️ Failed to auto-update accountExpires for {dn}")
+                    except Exception as e:
+                        logger.error(f"Error auto-updating accountExpires: {e}")
+                
+                # Run in background thread (non-blocking)
+                threading.Thread(target=update_account_expires, daemon=True).start()
+            except Exception as e:
+                logger.debug(f"Could not auto-update accountExpires: {e}")
+    
+    logon_count = parse_logon_count(get_attr("logonCount") or "0")
+    
+    # Get manager DN (if exists)
+    manager_dn = get_attr("manager") or None
+    
+    # Get userPrincipalName
+    user_principal_name = get_attr("userPrincipalName") or None
+    
     # Always include basic info
     result = {
         "dn": dn,
@@ -346,18 +308,14 @@ def format_user_data(entry: tuple, full_details: bool = True) -> Dict[str, Any]:
         "userCannotChangePassword": account_options["userCannotChangePassword"],
         "passwordNeverExpires": account_options["passwordNeverExpires"],
         "storePasswordReversible": account_options["storePasswordReversible"],
+        # New fields
+        "userPrincipalName": user_principal_name,
+        "manager": manager_dn,
+        "accountExpires": account_expires_dt.isoformat() if account_expires_dt else None,  # Always include (None = never expires)
     }
-    
-    
+
     # Only include full details when requested (single user view)
     if full_details:
-        last_logon_raw = get_attr("lastLogon") or None
-        last_logon_ts_raw = get_attr("lastLogonTimestamp") or None
-        last_logon_dt = ad_timestamp_to_datetime(last_logon_raw) or ad_timestamp_to_datetime(last_logon_ts_raw)
-        
-        pwd_last_set_raw = get_attr("pwdLastSet") or None
-        pwd_last_set_dt = ad_timestamp_to_datetime(pwd_last_set_raw) if pwd_last_set_raw and pwd_last_set_raw != "0" else None
-
         result.update({
             "givenName": get_attr("givenName") or None,
             "sn": get_attr("sn") or None,
@@ -372,18 +330,22 @@ def format_user_data(entry: tuple, full_details: bool = True) -> Dict[str, Any]:
             "co": get_attr("co") or None,
             "memberOf": attrs.get("memberOf", []),
             "whenCreated": get_attr("whenCreated") or None,
-            "whenChanged": get_attr("whenChanged") or None,
+            "whenChanged": when_changed_dt.isoformat() if when_changed_dt else None,
             "lastLogon": last_logon_dt.isoformat() if last_logon_dt else None,
             "pwdLastSet": pwd_last_set_dt.isoformat() if pwd_last_set_dt else None,
+            "logonCount": logon_count,
         })
     else:
-        # ⚡ Include limited metadata needed for list view (avoid heavy attributes)
+        # ⚡ Include essential metadata for list view (needed for filtering/sorting/display)
+        # Note: accountExpires is already in result (line 278) - no need to add again
         result.update({
-            "memberOf": [],
+            "memberOf": attrs.get("memberOf", []),  # Include for group count/display
             "whenCreated": get_attr("whenCreated") or None,  # keep for sorting/filtering
-            "whenChanged": None,
-            "lastLogon": None,
-            "pwdLastSet": None,
+            "whenChanged": when_changed_dt.isoformat() if when_changed_dt else None,  # Include for display
+            "lastLogon": last_logon_dt.isoformat() if last_logon_dt else None,  # Include for display
+            "pwdLastSet": pwd_last_set_dt.isoformat() if pwd_last_set_dt else None,  # Include for display
+            "logonCount": logon_count,  # Include for display
+            # accountExpires is already included in result (line 278) - no need to duplicate
         })
     
     return result
@@ -405,7 +367,7 @@ async def get_users(
     search_title: Optional[str] = None,
     search_department: Optional[str] = None,
     search_office: Optional[str] = None,
-    token_data = Depends(verify_token_or_api_key)
+    token_data = Depends(verify_token)
 ):
     """Get all users from Active Directory with advanced search support
     
@@ -494,7 +456,7 @@ async def get_users(
         else:
             filter_str = base_filter
 
-        # ⚡ PERFORMANCE: Fetch only essential fields (5x faster!)
+        # ⚡ PERFORMANCE: Fetch essential fields + metadata for filtering/sorting
         logger.info(f"🔍 Searching users with filter: {filter_str} (mode: {search_mode})")
         results = ldap_conn.search(
             settings.LDAP_BASE_DN,
@@ -521,12 +483,20 @@ async def get_users(
                 "st",
                 "postalCode",
                 "co",
-                "whenCreated"
+                "whenCreated",
+                "whenChanged",
+                "lastLogon",
+                "lastLogonTimestamp",
+                "memberOf",
+                "logonCount",
+                "userPrincipalName",
+                "manager",
+                "accountExpires"
             ]
         )
         
         if results is None:
-            raise HTTPException(status_code=500, detail="Failed to search users")
+            raise InternalServerError("Failed to search users")
         
         logger.info(f"✅ LDAP returned {len(results)} raw results from AD")
         
@@ -560,7 +530,7 @@ async def get_users(
         
     except Exception as e:
         logger.error(f"Error getting users: {e}")
-        raise HTTPException(status_code=500, detail="Failed to retrieve users")
+        raise InternalServerError("Failed to retrieve users")
 
 
 @router.get("/stats", response_model=UserStatsResponse)
@@ -575,7 +545,7 @@ async def get_user_stats(token: str = Depends(verify_token)):
         )
 
         if results is None:
-            raise HTTPException(status_code=500, detail="Failed to search users")
+            raise InternalServerError("Failed to search users")
 
         total_users = len(results)
         disabled_users = 0
@@ -601,17 +571,17 @@ async def get_user_stats(token: str = Depends(verify_token)):
             disabled_users=disabled_users,
             fetched_at=datetime.now().astimezone()
         )
-    except HTTPException:
+    except (NotFoundError, InternalServerError, ValidationError):
         raise
     except Exception as e:
         logger.error(f"Error getting user stats: {e}")
-        raise HTTPException(status_code=500, detail="Failed to retrieve user statistics")
+        raise InternalServerError("Failed to retrieve user statistics")
 
 
 @router.get("/login-insights/recent", response_model=List[LoginInsightEntry])
 async def get_recent_logins(
     limit: int = Query(10, ge=1, le=100),
-    token_data = Depends(verify_token_or_api_key)
+    token_data = Depends(verify_token)
 ):
     """Return top N users with the most recent logins"""
     ldap_conn = get_ldap_connection()
@@ -633,7 +603,7 @@ async def get_recent_logins(
         )
 
         if results is None:
-            raise HTTPException(status_code=500, detail="Failed to search users")
+            raise InternalServerError("Failed to search users")
 
         insights: List[LoginInsightEntry] = []
         for entry in results:
@@ -650,17 +620,17 @@ async def get_recent_logins(
         )
 
         return insights[:limit]
-    except HTTPException:
+    except (NotFoundError, InternalServerError, ValidationError):
         raise
     except Exception as e:
         logger.error(f"Error getting recent login insights: {e}")
-        raise HTTPException(status_code=500, detail="Failed to retrieve recent login insights")
+        raise InternalServerError("Failed to retrieve recent login insights")
 
 
 @router.get("/login-insights/never", response_model=List[LoginInsightEntry])
 async def get_users_single_login(
     limit: int = Query(10, ge=1, le=100),
-    token_data = Depends(verify_token_or_api_key)
+    token_data = Depends(verify_token)
 ):
     """Return top N users who have logged in only once (first login with no subsequent logins)"""
     ldap_conn = get_ldap_connection()
@@ -682,7 +652,7 @@ async def get_users_single_login(
         )
 
         if results is None:
-            raise HTTPException(status_code=500, detail="Failed to search users")
+            raise InternalServerError("Failed to search users")
 
         insights: List[LoginInsightEntry] = []
         for entry in results:
@@ -701,11 +671,11 @@ async def get_users_single_login(
         )
 
         return insights[:limit]
-    except HTTPException:
+    except (NotFoundError, InternalServerError, ValidationError):
         raise
     except Exception as e:
         logger.error(f"Error getting single-login insights: {e}")
-        raise HTTPException(status_code=500, detail="Failed to retrieve single-login insights")
+        raise InternalServerError("Failed to retrieve single-login insights")
 
 
 @router.get("/departments", response_model=List[str])
@@ -721,7 +691,7 @@ async def get_departments(token: str = Depends(verify_token)):
         )
 
         if results is None:
-            raise HTTPException(status_code=500, detail="Failed to search departments")
+            raise InternalServerError("Failed to search departments")
 
         deps = set()
         for entry in results:
@@ -741,7 +711,7 @@ async def get_departments(token: str = Depends(verify_token)):
         return sorted_deps
     except Exception as e:
         logger.error(f"Error getting departments: {e}")
-        raise HTTPException(status_code=500, detail="Failed to retrieve departments")
+        raise InternalServerError("Failed to retrieve departments")
 
 
 @router.get("/groups", response_model=List[Dict[str, str]])
@@ -756,7 +726,7 @@ async def get_groups(token: str = Depends(verify_token)):
         )
 
         if results is None:
-            raise HTTPException(status_code=500, detail="Failed to search groups")
+            raise InternalServerError("Failed to search groups")
 
         groups = []
         for entry in results:
@@ -769,7 +739,7 @@ async def get_groups(token: str = Depends(verify_token)):
         return groups
     except Exception as e:
         logger.error(f"Error getting groups: {e}")
-        raise HTTPException(status_code=500, detail="Failed to retrieve groups")
+        raise InternalServerError("Failed to retrieve groups")
 
 
 @router.get("/groups/members", response_model=List[UserResponse])
@@ -808,7 +778,7 @@ async def get_group_members(group_dn: str, token: str = Depends(verify_token)):
         return user_entries
     except Exception as e:
         logger.error(f"Error getting members for group {group_dn}: {e}")
-        raise HTTPException(status_code=500, detail="Failed to retrieve group members")
+        raise InternalServerError("Failed to retrieve group members")
 
 @router.get("/{dn}", response_model=UserResponse)
 async def get_user(dn: str, token_data = Depends(verify_token)):
@@ -825,20 +795,21 @@ async def get_user(dn: str, token_data = Depends(verify_token)):
              "employeeID", "physicalDeliveryOfficeName", "streetAddress", "l", 
              "st", "postalCode", "co", "description",
              "userAccountControl", "memberOf", "whenCreated", "whenChanged", 
-             "lastLogon", "lastLogonTimestamp", "pwdLastSet", "logonCount"]
+             "lastLogon", "lastLogonTimestamp", "pwdLastSet", "logonCount",
+             "userPrincipalName", "manager", "accountExpires"]
         )
         
         if not results:
-            raise HTTPException(status_code=404, detail="User not found")
+            raise NotFoundError("User", dn)
         
         return format_user_data(results[0], full_details=True)
         
     except Exception as e:
         logger.error(f"Error getting user {dn}: {e}")
-        raise HTTPException(status_code=500, detail="Failed to retrieve user")
+        raise InternalServerError("Failed to retrieve user")
 
-@router.post("/", response_model=Dict[str, Any])
-async def create_user(user_data: UserCreate, request: Request, token_data = Depends(verify_token_or_api_key)):
+@router.post("/", response_model=UserCreateResponse)
+async def create_user(user_data: UserCreate, request: Request, token_data = Depends(verify_token)):
     """Create new user in Active Directory"""
     # 🔍 DEBUG: Log incoming data (without password for security)
     logger.info(f"📥 Received user creation request")
@@ -935,7 +906,7 @@ async def create_user(user_data: UserCreate, request: Request, token_data = Depe
         
         # Create user
         if not ldap_conn.add_entry(user_dn, user_attrs):
-            raise HTTPException(status_code=500, detail="Failed to create user")
+            raise InternalServerError("Failed to create user")
         
         logger.info(f"✅ User entry created (disabled): {user_dn}")
         
@@ -1055,27 +1026,29 @@ async def create_user(user_data: UserCreate, request: Request, token_data = Depe
             status="success"
         )
         
-        return {
-            "success": True,
-            "message": response_message,
-            "passwordSet": password_set_success,
-            "accountEnabled": account_enabled,
-            "groupsAssigned": len(groups_assigned),
-            "groupsFailed": len(groups_failed),
-            "user": {
+        return UserCreateResponse(
+            success=True,
+            message=response_message,
+            passwordSet=password_set_success,
+            accountEnabled=account_enabled,
+            groupsAssigned=len(groups_assigned),
+            groupsFailed=len(groups_failed),
+            user={
                 "dn": user_dn,
                 "cn": user_data.cn,
                 "sAMAccountName": user_data.sAMAccountName,
                 "mail": user_data.mail,
                 "ou": user_data.ou or f"CN=Users,{settings.LDAP_BASE_DN}"
             }
-        }
+        )
         
+    except (NotFoundError, InternalServerError, ValidationError):
+        raise
     except Exception as e:
         logger.error(f"Error creating user: {e}")
-        raise HTTPException(status_code=500, detail="Failed to create user")
+        raise InternalServerError("Failed to create user")
 
-@router.put("/{dn}", response_model=Dict[str, Any])
+@router.put("/{dn}", response_model=UserUpdateResponse)
 async def update_user(dn: str, user_data: UserUpdate, request: Request, token_data = Depends(verify_token)):
     """Update user in Active Directory"""
     ldap_conn = get_ldap_connection()
@@ -1175,7 +1148,7 @@ async def update_user(dn: str, user_data: UserUpdate, request: Request, token_da
                     parent_dn = ','.join(dn.split(',')[1:])
                     logger.info(f"🔄 Renaming DN from {dn} to {new_rdn},{parent_dn}")
                     if not ldap_conn.rename_entry(dn, new_rdn, new_superior=parent_dn):
-                        raise HTTPException(status_code=500, detail="Failed to rename user (CN change)")
+                        raise InternalServerError("Failed to rename user (CN change)")
                     changes.append({
                         "field": "cn",
                         "old_value": current_cn,
@@ -1276,10 +1249,7 @@ async def update_user(dn: str, user_data: UserUpdate, request: Request, token_da
             
             if not password_reset_success:
                 logger.error(f"❌ Failed to reset password using all methods")
-                raise HTTPException(
-                    status_code=500, 
-                    detail="Failed to reset password. LDAPS not configured and PowerShell unavailable."
-                )
+                raise InternalServerError("Failed to reset password. LDAPS not configured and PowerShell unavailable.")
         
         # Apply other modifications (if any)
         if modifications:
@@ -1287,7 +1257,7 @@ async def update_user(dn: str, user_data: UserUpdate, request: Request, token_da
             
             if not ldap_conn.modify_entry(dn, modifications):
                 logger.error(f"❌ Failed to modify entry: {ldap_conn.connection.last_error if ldap_conn.connection else 'Unknown error'}")
-                raise HTTPException(status_code=500, detail=f"Failed to update user: {ldap_conn.connection.last_error if ldap_conn.connection else 'Unknown error'}")
+                raise InternalServerError(f"Failed to update user: {ldap_conn.connection.last_error if ldap_conn.connection else 'Unknown error'}")
             
             logger.info(f"✅ User updated successfully: {dn}")
         
@@ -1330,24 +1300,22 @@ async def update_user(dn: str, user_data: UserUpdate, request: Request, token_da
         )
         
         message = "Password reset successfully" if password_changed else "User updated successfully"
-        response_payload = {
-            "success": True,
-            "message": message,
-            "user": refreshed_user
-        }
-        if renamed_dn:
-            response_payload["dn"] = renamed_dn
-        return response_payload
+        return UserUpdateResponse(
+            success=True,
+            message=message,
+            user=refreshed_user,
+            dn=renamed_dn
+        )
         
-    except HTTPException:
+    except (NotFoundError, InternalServerError, ValidationError):
         raise
     except Exception as e:
         logger.error(f"❌ Error updating user {dn}: {e}")
         logger.error(f"Exception type: {type(e).__name__}")
         logger.error(f"Exception details: {str(e)}")
-        raise HTTPException(status_code=500, detail=f"Failed to update user: {str(e)}")
+        raise InternalServerError(f"Failed to update user: {str(e)}")
 
-@router.patch("/{dn}/toggle-status", response_model=Dict[str, Any])
+@router.patch("/{dn}/toggle-status", response_model=UserStatusToggleResponse)
 async def toggle_user_status(dn: str, request: Request, token_data = Depends(verify_token)):
     """Enable/Disable user account"""
     ldap_conn = get_ldap_connection()
@@ -1357,7 +1325,7 @@ async def toggle_user_status(dn: str, request: Request, token_data = Depends(ver
         results = ldap_conn.search(dn, "(objectClass=user)", ["userAccountControl"])
         
         if not results:
-            raise HTTPException(status_code=404, detail="User not found")
+            raise NotFoundError("User", dn)
         
         current_uac = int(results[0][1].get("userAccountControl", ["0"])[0])
         is_disabled = is_account_disabled(current_uac)
@@ -1371,7 +1339,7 @@ async def toggle_user_status(dn: str, request: Request, token_data = Depends(ver
         modifications = [(MODIFY_REPLACE, "userAccountControl", [str(new_uac)])]
         
         if not ldap_conn.modify_entry(dn, modifications):
-            raise HTTPException(status_code=500, detail="Failed to toggle user status")
+            raise InternalServerError("Failed to toggle user status")
         
         # Invalidate cache after status toggle
         invalidate_cache("get_users")
@@ -1388,17 +1356,19 @@ async def toggle_user_status(dn: str, request: Request, token_data = Depends(ver
             status="success"
         )
         
-        return {
-            "success": True,
-            "message": f"User {'enabled' if is_disabled else 'disabled'} successfully",
-            "isEnabled": not is_disabled
-        }
+        return UserStatusToggleResponse(
+            success=True,
+            message=f"User {'enabled' if is_disabled else 'disabled'} successfully",
+            isEnabled=not is_disabled
+        )
         
+    except (NotFoundError, InternalServerError, ValidationError):
+        raise
     except Exception as e:
         logger.error(f"Error toggling user status for {dn}: {e}")
-        raise HTTPException(status_code=500, detail="Failed to toggle user status")
+        raise InternalServerError("Failed to toggle user status")
 
-@router.delete("/{dn}", response_model=Dict[str, Any])
+@router.delete("/{dn}", response_model=UserDeleteResponse)
 async def delete_user(dn: str, request: Request, token_data = Depends(verify_token)):
     """Delete user from Active Directory"""
     ldap_conn = get_ldap_connection()
@@ -1407,7 +1377,7 @@ async def delete_user(dn: str, request: Request, token_data = Depends(verify_tok
         user_name = dn.split(',')[0].replace('CN=', '')
         
         if not ldap_conn.delete_entry(dn):
-            raise HTTPException(status_code=500, detail="Failed to delete user")
+            raise InternalServerError("Failed to delete user")
         
         # Invalidate cache after user deletion
         invalidate_cache("get_users")
@@ -1423,17 +1393,19 @@ async def delete_user(dn: str, request: Request, token_data = Depends(verify_tok
             status="success"
         )
         
-        return {
-            "success": True,
-            "message": "User deleted successfully"
-        }
+        return UserDeleteResponse(
+            success=True,
+            message="User deleted successfully"
+        )
         
+    except (NotFoundError, InternalServerError, ValidationError):
+        raise
     except Exception as e:
         logger.error(f"Error deleting user {dn}: {e}")
-        raise HTTPException(status_code=500, detail="Failed to delete user")
+        raise InternalServerError("Failed to delete user")
 
 
-@router.get("/{dn}/password-expiry", response_model=Dict[str, Any])
+@router.get("/{dn}/password-expiry", response_model=PasswordExpiryResponse)
 async def get_password_expiry(dn: str, token_data = Depends(verify_token)):
     """Get password expiry information for a user"""
     ldap_conn = get_ldap_connection()
@@ -1446,7 +1418,7 @@ async def get_password_expiry(dn: str, token_data = Depends(verify_token)):
         )
         
         if not results:
-            raise HTTPException(status_code=404, detail="User not found")
+            raise NotFoundError("User", dn)
         
         _, attrs = results[0]
         pwd_last_set = attrs.get("pwdLastSet", [None])[0]
@@ -1463,17 +1435,17 @@ async def get_password_expiry(dn: str, token_data = Depends(verify_token)):
             expiry_date = None
             days_remaining = None
         
-        return {
-            "createdDate": created_date.isoformat() if created_date else None,
-            "expiryDate": expiry_date.isoformat() if expiry_date else None,
-            "daysRemaining": days_remaining
-        }
+        return PasswordExpiryResponse(
+            createdDate=created_date.isoformat() if created_date else None,
+            expiryDate=expiry_date.isoformat() if expiry_date else None,
+            daysRemaining=days_remaining
+        )
         
-    except HTTPException:
+    except (NotFoundError, InternalServerError, ValidationError):
         raise
     except Exception as e:
         logger.error(f"Error getting password expiry for {dn}: {e}")
-        raise HTTPException(status_code=500, detail="Failed to retrieve password expiry information")
+        raise InternalServerError("Failed to retrieve password expiry information")
 
 
 def set_password_via_powershell(user_dn: str, password: str) -> bool:
@@ -1718,7 +1690,7 @@ async def get_user_groups(dn: str, token_data = Depends(verify_token)):
         )
         
         if not results:
-            raise HTTPException(status_code=404, detail="User not found")
+            raise NotFoundError("User", dn)
         
         _, attrs = results[0]
         member_of = attrs.get("memberOf", [])
@@ -1737,11 +1709,11 @@ async def get_user_groups(dn: str, token_data = Depends(verify_token)):
         
         return groups
         
-    except HTTPException:
+    except (NotFoundError, InternalServerError, ValidationError):
         raise
     except Exception as e:
         logger.error(f"Error getting groups for {dn}: {e}")
-        raise HTTPException(status_code=500, detail="Failed to retrieve user groups")
+        raise InternalServerError("Failed to retrieve user groups")
 
 
 @router.get("/{dn}/permissions", response_model=List[Dict[str, Any]])
@@ -1757,7 +1729,7 @@ async def get_user_permissions(dn: str, token_data = Depends(verify_token)):
         )
         
         if not results:
-            raise HTTPException(status_code=404, detail="User not found")
+            raise NotFoundError("User", dn)
         
         _, attrs = results[0]
         member_of = attrs.get("memberOf", [])
@@ -1815,8 +1787,8 @@ async def get_user_permissions(dn: str, token_data = Depends(verify_token)):
         
         return permissions
         
-    except HTTPException:
+    except (NotFoundError, InternalServerError, ValidationError):
         raise
     except Exception as e:
         logger.error(f"Error getting permissions for {dn}: {e}")
-        raise HTTPException(status_code=500, detail="Failed to retrieve permissions")
+        raise InternalServerError("Failed to retrieve permissions")

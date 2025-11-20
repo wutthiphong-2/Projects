@@ -230,7 +230,12 @@ const UserManagement = () => {
     mobile: false,
     location: true,
     description: true,
-    status: false
+    status: false,
+    userPrincipalName: false,
+    manager: false,
+    lastLogon: false,
+    pwdLastSet: false,
+    accountExpires: false
   });
   const [isColumnSettingsVisible, setIsColumnSettingsVisible] = useState(false);
   const [currentPage, setCurrentPage] = useState(1);
@@ -502,6 +507,18 @@ const UserManagement = () => {
       // Load data
       const result = await userService.getUsers(params);
       const userData = result || [];
+      
+      // Debug: Check if accountExpires is in the data
+      if (process.env.NODE_ENV === 'development' && userData.length > 0) {
+        const sampleUser = userData[0];
+        console.log('Sample user data:', {
+          dn: sampleUser.dn,
+          sAMAccountName: sampleUser.sAMAccountName,
+          accountExpires: sampleUser.accountExpires,
+          hasAccountExpires: 'accountExpires' in sampleUser,
+          allKeys: Object.keys(sampleUser)
+        });
+      }
       
       setUsers(userData);
       await fetchDirectoryCounts();
@@ -1278,29 +1295,39 @@ const UserManagement = () => {
             <div>
               {userGroups.length > 0 ? (
                 <>
-                  {GROUP_DEFAULTS_CONFIG.sort.priorityOrder.map(category => {
-                    const categoryGroupsInUser = userGroups.filter(group => {
-                      let belongsToCategory = false;
-                      if (categorizedGroups[category]) {
-                        belongsToCategory = categorizedGroups[category].some(cg => cg.dn === group.dn);
+                  {/* Debug: Log groups data */}
+                  {process.env.NODE_ENV === 'development' && console.log('Groups Debug:', {
+                    userGroupsCount: userGroups.length,
+                    categorizedGroupsKeys: Object.keys(categorizedGroups),
+                    categorizedGroupsHasData: Object.values(categorizedGroups).some(cat => Array.isArray(cat) && cat.length > 0),
+                    categorizedGroups: categorizedGroups
+                  })}
+                  
+                  {/* Show categorized groups */}
+                  {Object.keys(categorizedGroups).length > 0 && Object.values(categorizedGroups).some(cat => Array.isArray(cat) && cat.length > 0) ? (
+                    GROUP_DEFAULTS_CONFIG.sort.priorityOrder.map(category => {
+                      const categoryGroupsInUser = userGroups.filter(group => {
+                        let belongsToCategory = false;
+                        if (categorizedGroups[category]) {
+                          belongsToCategory = categorizedGroups[category].some(cg => cg.dn === group.dn);
+                        }
+                        
+                        if (!belongsToCategory) return false;
+                        
+                        if (groupSearchText) {
+                          return group.cn.toLowerCase().includes(groupSearchText.toLowerCase());
+                        }
+                        
+                        if (groupCategoryFilter !== 'all' && category !== groupCategoryFilter) {
+                          return false;
+                        }
+                        
+                        return true;
+                      });
+                      
+                      if (GROUP_DEFAULTS_CONFIG.display.hideEmpty && categoryGroupsInUser.length === 0) {
+                        return null;
                       }
-                      
-                      if (!belongsToCategory) return false;
-                      
-                      if (groupSearchText) {
-                        return group.cn.toLowerCase().includes(groupSearchText.toLowerCase());
-                      }
-                      
-                      if (groupCategoryFilter !== 'all' && category !== groupCategoryFilter) {
-                        return false;
-                      }
-                      
-                      return true;
-                    });
-                    
-                    if (GROUP_DEFAULTS_CONFIG.display.hideEmpty && categoryGroupsInUser.length === 0) {
-                      return null;
-                    }
                     
                     const isExpanded = expandedCategories.has(category);
                     const itemsToShow = isExpanded ? categoryGroupsInUser : categoryGroupsInUser.slice(0, GROUP_DEFAULTS_CONFIG.display.itemsPerCategory);
@@ -1425,7 +1452,81 @@ const UserManagement = () => {
                         )}
                       </Card>
                     );
-                  })}
+                  })
+                  ) : (
+                    /* Fallback: Show all groups if categorizedGroups not loaded yet */
+                    <Card
+                      size="small"
+                      style={{
+                        marginBottom: 12,
+                        background: '#ffffff',
+                        border: '1px solid #e5e7eb',
+                        borderRadius: 8
+                      }}
+                      title={
+                        <Space>
+                          <Text strong style={{ fontSize: 13 }}>
+                            📦 All Groups ({userGroups.length})
+                          </Text>
+                        </Space>
+                      }
+                    >
+                      <List
+                        dataSource={userGroups.filter(group => {
+                          if (groupSearchText) {
+                            return group.cn.toLowerCase().includes(groupSearchText.toLowerCase());
+                          }
+                          return true;
+                        })}
+                        renderItem={(group) => (
+                          <List.Item 
+                            style={{ borderBottom: '1px solid #f3f4f6', padding: '12px 8px' }}
+                            actions={[
+                              <Popconfirm
+                                key="remove"
+                                title={`Remove from "${group.cn}"?`}
+                                description="Are you sure?"
+                                onConfirm={() => handleRemoveFromGroup(group.dn, group.cn)}
+                                okText="Yes"
+                                cancelText="No"
+                                okButtonProps={{ danger: true }}
+                              >
+                                <Button 
+                                  type="text" 
+                                  danger 
+                                  size="small"
+                                  icon={<DeleteOutlined />}
+                                >
+                                  Remove
+                                </Button>
+                              </Popconfirm>
+                            ]}
+                          >
+                            <List.Item.Meta
+                              avatar={
+                                <Avatar
+                                  icon={<TeamOutlined />}
+                                  style={{ background: '#fa8c16' }}
+                                />
+                              }
+                              title={<Text strong style={{ fontSize: 13 }}>{group.cn}</Text>}
+                              description={
+                                <Text
+                                  style={{
+                                    fontSize: 11,
+                                    color: '#9ca3af',
+                                    wordBreak: 'break-all'
+                                  }}
+                                >
+                                  {group.dn}
+                                </Text>
+                              }
+                            />
+                          </List.Item>
+                        )}
+                      />
+                    </Card>
+                  )}
                 </>
               ) : (
                 <Empty
@@ -2887,6 +2988,255 @@ const UserManagement = () => {
     </Tag>
   ), []);
 
+  const renderUserPrincipalNameCell = useCallback((value) => (
+    value ? (
+      <Tooltip title={value} placement="topLeft">
+        <Text
+          ellipsis
+          copyable={{ text: value, tooltips: ['คัดลอก UPN', 'คัดลอกแล้ว'] }}
+          className="copyable-text table-cell-text"
+          style={{ fontSize: 13, maxWidth: 200 }}
+        >
+          {value}
+        </Text>
+      </Tooltip>
+    ) : (
+      <Text type="secondary" style={{ fontSize: 12 }}>-</Text>
+    )
+  ), []);
+
+  const renderManagerCell = useCallback((value, record) => {
+    if (!value) {
+      return <Text type="secondary" style={{ fontSize: 12 }}>-</Text>;
+    }
+    
+    // Try to find manager in users list
+    const manager = users.find(u => u.dn === value);
+    const managerName = manager ? (manager.cn || manager.displayName || manager.sAMAccountName) : value.split(',')[0].replace('CN=', '');
+    
+    return (
+      <Tooltip title={value} placement="topLeft">
+        <Text
+          ellipsis
+          className="table-cell-text"
+          style={{ fontSize: 13, maxWidth: 200 }}
+        >
+          {managerName}
+        </Text>
+      </Tooltip>
+    );
+  }, [users]);
+
+  const renderLastLogonCell = useCallback((value) => {
+    if (!value || value === '0' || value === '') {
+      return (
+        <Tooltip title="ไม่เคยเข้าสู่ระบบ">
+          <Tag color="default" style={{ fontSize: 12 }}>
+            <HistoryOutlined style={{ marginRight: 4 }} />
+            ไม่เคยเข้าสู่ระบบ
+          </Tag>
+        </Tooltip>
+      );
+    }
+    
+    try {
+      // Handle ISO string format
+      const logonDate = dayjs(value);
+      if (!logonDate.isValid()) {
+        return <Text type="secondary" style={{ fontSize: 12 }}>-</Text>;
+      }
+      
+      const now = dayjs();
+      const daysAgo = now.diff(logonDate, 'day');
+      const hoursAgo = now.diff(logonDate, 'hour');
+      const minutesAgo = now.diff(logonDate, 'minute');
+      
+      let timeAgoText = '';
+      if (daysAgo > 0) {
+        timeAgoText = `${daysAgo} วันที่แล้ว`;
+      } else if (hoursAgo > 0) {
+        timeAgoText = `${hoursAgo} ชั่วโมงที่แล้ว`;
+      } else if (minutesAgo > 0) {
+        timeAgoText = `${minutesAgo} นาทีที่แล้ว`;
+      } else {
+        timeAgoText = 'เมื่อสักครู่';
+      }
+      
+      // Color based on recency
+      let tagColor = 'default';
+      if (daysAgo > 90) tagColor = 'error';
+      else if (daysAgo > 30) tagColor = 'warning';
+      else if (daysAgo > 7) tagColor = 'processing';
+      else tagColor = 'success';
+      
+      return (
+        <Tooltip title={`เข้าสู่ระบบล่าสุด: ${logonDate.format('DD/MM/YYYY HH:mm')} (${timeAgoText})`}>
+          <div>
+            <Text style={{ fontSize: 13, display: 'block', marginBottom: 4 }}>
+              {logonDate.format('DD/MM/YYYY')}
+            </Text>
+            <Tag color={tagColor} style={{ fontSize: 11 }}>
+              {timeAgoText}
+            </Tag>
+          </div>
+        </Tooltip>
+      );
+    } catch (error) {
+      console.error('Error parsing lastLogon:', error, value);
+      return <Text type="secondary" style={{ fontSize: 12 }}>-</Text>;
+    }
+  }, []);
+
+  const renderPasswordLastSetCell = useCallback((value) => {
+    if (!value || value === '0' || value === '') {
+      return (
+        <Tooltip title="ยังไม่เคยตั้งรหัสผ่าน">
+          <Tag color="default" style={{ fontSize: 12 }}>
+            <KeyOutlined style={{ marginRight: 4 }} />
+            ยังไม่เคยตั้ง
+          </Tag>
+        </Tooltip>
+      );
+    }
+    
+    try {
+      // Handle ISO string format
+      const pwdDate = dayjs(value);
+      if (!pwdDate.isValid()) {
+        return <Text type="secondary" style={{ fontSize: 12 }}>-</Text>;
+      }
+      
+      const now = dayjs();
+      const daysAgo = now.diff(pwdDate, 'day');
+      
+      // Color based on password age
+      let tagColor = 'default';
+      if (daysAgo > 180) tagColor = 'error'; // > 6 months
+      else if (daysAgo > 90) tagColor = 'warning'; // > 3 months
+      else if (daysAgo > 30) tagColor = 'processing'; // > 1 month
+      else tagColor = 'success'; // < 1 month
+      
+      return (
+        <Tooltip title={`ตั้งรหัสผ่านเมื่อ: ${pwdDate.format('DD/MM/YYYY HH:mm')} (${daysAgo} วันที่แล้ว)`}>
+          <div>
+            <Text style={{ fontSize: 13, display: 'block', marginBottom: 4 }}>
+              {pwdDate.format('DD/MM/YYYY')}
+            </Text>
+            <Tag color={tagColor} style={{ fontSize: 11 }}>
+              {daysAgo} วันที่แล้ว
+            </Tag>
+          </div>
+        </Tooltip>
+      );
+    } catch (error) {
+      console.error('Error parsing pwdLastSet:', error, value);
+      return <Text type="secondary" style={{ fontSize: 12 }}>-</Text>;
+    }
+  }, []);
+
+  const renderAccountExpiresCell = useCallback((value, record) => {
+    // Debug: Log the value to see what we're getting
+    if (process.env.NODE_ENV === 'development') {
+      console.log('renderAccountExpiresCell - value:', value, 'type:', typeof value, 'record.dn:', record?.dn);
+    }
+    
+    // Check for null, undefined, empty string, '0', or falsy values
+    if (!value || value === '0' || value === '' || value === null || value === undefined) {
+      return (
+        <Tooltip title="บัญชีไม่มีวันหมดอายุ">
+          <Tag color="default" style={{ fontSize: 12 }}>
+            <CheckCircleOutlined style={{ marginRight: 4 }} />
+            ไม่หมดอายุ
+          </Tag>
+        </Tooltip>
+      );
+    }
+    
+    try {
+      // Handle ISO string format
+      const expiryDate = dayjs(value);
+      if (!expiryDate.isValid()) {
+        console.warn('Invalid accountExpires date:', value, 'for user:', record?.dn);
+        return (
+          <Tooltip title={`Invalid date format: ${value}`}>
+            <Text type="secondary" style={{ fontSize: 12 }}>-</Text>
+          </Tooltip>
+        );
+      }
+      
+      const now = dayjs();
+      const daysRemaining = expiryDate.diff(now, 'day');
+      const hoursRemaining = expiryDate.diff(now, 'hour');
+      
+      // Check if expired
+      if (daysRemaining < 0) {
+        const daysExpired = Math.abs(daysRemaining);
+        return (
+          <Tooltip title={`หมดอายุเมื่อ: ${expiryDate.format('DD/MM/YYYY HH:mm')} (${daysExpired} วันที่แล้ว)`}>
+            <div>
+              <Text style={{ fontSize: 13, display: 'block', marginBottom: 4, color: '#ef4444' }}>
+                {expiryDate.format('DD/MM/YYYY')}
+              </Text>
+              <Tag color="error" style={{ fontSize: 11 }}>
+                <CloseCircleOutlined style={{ marginRight: 4 }} />
+                หมดอายุแล้ว ({daysExpired} วัน)
+              </Tag>
+            </div>
+          </Tooltip>
+        );
+      }
+      
+      // Check if expiring soon
+      if (daysRemaining <= 7) {
+        return (
+          <Tooltip title={`จะหมดอายุ: ${expiryDate.format('DD/MM/YYYY HH:mm')} (เหลือ ${daysRemaining} วัน)`}>
+            <div>
+              <Text style={{ fontSize: 13, display: 'block', marginBottom: 4, color: '#f59e0b' }}>
+                {expiryDate.format('DD/MM/YYYY')}
+              </Text>
+              <Tag color="error" style={{ fontSize: 11 }}>
+                <ClockCircleOutlined style={{ marginRight: 4 }} />
+                ใกล้หมดอายุ ({daysRemaining} วัน)
+              </Tag>
+            </div>
+          </Tooltip>
+        );
+      } else if (daysRemaining <= 30) {
+        return (
+          <Tooltip title={`จะหมดอายุ: ${expiryDate.format('DD/MM/YYYY HH:mm')} (เหลือ ${daysRemaining} วัน)`}>
+            <div>
+              <Text style={{ fontSize: 13, display: 'block', marginBottom: 4 }}>
+                {expiryDate.format('DD/MM/YYYY')}
+              </Text>
+              <Tag color="warning" style={{ fontSize: 11 }}>
+                <ClockCircleOutlined style={{ marginRight: 4 }} />
+                เหลือ {daysRemaining} วัน
+              </Tag>
+            </div>
+          </Tooltip>
+        );
+      } else {
+        // Valid, not expiring soon
+        return (
+          <Tooltip title={`จะหมดอายุ: ${expiryDate.format('DD/MM/YYYY HH:mm')} (เหลือ ${daysRemaining} วัน)`}>
+            <div>
+              <Text style={{ fontSize: 13, display: 'block', marginBottom: 4 }}>
+                {expiryDate.format('DD/MM/YYYY')}
+              </Text>
+              <Tag color="success" style={{ fontSize: 11 }}>
+                <CheckCircleOutlined style={{ marginRight: 4 }} />
+                เหลือ {daysRemaining} วัน
+              </Tag>
+            </div>
+          </Tooltip>
+        );
+      }
+    } catch (error) {
+      console.error('Error parsing accountExpires:', error, value);
+      return <Text type="secondary" style={{ fontSize: 12 }}>-</Text>;
+    }
+  }, []);
+
 
   const renderActionsCell = useCallback((_, record) => {
     const dropdownKey = `dropdown-${record.dn}`;
@@ -3192,6 +3542,111 @@ const UserManagement = () => {
       render: renderStatusCell
     },
     {
+      title: (
+        <Tooltip title="User Principal Name (UPN)">
+          <Space size={4}>
+            <GlobalOutlined style={{ fontSize: 14, color: '#6b7280' }} />
+            <span>UPN</span>
+          </Space>
+        </Tooltip>
+      ),
+      dataIndex: 'userPrincipalName',
+      key: 'userPrincipalName',
+      width: 220,
+      className: 'col-upn',
+      responsive: ['lg'],
+      ellipsis: true,
+      sorter: (a, b) => (a.userPrincipalName || '').localeCompare(b.userPrincipalName || ''),
+      sortOrder: sortedInfo.columnKey === 'userPrincipalName' ? sortedInfo.order : null,
+      render: renderUserPrincipalNameCell
+    },
+    {
+      title: (
+        <Tooltip title="Manager (หัวหน้า)">
+          <Space size={4}>
+            <UserSwitchOutlined style={{ fontSize: 14, color: '#6b7280' }} />
+            <span>Manager</span>
+          </Space>
+        </Tooltip>
+      ),
+      dataIndex: 'manager',
+      key: 'manager',
+      width: 200,
+      className: 'col-manager',
+      responsive: ['lg'],
+      ellipsis: true,
+      render: renderManagerCell
+    },
+    {
+      title: (
+        <Tooltip title="เข้าสู่ระบบล่าสุด">
+          <Space size={4}>
+            <HistoryOutlined style={{ fontSize: 14, color: '#6b7280' }} />
+            <span>เข้าสู่ระบบล่าสุด</span>
+          </Space>
+        </Tooltip>
+      ),
+      dataIndex: 'lastLogon',
+      key: 'lastLogon',
+      width: 200,
+      className: 'col-last-logon',
+      responsive: ['lg'],
+      sorter: (a, b) => {
+        if (!a.lastLogon && !b.lastLogon) return 0;
+        if (!a.lastLogon || a.lastLogon === '0') return 1;
+        if (!b.lastLogon || b.lastLogon === '0') return -1;
+        return new Date(a.lastLogon) - new Date(b.lastLogon);
+      },
+      sortOrder: sortedInfo.columnKey === 'lastLogon' ? sortedInfo.order : null,
+      render: renderLastLogonCell
+    },
+    {
+      title: (
+        <Tooltip title="รหัสผ่านล่าสุด">
+          <Space size={4}>
+            <KeyOutlined style={{ fontSize: 14, color: '#6b7280' }} />
+            <span>รหัสผ่านล่าสุด</span>
+          </Space>
+        </Tooltip>
+      ),
+      dataIndex: 'pwdLastSet',
+      key: 'pwdLastSet',
+      width: 200,
+      className: 'col-pwd-last-set',
+      responsive: ['lg'],
+      sorter: (a, b) => {
+        if (!a.pwdLastSet && !b.pwdLastSet) return 0;
+        if (!a.pwdLastSet || a.pwdLastSet === '0') return 1;
+        if (!b.pwdLastSet || b.pwdLastSet === '0') return -1;
+        return new Date(a.pwdLastSet) - new Date(b.pwdLastSet);
+      },
+      sortOrder: sortedInfo.columnKey === 'pwdLastSet' ? sortedInfo.order : null,
+      render: renderPasswordLastSetCell
+    },
+    {
+      title: (
+        <Tooltip title="วันหมดอายุบัญชี">
+          <Space size={4}>
+            <ClockCircleOutlined style={{ fontSize: 14, color: '#6b7280' }} />
+            <span>หมดอายุ</span>
+          </Space>
+        </Tooltip>
+      ),
+      dataIndex: 'accountExpires',
+      key: 'accountExpires',
+      width: 200,
+      className: 'col-account-expires',
+      responsive: ['lg'],
+      sorter: (a, b) => {
+        if (!a.accountExpires && !b.accountExpires) return 0;
+        if (!a.accountExpires || a.accountExpires === '0' || a.accountExpires === null) return 1;
+        if (!b.accountExpires || b.accountExpires === '0' || b.accountExpires === null) return -1;
+        return new Date(a.accountExpires) - new Date(b.accountExpires);
+      },
+      sortOrder: sortedInfo.columnKey === 'accountExpires' ? sortedInfo.order : null,
+      render: (value, record) => renderAccountExpiresCell(value, record)
+    },
+    {
       title: 'Actions',
       key: 'actions',
       fixed: (screens.md || screens.lg || screens.xl) ? 'right' : undefined,
@@ -3199,7 +3654,7 @@ const UserManagement = () => {
       className: 'col-actions',
       render: renderActionsCell
     }
-  ], [renderDisplayName, renderUsernameCell, renderTextCell, renderDepartmentTag, renderEmployeeIdCell, renderStatusCell, renderActionsCell, screens.md, screens.lg, screens.xl, sortedInfo]);
+  ], [renderDisplayName, renderUsernameCell, renderTextCell, renderDepartmentTag, renderEmployeeIdCell, renderStatusCell, renderUserPrincipalNameCell, renderManagerCell, renderLastLogonCell, renderPasswordLastSetCell, renderAccountExpiresCell, renderActionsCell, screens.md, screens.lg, screens.xl, sortedInfo, users]);
 
   // ⚡ Filter columns based on visibility settings
   const columns = allColumns.filter(col => {
@@ -5276,6 +5731,111 @@ const UserManagement = () => {
           <Empty description="ไม่มี Activity ล่าสุด" />
         )}
       </Drawer>
+
+      {/* Column Settings Modal */}
+      <Modal
+        title={
+          <Space>
+            <TagOutlined />
+            <span>ตั้งค่าคอลัมน์</span>
+          </Space>
+        }
+        open={isColumnSettingsVisible}
+        onCancel={() => setIsColumnSettingsVisible(false)}
+        footer={[
+          <Button key="reset" onClick={() => {
+            setVisibleColumns({
+              user: true,
+              sAMAccountName: true,
+              mail: true,
+              title: true,
+              department: true,
+              company: true,
+              employeeID: false,
+              phone: false,
+              mobile: false,
+              location: true,
+              description: true,
+              status: false,
+              userPrincipalName: false,
+              manager: false,
+              lastLogon: false,
+              pwdLastSet: false,
+              accountExpires: false
+            });
+          }}>
+            รีเซ็ต
+          </Button>,
+          <Button key="cancel" onClick={() => setIsColumnSettingsVisible(false)}>
+            ยกเลิก
+          </Button>,
+          <Button 
+            key="ok" 
+            type="primary" 
+            onClick={() => setIsColumnSettingsVisible(false)}
+            style={{ borderRadius: 8 }}
+          >
+            ตกลง
+          </Button>
+        ]}
+        width={600}
+        destroyOnClose
+      >
+        <div style={{ padding: '8px 0' }}>
+          <Text type="secondary" style={{ fontSize: 13, marginBottom: 16, display: 'block' }}>
+            เลือกคอลัมน์ที่ต้องการแสดงในตาราง
+          </Text>
+          <Divider style={{ margin: '16px 0' }} />
+          <Space direction="vertical" style={{ width: '100%' }} size="middle">
+            {allColumns && allColumns.length > 0 ? allColumns
+              .filter(col => col.key !== 'actions') // ไม่แสดง Actions column
+              .map(col => {
+                const columnLabels = {
+                  user: 'Display Name',
+                  sAMAccountName: 'Username',
+                  mail: 'Email',
+                  title: 'Job Title',
+                  department: 'Department',
+                  company: 'Company',
+                  employeeID: 'Employee ID',
+                  phone: 'Phone',
+                  mobile: 'Mobile',
+                  location: 'Work Location',
+                  description: 'Description',
+                  status: 'Status',
+                  userPrincipalName: 'UPN (User Principal Name)',
+                  manager: 'Manager',
+                  lastLogon: 'เข้าสู่ระบบล่าสุด (Last Login)',
+                  pwdLastSet: 'รหัสผ่านล่าสุด (Last Password Set)',
+                  accountExpires: 'หมดอายุ (Account Expires)'
+                };
+                
+                return (
+                  <div key={col.key} style={{ 
+                    display: 'flex', 
+                    justifyContent: 'space-between', 
+                    alignItems: 'center',
+                    padding: '8px 0',
+                    borderBottom: '1px solid #f0f0f0'
+                  }}>
+                    <Text style={{ fontSize: 14 }}>{columnLabels[col.key] || col.key}</Text>
+                    <Switch
+                      checked={visibleColumns[col.key] !== false}
+                      onChange={(checked) => {
+                        setVisibleColumns(prev => ({
+                          ...prev,
+                          [col.key]: checked
+                        }));
+                      }}
+                    />
+                  </div>
+                );
+              }) : (
+                <Empty description="ไม่พบคอลัมน์" />
+              )}
+          </Space>
+        </div>
+      </Modal>
 
       {/* Level 3: Filter Preset Modal */}
       <Modal

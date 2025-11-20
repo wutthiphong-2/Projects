@@ -1,5 +1,4 @@
-from fastapi import APIRouter, HTTPException, Depends, status, Query, Request
-from pydantic import BaseModel
+from fastapi import APIRouter, Depends, Query, Request
 from typing import List, Optional, Dict, Any
 from ldap3 import MODIFY_REPLACE, MODIFY_ADD, MODIFY_DELETE
 import logging
@@ -9,53 +8,37 @@ from pathlib import Path
 
 from app.core.config import settings
 from app.core.database import get_ldap_connection
-from app.routers.auth import verify_token, verify_token_or_api_key, get_client_ip
+from app.core.exceptions import NotFoundError, InternalServerError, ValidationError
+from app.routers.auth import verify_token, get_client_ip
 from app.core.activity_log import activity_log_manager
 from app.core.cache import cached_response, invalidate_cache
+from datetime import datetime, timedelta, timezone
+from app.schemas.groups import (
+    GroupCreate, GroupUpdate, GroupResponse, GroupMemberAdd, GroupMemberRemove,
+    GroupMemberResponse, GroupCreateResponse, GroupUpdateResponse, GroupDeleteResponse,
+    GroupMemberAddResponse, GroupMemberRemoveResponse, CategorizedGroupsResponse
+)
+from app.schemas.ous import DefaultGroupsByOUResponse
 
 router = APIRouter()
 logger = logging.getLogger(__name__)
 
-# Pydantic models
-class GroupCreate(BaseModel):
-    cn: str
-    sAMAccountName: Optional[str] = None  # Pre-Windows 2000 group name
-    description: Optional[str] = None
-    ou_dn: Optional[str] = None  # OU where group will be created
-    groupType: Optional[str] = "Security"  # Security or Distribution
-    groupScope: Optional[str] = "Global"  # Global, Domain Local, or Universal
-    mail: Optional[str] = None  # Email address (for Distribution groups)
-    info: Optional[str] = None  # Notes
-    managedBy: Optional[str] = None  # DN of user who manages this group
-
-class GroupResponse(BaseModel):
-    dn: str
-    cn: str
-    description: str
-    member: List[str]
-    memberCount: int = 0
-    groupType: Optional[str] = None
-    groupScope: Optional[str] = None
-    managedBy: Optional[str] = None
-    ouPath: Optional[str] = None  # OU path for tree structure
-    parentOU: Optional[str] = None  # Parent OU name
-
-class GroupUpdate(BaseModel):
-    description: Optional[str] = None
-
-class GroupMemberAdd(BaseModel):
-    user_dn: str
-
-class GroupMemberRemove(BaseModel):
-    user_dn: str
-
-class GroupMemberResponse(BaseModel):
-    dn: str
-    cn: str
-    sAMAccountName: Optional[str] = None
-    mail: str
-    department: Optional[str] = None
-    isEnabled: bool
+# PSO (Password Settings Object) attributes
+PSO_ATTRIBUTES = [
+    "cn",
+    "description",
+    "msDS-MaximumPasswordAge",  # Maximum password age (in days, stored as negative seconds)
+    "msDS-MinimumPasswordAge",  # Minimum password age
+    "msDS-PasswordSettingsPrecedence",  # Precedence (lower = higher priority)
+    "msDS-PasswordComplexityEnabled",  # Password complexity required
+    "msDS-PasswordReversibleEncryptionEnabled",  # Store password using reversible encryption
+    "msDS-MinimumPasswordLength",  # Minimum password length
+    "msDS-PasswordHistoryLength",  # Password history length
+    "msDS-LockoutThreshold",  # Account lockout threshold
+    "msDS-LockoutObservationWindow",  # Lockout observation window
+    "msDS-LockoutDuration",  # Lockout duration
+    "msDS-PSOAppliesTo"  # Groups/users this PSO applies to
+]
 
 # Helper functions
 def format_group_data(entry: tuple) -> Dict[str, Any]:
@@ -172,7 +155,7 @@ def format_user_data(entry: tuple) -> Dict[str, Any]:
 @router.get("/", response_model=List[GroupResponse])
 @cached_response(ttl_seconds=600)  # ⚡ Cache for 10 minutes
 async def get_groups(
-    token_data = Depends(verify_token_or_api_key),
+    token_data = Depends(verify_token),
     q: str | None = Query(default=None, description="Search text for cn/description"),
     page: int = Query(default=1, ge=1),
     page_size: int = Query(default=50, ge=1, le=50000),  # Increased to 50000
@@ -205,7 +188,7 @@ async def get_groups(
         )
         
         if results is None:
-            raise HTTPException(status_code=500, detail="Failed to search groups")
+            raise InternalServerError("Failed to search groups")
         
         logger.info(f"✅ LDAP returned {len(results)} groups from AD")
         
@@ -227,9 +210,9 @@ async def get_groups(
         
     except Exception as e:
         logger.error(f"Error getting groups: {e}")
-        raise HTTPException(status_code=500, detail="Failed to retrieve groups")
+        raise InternalServerError("Failed to retrieve groups")
 
-@router.get("/categorized", response_model=Dict[str, Any])
+@router.get("/categorized", response_model=CategorizedGroupsResponse)
 async def get_categorized_groups(token_data = Depends(verify_token)):
     """Get groups organized by category for user creation form"""
     ldap_conn = get_ldap_connection()
@@ -244,7 +227,7 @@ async def get_categorized_groups(token_data = Depends(verify_token)):
         )
         
         if results is None:
-            raise HTTPException(status_code=500, detail="Failed to search groups")
+            raise InternalServerError("Failed to search groups")
         
         logger.info(f"🔍 Categorizing {len(results)} groups...")
         
@@ -317,14 +300,14 @@ async def get_categorized_groups(token_data = Depends(verify_token)):
         for category, groups in categories.items():
             logger.info(f"  📁 {category}: {len(groups)} groups")
         
-        return {
-            "categories": categories,
-            "totalGroups": len(results)
-        }
+        return CategorizedGroupsResponse(
+            categories=categories,
+            totalGroups=len(results)
+        )
         
     except Exception as e:
         logger.error(f"Error getting categorized groups: {e}")
-        raise HTTPException(status_code=500, detail="Failed to retrieve categorized groups")
+        raise InternalServerError("Failed to retrieve categorized groups")
 
 @router.get("/{dn}", response_model=GroupResponse)
 async def get_group(dn: str, token_data = Depends(verify_token)):
@@ -339,16 +322,16 @@ async def get_group(dn: str, token_data = Depends(verify_token)):
         )
         
         if not results:
-            raise HTTPException(status_code=404, detail="Group not found")
+            raise NotFoundError("Group", dn)
         
         return format_group_data(results[0])
         
     except Exception as e:
         logger.error(f"Error getting group {dn}: {e}")
-        raise HTTPException(status_code=500, detail="Failed to retrieve group")
+        raise InternalServerError("Failed to retrieve group")
 
-@router.post("/", response_model=Dict[str, Any])
-async def create_group(group_data: GroupCreate, token_data = Depends(verify_token_or_api_key)):
+@router.post("/", response_model=GroupCreateResponse)
+async def create_group(group_data: GroupCreate, token_data = Depends(verify_token)):
     """Create new group in Active Directory with full AD support"""
     ldap_conn = get_ldap_connection()
     
@@ -418,17 +401,17 @@ async def create_group(group_data: GroupCreate, token_data = Depends(verify_toke
         if not ldap_conn.add_entry(group_dn, group_attrs):
             error_msg = ldap_conn.connection.last_error if ldap_conn.connection else "Unknown error"
             logger.error(f"❌ Failed to create group: {error_msg}")
-            raise HTTPException(status_code=500, detail=f"Failed to create group: {error_msg}")
+            raise InternalServerError(f"Failed to create group: {error_msg}")
         
         logger.info(f"✅ Group created successfully: {group_dn}")
         
         # ⚡ Invalidate cache after creation
         invalidate_cache("get_groups")
         
-        return {
-            "success": True,
-            "message": "Group created successfully",
-            "group": {
+        return GroupCreateResponse(
+            success=True,
+            message="Group created successfully",
+            group={
                 "dn": group_dn,
                 "cn": group_data.cn,
                 "sAMAccountName": sam_account_name,
@@ -436,13 +419,15 @@ async def create_group(group_data: GroupCreate, token_data = Depends(verify_toke
                 "groupType": group_data.groupType,
                 "groupScope": group_data.groupScope
             }
-        }
+        )
         
+    except (NotFoundError, InternalServerError, ValidationError):
+        raise
     except Exception as e:
         logger.error(f"❌ Error creating group: {e}")
-        raise HTTPException(status_code=500, detail=str(e))
+        raise InternalServerError(str(e))
 
-@router.put("/{dn}", response_model=Dict[str, Any])
+@router.put("/{dn}", response_model=GroupUpdateResponse)
 async def update_group(dn: str, group_data: GroupUpdate, token_data = Depends(verify_token)):
     """Update group in Active Directory"""
     ldap_conn = get_ldap_connection()
@@ -454,31 +439,33 @@ async def update_group(dn: str, group_data: GroupUpdate, token_data = Depends(ve
             modifications.append((MODIFY_REPLACE, "description", [group_data.description]))
 
         if not modifications:
-            raise HTTPException(status_code=400, detail="No fields to update")
+            raise ValidationError("No fields to update")
 
         if not ldap_conn.modify_entry(dn, modifications):
-            raise HTTPException(status_code=500, detail="Failed to update group")
+            raise InternalServerError("Failed to update group")
         
         # ⚡ Invalidate cache after update
         invalidate_cache("get_groups")
         
-        return {
-            "success": True,
-            "message": "Group updated successfully"
-        }
+        return GroupUpdateResponse(
+            success=True,
+            message="Group updated successfully"
+        )
         
+    except (NotFoundError, InternalServerError, ValidationError):
+        raise
     except Exception as e:
         logger.error(f"Error updating group {dn}: {e}")
-        raise HTTPException(status_code=500, detail="Failed to update group")
+        raise InternalServerError("Failed to update group")
 
-@router.delete("/{dn}", response_model=Dict[str, Any])
+@router.delete("/{dn}", response_model=GroupDeleteResponse)
 async def delete_group(dn: str, token_data = Depends(verify_token)):
     """Delete group from Active Directory"""
     ldap_conn = get_ldap_connection()
     
     try:
         if not ldap_conn.delete_entry(dn):
-            raise HTTPException(status_code=500, detail="Failed to delete group")
+            raise InternalServerError("Failed to delete group")
         
         # ⚡ Invalidate cache after deletion
         invalidate_cache("get_groups")
@@ -488,9 +475,11 @@ async def delete_group(dn: str, token_data = Depends(verify_token)):
             "message": "Group deleted successfully"
         }
         
+    except (NotFoundError, InternalServerError, ValidationError):
+        raise
     except Exception as e:
         logger.error(f"Error deleting group {dn}: {e}")
-        raise HTTPException(status_code=500, detail="Failed to delete group")
+        raise InternalServerError("Failed to delete group")
 
 # Group Member Management Endpoints
 @router.get("/{group_dn}/members", response_model=List[GroupMemberResponse])
@@ -507,7 +496,7 @@ async def get_group_members(group_dn: str, token_data = Depends(verify_token)):
         )
         
         if not group_results:
-            raise HTTPException(status_code=404, detail="Group not found")
+            raise NotFoundError("Group", dn)
         
         group_entry = group_results[0]
         member_dns = group_entry[1].get("member", [])
@@ -543,9 +532,9 @@ async def get_group_members(group_dn: str, token_data = Depends(verify_token)):
         
     except Exception as e:
         logger.error(f"Error getting group members for {group_dn}: {e}")
-        raise HTTPException(status_code=500, detail="Failed to retrieve group members")
+        raise InternalServerError("Failed to retrieve group members")
 
-@router.post("/{group_dn}/members", response_model=Dict[str, Any])
+@router.post("/{group_dn}/members", response_model=GroupMemberAddResponse)
 async def add_group_member(group_dn: str, member_data: GroupMemberAdd, request: Request, token_data = Depends(verify_token)):
     """Add a user to a group and verify memberOf is updated in AD"""
     ldap_conn = get_ldap_connection()
@@ -561,7 +550,7 @@ async def add_group_member(group_dn: str, member_data: GroupMemberAdd, request: 
         )
         
         if not user_results:
-            raise HTTPException(status_code=404, detail="User not found")
+            raise NotFoundError("User", member_data.user_dn)
         
         user_cn = user_results[0][1].get("cn", ["Unknown"])[0]
         user_sam = user_results[0][1].get("sAMAccountName", ["Unknown"])[0]
@@ -573,15 +562,15 @@ async def add_group_member(group_dn: str, member_data: GroupMemberAdd, request: 
         if group_dn in old_member_of:
             logger.info(f"User {user_sam} is already a member of group {group_dn}. Returning success (idempotent operation).")
             group_cn = group_dn.split(',')[0].replace('CN=', '')
-            return {
-                "success": True,
-                "message": f"User {user_sam} is already a member of this group.",
-                "user_dn": member_data.user_dn,
-                "user_cn": user_cn,
-                "groups_before": len(old_member_of),
-                "groups_after": len(old_member_of),
-                "already_member": True
-            }
+            return GroupMemberAddResponse(
+                success=True,
+                message=f"User {user_sam} is already a member of this group.",
+                user_dn=member_data.user_dn,
+                user_cn=user_cn,
+                groups_before=len(old_member_of),
+                groups_after=len(old_member_of),
+                already_member=True
+            )
         
         # Add user to group by modifying the group's member attribute
         modifications = [(MODIFY_ADD, "member", [member_data.user_dn])]
@@ -607,19 +596,19 @@ async def add_group_member(group_dn: str, member_data: GroupMemberAdd, request: 
                     if group_dn in current_member_of:
                         logger.info(f"Verified: User {user_sam} is already a member. Returning success.")
                         group_cn = group_dn.split(',')[0].replace('CN=', '')
-                        return {
-                            "success": True,
-                            "message": f"User {user_sam} is already a member of this group.",
-                            "user_dn": member_data.user_dn,
-                            "user_cn": user_cn,
-                            "groups_before": len(old_member_of),
-                            "groups_after": len(current_member_of),
-                            "already_member": True
-                        }
+                        return GroupMemberAddResponse(
+                            success=True,
+                            message=f"User {user_sam} is already a member of this group.",
+                            user_dn=member_data.user_dn,
+                            user_cn=user_cn,
+                            groups_before=len(old_member_of),
+                            groups_after=len(current_member_of),
+                            already_member=True
+                        )
             
             # If not an entryAlreadyExists error, raise the error
             logger.error(f"Failed to add member: {error_msg}")
-            raise HTTPException(status_code=500, detail=f"Failed to add member to group: {error_msg}")
+            raise InternalServerError(f"Failed to add member to group: {error_msg}")
         
         logger.info(f"Successfully modified group {group_dn}")
         
@@ -639,6 +628,49 @@ async def add_group_member(group_dn: str, member_data: GroupMemberAdd, request: 
             # Check if the group DN is in memberOf
             if group_dn in new_member_of:
                 logger.info(f"Verified: memberOf attribute updated in AD for {user_sam}")
+                
+                # ⚡ Auto-update accountExpires for PSO-OU-90Days group
+                group_cn = group_dn.split(',')[0].replace('CN=', '')
+                if group_cn == "PSO-OU-90Days":
+                    try:
+                        # Get user's pwdLastSet (password last set date)
+                        user_pwd_results = ldap_conn.search(
+                            member_data.user_dn,
+                            "(objectClass=user)",
+                            ["pwdLastSet"]
+                        )
+                        
+                        if user_pwd_results:
+                            pwd_last_set_raw = user_pwd_results[0][1].get("pwdLastSet", [None])[0]
+                            
+                            if pwd_last_set_raw and pwd_last_set_raw != "0":
+                                # Import helper functions from users router
+                                from app.routers.users import ad_timestamp_to_datetime, datetime_to_filetime
+                                
+                                # Parse pwdLastSet to datetime
+                                pwd_last_set_dt = ad_timestamp_to_datetime(pwd_last_set_raw)
+                                
+                                if pwd_last_set_dt:
+                                    # Calculate expiration: pwdLastSet + 90 days
+                                    expiry_date = pwd_last_set_dt + timedelta(days=90)
+                                    
+                                    # Convert to Windows FILETIME format
+                                    filetime_str = datetime_to_filetime(expiry_date)
+                                    
+                                    # Update accountExpires attribute
+                                    user_modifications = [(MODIFY_REPLACE, "accountExpires", [filetime_str])]
+                                    if ldap_conn.modify_entry(member_data.user_dn, user_modifications):
+                                        logger.info(f"✅ Updated accountExpires to {expiry_date.strftime('%Y-%m-%d')} (90 days from pwdLastSet {pwd_last_set_dt.strftime('%Y-%m-%d')}) for user {user_sam}")
+                                    else:
+                                        logger.warning(f"⚠️ Failed to update accountExpires for user {user_sam}: {ldap_conn.connection.last_error if ldap_conn.connection else 'Unknown error'}")
+                                else:
+                                    logger.warning(f"⚠️ Could not parse pwdLastSet for user {user_sam}, skipping accountExpires update")
+                            else:
+                                logger.warning(f"⚠️ User {user_sam} has no pwdLastSet (password never set), skipping accountExpires update")
+                        else:
+                            logger.warning(f"⚠️ Could not fetch user data for {user_sam}, skipping accountExpires update")
+                    except Exception as exp_error:
+                        logger.error(f"Error updating accountExpires for user {user_sam}: {exp_error}")
             else:
                 logger.warning(f"Warning: memberOf not yet updated (may take a moment for AD replication)")
         
@@ -655,22 +687,22 @@ async def add_group_member(group_dn: str, member_data: GroupMemberAdd, request: 
             status="success"
         )
         
-        return {
-            "success": True,
-            "message": f"Member added to group successfully. User {user_sam} is now a member.",
-            "user_dn": member_data.user_dn,
-            "user_cn": user_cn,
-            "groups_before": len(old_member_of),
-            "groups_after": len(new_member_of) if user_results_after else len(old_member_of)
-        }
+        return GroupMemberAddResponse(
+            success=True,
+            message=f"Member added to group successfully. User {user_sam} is now a member.",
+            user_dn=member_data.user_dn,
+            user_cn=user_cn,
+            groups_before=len(old_member_of),
+            groups_after=len(new_member_of) if user_results_after else len(old_member_of)
+        )
         
-    except HTTPException:
+    except (NotFoundError, InternalServerError, ValidationError):
         raise
     except Exception as e:
         logger.error(f"Error adding member to group {group_dn}: {e}")
-        raise HTTPException(status_code=500, detail="Failed to add member to group")
+        raise InternalServerError("Failed to add member to group")
 
-@router.delete("/{group_dn}/members", response_model=Dict[str, Any])
+@router.delete("/{group_dn}/members", response_model=GroupMemberRemoveResponse)
 async def remove_group_member(group_dn: str, member_data: GroupMemberRemove, request: Request, token_data = Depends(verify_token)):
     """Remove a user from a group and verify memberOf is updated in AD"""
     ldap_conn = get_ldap_connection()
@@ -701,7 +733,7 @@ async def remove_group_member(group_dn: str, member_data: GroupMemberRemove, req
         if not ldap_conn.modify_entry(group_dn, modifications):
             error_msg = ldap_conn.connection.last_error if ldap_conn.connection else "Unknown error"
             logger.error(f"Failed to remove member: {error_msg}")
-            raise HTTPException(status_code=500, detail=f"Failed to remove member from group: {error_msg}")
+            raise InternalServerError(f"Failed to remove member from group: {error_msg}")
         
         logger.info(f"Successfully removed from group {group_dn}")
         
@@ -722,6 +754,19 @@ async def remove_group_member(group_dn: str, member_data: GroupMemberRemove, req
             # Check if the group DN is NOT in memberOf
             if group_dn not in new_member_of:
                 logger.info(f"Verified: memberOf attribute updated in AD for {user_sam}")
+                
+                # ⚡ Reset accountExpires when removed from PSO-OU-90Days group
+                group_cn = group_dn.split(',')[0].replace('CN=', '')
+                if group_cn == "PSO-OU-90Days":
+                    try:
+                        # Reset accountExpires to 0 (never expires)
+                        user_modifications = [(MODIFY_REPLACE, "accountExpires", ["0"])]
+                        if ldap_conn.modify_entry(member_data.user_dn, user_modifications):
+                            logger.info(f"✅ Reset accountExpires (never expires) for user {user_sam} after removing from PSO-OU-90Days")
+                        else:
+                            logger.warning(f"⚠️ Failed to reset accountExpires for user {user_sam}: {ldap_conn.connection.last_error if ldap_conn.connection else 'Unknown error'}")
+                    except Exception as exp_error:
+                        logger.error(f"Error resetting accountExpires for user {user_sam}: {exp_error}")
             else:
                 logger.warning(f"Warning: memberOf still shows group (may take a moment for AD replication)")
         
@@ -749,7 +794,7 @@ async def remove_group_member(group_dn: str, member_data: GroupMemberRemove, req
         
     except Exception as e:
         logger.error(f"Error removing member from group {group_dn}: {e}")
-        raise HTTPException(status_code=500, detail="Failed to remove member from group")
+        raise InternalServerError("Failed to remove member from group")
 
 @router.get("/{group_dn}/available-users", response_model=List[GroupMemberResponse])
 async def get_available_users_for_group(group_dn: str, token_data = Depends(verify_token)):
@@ -767,7 +812,7 @@ async def get_available_users_for_group(group_dn: str, token_data = Depends(veri
         )
         
         if not group_results:
-            raise HTTPException(status_code=404, detail="Group not found")
+            raise NotFoundError("Group", dn)
         
         group_entry = group_results[0]
         current_member_dns = set(group_entry[1].get("member", []))
@@ -819,10 +864,225 @@ async def get_available_users_for_group(group_dn: str, token_data = Depends(veri
         
     except Exception as e:
         logger.error(f"❌ Error getting available users for group {group_dn}: {e}")
-        raise HTTPException(status_code=500, detail="Failed to retrieve available users")
+        raise InternalServerError("Failed to retrieve available users")
 
+@router.get("/pso/{group_name}")
+async def get_pso_settings(group_name: str, token_data = Depends(verify_token)):
+    """Get Password Settings Object (PSO) configuration for a specific group"""
+    ldap_conn = get_ldap_connection()
+    
+    try:
+        # Search for PSO object in AD
+        # PSO objects are typically in CN=Password Settings Container,CN=System,<BASE_DN>
+        pso_base = f"CN=Password Settings Container,CN=System,{settings.LDAP_BASE_DN}"
+        
+        # Search for PSO by name
+        pso_filter = f"(&(objectClass=msDS-PasswordSettings)(cn={group_name}))"
+        
+        logger.info(f"Searching for PSO: {group_name} in {pso_base}")
+        
+        pso_results = ldap_conn.search(
+            pso_base,
+            pso_filter,
+            PSO_ATTRIBUTES
+        )
+        
+        if not pso_results or len(pso_results) == 0:
+            # Try searching in entire domain if not found in default location
+            logger.info(f"PSO not found in default location, searching entire domain...")
+            pso_results = ldap_conn.search(
+                settings.LDAP_BASE_DN,
+                pso_filter,
+                PSO_ATTRIBUTES
+            )
+        
+        if not pso_results or len(pso_results) == 0:
+            raise NotFoundError("PSO", group_name)
+        
+        pso_entry = pso_results[0]
+        dn, attrs = pso_entry
+        
+        # Parse PSO attributes
+        def get_attr(name, default=None):
+            value = attrs.get(name, [default])[0] if attrs.get(name) else default
+            return value
+        
+        # Convert msDS-MaximumPasswordAge from negative seconds to days
+        max_age_seconds = get_attr("msDS-MaximumPasswordAge")
+        max_age_days = None
+        if max_age_seconds and max_age_seconds != "0":
+            try:
+                # AD stores as negative seconds, convert to positive days
+                max_age_days = abs(int(max_age_seconds)) // 86400
+            except (ValueError, TypeError):
+                pass
+        
+        # Convert msDS-MinimumPasswordAge from negative seconds to days
+        min_age_seconds = get_attr("msDS-MinimumPasswordAge")
+        min_age_days = None
+        if min_age_seconds and min_age_seconds != "0":
+            try:
+                min_age_days = abs(int(min_age_seconds)) // 86400
+            except (ValueError, TypeError):
+                pass
+        
+        # Convert lockout duration and observation window from negative seconds to minutes
+        lockout_duration_seconds = get_attr("msDS-LockoutDuration")
+        lockout_duration_minutes = None
+        if lockout_duration_seconds and lockout_duration_seconds != "0":
+            try:
+                lockout_duration_minutes = abs(int(lockout_duration_seconds)) // 60
+            except (ValueError, TypeError):
+                pass
+        
+        lockout_window_seconds = get_attr("msDS-LockoutObservationWindow")
+        lockout_window_minutes = None
+        if lockout_window_seconds and lockout_window_seconds != "0":
+            try:
+                lockout_window_minutes = abs(int(lockout_window_seconds)) // 60
+            except (ValueError, TypeError):
+                pass
+        
+        pso_data = {
+            "dn": dn,
+            "cn": get_attr("cn", "Unknown"),
+            "description": get_attr("description", ""),
+            "precedence": get_attr("msDS-PasswordSettingsPrecedence", 0),
+            "passwordPolicy": {
+                "maximumPasswordAge": {
+                    "seconds": max_age_seconds,
+                    "days": max_age_days
+                },
+                "minimumPasswordAge": {
+                    "seconds": min_age_seconds,
+                    "days": min_age_days
+                },
+                "minimumPasswordLength": get_attr("msDS-MinimumPasswordLength", 0),
+                "passwordHistoryLength": get_attr("msDS-PasswordHistoryLength", 0),
+                "passwordComplexityEnabled": bool(get_attr("msDS-PasswordComplexityEnabled", False)),
+                "passwordReversibleEncryptionEnabled": bool(get_attr("msDS-PasswordReversibleEncryptionEnabled", False))
+            },
+            "lockoutPolicy": {
+                "lockoutThreshold": get_attr("msDS-LockoutThreshold", 0),
+                "lockoutDuration": {
+                    "seconds": lockout_duration_seconds,
+                    "minutes": lockout_duration_minutes
+                },
+                "lockoutObservationWindow": {
+                    "seconds": lockout_window_seconds,
+                    "minutes": lockout_window_minutes
+                }
+            },
+            "appliesTo": get_attr("msDS-PSOAppliesTo", [])
+        }
+        
+        logger.info(f"✅ Retrieved PSO settings for {group_name}")
+        return pso_data
+        
+    except NotFoundError:
+        raise
+    except Exception as e:
+        logger.error(f"Error getting PSO settings for {group_name}: {e}")
+        raise InternalServerError(f"Failed to retrieve PSO settings: {str(e)}")
 
-@router.get("/default-groups-by-ou")
+@router.post("/pso/{group_name}/sync-account-expires")
+async def sync_account_expires_for_pso_group(group_name: str, token_data = Depends(verify_token)):
+    """Update accountExpires for all users in PSO group based on their pwdLastSet + 90 days"""
+    ldap_conn = get_ldap_connection()
+    
+    try:
+        from app.routers.users import ad_timestamp_to_datetime, datetime_to_filetime
+        
+        # Find the group DN
+        group_results = ldap_conn.search(
+            settings.LDAP_BASE_DN,
+            f"(&(objectClass=group)(cn={group_name}))",
+            ["member", "cn"]
+        )
+        
+        if not group_results or len(group_results) == 0:
+            raise NotFoundError("Group", group_name)
+        
+        group_entry = group_results[0]
+        group_dn = group_entry[0]
+        members = group_entry[1].get("member", [])
+        
+        if not members:
+            return {
+                "success": True,
+                "message": f"No members in group {group_name}",
+                "updated": 0,
+                "failed": 0
+            }
+        
+        logger.info(f"Found {len(members)} members in group {group_name}")
+        
+        updated_count = 0
+        failed_count = 0
+        skipped_count = 0
+        
+        for member_dn in members:
+            try:
+                # Get user's pwdLastSet
+                user_results = ldap_conn.search(
+                    member_dn,
+                    "(objectClass=user)",
+                    ["pwdLastSet", "sAMAccountName"]
+                )
+                
+                if not user_results:
+                    skipped_count += 1
+                    continue
+                
+                user_attrs = user_results[0][1]
+                user_sam = user_attrs.get("sAMAccountName", ["Unknown"])[0]
+                pwd_last_set_raw = user_attrs.get("pwdLastSet", [None])[0]
+                
+                if not pwd_last_set_raw or pwd_last_set_raw == "0":
+                    logger.info(f"Skipping {user_sam}: no pwdLastSet")
+                    skipped_count += 1
+                    continue
+                
+                # Parse pwdLastSet and calculate expiry
+                pwd_last_set_dt = ad_timestamp_to_datetime(pwd_last_set_raw)
+                if not pwd_last_set_dt:
+                    logger.warning(f"Could not parse pwdLastSet for {user_sam}")
+                    skipped_count += 1
+                    continue
+                
+                # Calculate: pwdLastSet + 90 days
+                expiry_date = pwd_last_set_dt + timedelta(days=90)
+                filetime_str = datetime_to_filetime(expiry_date)
+                
+                # Update accountExpires
+                user_modifications = [(MODIFY_REPLACE, "accountExpires", [filetime_str])]
+                if ldap_conn.modify_entry(member_dn, user_modifications):
+                    logger.info(f"✅ Updated accountExpires for {user_sam}: {expiry_date.strftime('%Y-%m-%d')}")
+                    updated_count += 1
+                else:
+                    logger.warning(f"⚠️ Failed to update accountExpires for {user_sam}")
+                    failed_count += 1
+                    
+            except Exception as e:
+                logger.error(f"Error processing member {member_dn}: {e}")
+                failed_count += 1
+        
+        return {
+            "success": True,
+            "message": f"Sync completed for group {group_name}",
+            "total_members": len(members),
+            "updated": updated_count,
+            "failed": failed_count,
+            "skipped": skipped_count
+        }
+        
+    except NotFoundError:
+        raise
+    except Exception as e:
+        logger.error(f"Error syncing accountExpires for group {group_name}: {e}")
+        raise InternalServerError(f"Failed to sync accountExpires: {str(e)}")
+
+@router.get("/default-groups-by-ou", response_model=DefaultGroupsByOUResponse)
 async def get_default_groups_by_ou(ou_dn: str):
     """
     ดึงรายชื่อกลุ่มที่แนะนำตาม OU
@@ -838,7 +1098,7 @@ async def get_default_groups_by_ou(ou_dn: str):
         
         if not config_path.exists():
             logger.error(f"❌ Config file NOT found")
-            return {"department": None, "group_names": [], "total_users": 0}
+            return DefaultGroupsByOUResponse(department=None, group_names=[], total_users=0)
         
         with open(config_path, 'r', encoding='utf-8') as f:
             config_data = json.load(f)
@@ -860,7 +1120,7 @@ async def get_default_groups_by_ou(ou_dn: str):
         
         if not department_code:
             logger.error(f"❌ Could not extract department code from: {ou_dn}")
-            return {"department": None, "group_names": [], "total_users": 0}
+            return DefaultGroupsByOUResponse(department=None, group_names=[], total_users=0)
         
         # ดึงข้อมูลจาก config
         dept_config = config_data.get('departments', {}).get(department_code, {})
@@ -869,14 +1129,14 @@ async def get_default_groups_by_ou(ou_dn: str):
         
         logger.info(f"✅ Default groups for {department_code}: {len(group_names)} groups - {group_names}")
         
-        return {
-            "department": department_code,
-            "group_names": group_names,
-            "total_users": total_users
-        }
+        return DefaultGroupsByOUResponse(
+            department=department_code,
+            group_names=group_names,
+            total_users=total_users
+        )
         
     except Exception as e:
         logger.error(f"❌ Error getting default groups: {e}")
         import traceback
         logger.error(traceback.format_exc())
-        return {"department": None, "group_names": [], "total_users": 0}
+        return DefaultGroupsByOUResponse(department=None, group_names=[], total_users=0)
