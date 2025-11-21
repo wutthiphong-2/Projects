@@ -212,10 +212,58 @@ def format_user_data(entry: tuple, full_details: bool = True) -> Dict[str, Any]:
     """
     dn, attrs = entry
     
+    # Debug: Log all available attributes for first user (to identify correct attribute name)
+    if logger.isEnabledFor(logging.DEBUG):
+        username_sample = (attrs.get("sAMAccountName") or [None])[0]
+        if username_sample and username_sample not in getattr(format_user_data, '_logged_users', set()):
+            if not hasattr(format_user_data, '_logged_users'):
+                format_user_data._logged_users = set()
+            format_user_data._logged_users.add(username_sample)
+            
+            # Find all attributes that might contain "K1IT00" or similar values
+            all_attrs = {k: (attrs.get(k, [None])[0] if attrs.get(k) else None) for k in attrs.keys()}
+            logger.info(f"🔍 DEBUG - All attributes for user {username_sample}:")
+            for attr_name, attr_value in sorted(all_attrs.items()):
+                if attr_value and isinstance(attr_value, str) and ('K1' in attr_value.upper() or 'IT' in attr_value.upper() or '00' in attr_value):
+                    logger.info(f"  ⭐ {attr_name} = {attr_value}")
+                elif attr_value:
+                    logger.debug(f"  {attr_name} = {attr_value}")
+    
     def get_attr(attr_name: str, default: str = "") -> str:
         """Helper to get first value from attribute"""
-        val = attrs.get(attr_name, [default])
-        return val[0] if val else default
+        # Try exact match first
+        if attr_name in attrs:
+            attr_values = attrs.get(attr_name)
+            if attr_values and len(attr_values) > 0:
+                result = attr_values[0]
+                # Handle bytes encoding
+                if isinstance(result, bytes):
+                    try:
+                        result = result.decode('utf-8', errors='ignore')
+                    except:
+                        result = str(result)
+                # Return if not empty
+                if result and str(result).strip():
+                    return str(result).strip()
+        
+        # Try case-insensitive match (LDAP attributes are case-insensitive)
+        attr_name_lower = attr_name.lower()
+        for key in attrs.keys():
+            if key.lower() == attr_name_lower:
+                attr_values = attrs.get(key)
+                if attr_values and len(attr_values) > 0:
+                    result = attr_values[0]
+                    # Handle bytes encoding
+                    if isinstance(result, bytes):
+                        try:
+                            result = result.decode('utf-8', errors='ignore')
+                        except:
+                            result = str(result)
+                    # Return if not empty
+                    if result and str(result).strip():
+                        return str(result).strip()
+        
+        return default
     
     user_account_control = int(attrs.get("userAccountControl", ["0"])[0]) if attrs.get("userAccountControl") else 0
     
@@ -289,6 +337,53 @@ def format_user_data(entry: tuple, full_details: bool = True) -> Dict[str, Any]:
     # Get userPrincipalName
     user_principal_name = get_attr("userPrincipalName") or None
     
+    # Get departmentNumber
+    department_number = get_attr("departmentNumber") or None
+    
+    # Clean up the value (remove whitespace, handle empty strings)
+    if department_number:
+        department_number = str(department_number).strip()
+        if not department_number:  # Empty after strip
+            department_number = None
+    
+    # Debug: Log departmentNumber status (only log if not found, to reduce log spam)
+    if not department_number:
+        # Check if attribute exists but is empty
+        if "departmentNumber" in attrs:
+            attr_values = attrs.get("departmentNumber", [])
+            if attr_values and len(attr_values) > 0:
+                raw_value = attr_values[0]
+                if isinstance(raw_value, bytes):
+                    try:
+                        raw_value = raw_value.decode('utf-8', errors='ignore')
+                    except:
+                        raw_value = str(raw_value)
+                # Only log if it's actually empty, not just whitespace
+                if raw_value and str(raw_value).strip():
+                    # Value exists but get_attr didn't return it - this shouldn't happen
+                    department_number = str(raw_value).strip()
+                    logger.debug(f"✅ Found departmentNumber (from raw) for {get_attr('sAMAccountName')}: {department_number}")
+                else:
+                    # Attribute exists but is empty
+                    logger.debug(f"ℹ️ departmentNumber exists but is empty for {get_attr('sAMAccountName')}")
+            else:
+                # Attribute exists but has no values
+                logger.debug(f"ℹ️ departmentNumber attribute exists but has no values for {get_attr('sAMAccountName')}")
+        else:
+            # Attribute doesn't exist at all - only log in debug mode to reduce spam
+            if logger.isEnabledFor(logging.DEBUG):
+                available_dept_attrs = [k for k in attrs.keys() if 'dept' in k.lower() or 'number' in k.lower()]
+                if available_dept_attrs:
+                    logger.debug(f"⚠️ departmentNumber attribute not found for {get_attr('sAMAccountName')}, but found related attrs: {available_dept_attrs}")
+    else:
+        # Found successfully - only log first few to confirm it's working
+        username = get_attr('sAMAccountName')
+        if not hasattr(format_user_data, '_dept_num_logged'):
+            format_user_data._dept_num_logged = set()
+        if username and username not in format_user_data._dept_num_logged and len(format_user_data._dept_num_logged) < 5:
+            format_user_data._dept_num_logged.add(username)
+            logger.info(f"✅ Found departmentNumber for {username}: {department_number}")
+    
     # Always include basic info
     result = {
         "dn": dn,
@@ -312,6 +407,7 @@ def format_user_data(entry: tuple, full_details: bool = True) -> Dict[str, Any]:
         "userPrincipalName": user_principal_name,
         "manager": manager_dn,
         "accountExpires": account_expires_dt.isoformat() if account_expires_dt else None,  # Always include (None = never expires)
+        "departmentNumber": department_number,
     }
 
     # Only include full details when requested (single user view)
@@ -458,41 +554,48 @@ async def get_users(
 
         # ⚡ PERFORMANCE: Fetch essential fields + metadata for filtering/sorting
         logger.info(f"🔍 Searching users with filter: {filter_str} (mode: {search_mode})")
+        
+        # List of attributes to fetch from LDAP
+        attributes_to_fetch = [
+            "cn",
+            "sAMAccountName",
+            "mail",
+            "displayName",
+            "title",
+            "department",
+            "company",
+            "physicalDeliveryOfficeName",
+            "description",
+            "userAccountControl",
+            "pwdLastSet",
+            "givenName",
+            "sn",
+            "telephoneNumber",
+            "mobile",
+            "employeeID",
+            "streetAddress",
+            "l",
+            "st",
+            "postalCode",
+            "co",
+            "whenCreated",
+            "whenChanged",
+            "lastLogon",
+            "lastLogonTimestamp",
+            "memberOf",
+            "logonCount",
+            "userPrincipalName",
+            "manager",
+            "accountExpires",
+            "departmentNumber"
+        ]
+        
+        logger.debug(f"Fetching attributes: {attributes_to_fetch}")
+        
         results = ldap_conn.search(
             settings.LDAP_BASE_DN,
             filter_str,
-            [
-                "cn",
-                "sAMAccountName",
-                "mail",
-                "displayName",
-                "title",
-                "department",
-                "company",
-                "physicalDeliveryOfficeName",
-                "description",
-                "userAccountControl",
-                "pwdLastSet",
-                "givenName",
-                "sn",
-                "telephoneNumber",
-                "mobile",
-                "employeeID",
-                "streetAddress",
-                "l",
-                "st",
-                "postalCode",
-                "co",
-                "whenCreated",
-                "whenChanged",
-                "lastLogon",
-                "lastLogonTimestamp",
-                "memberOf",
-                "logonCount",
-                "userPrincipalName",
-                "manager",
-                "accountExpires"
-            ]
+            attributes_to_fetch
         )
         
         if results is None:
@@ -500,9 +603,40 @@ async def get_users(
         
         logger.info(f"✅ LDAP returned {len(results)} raw results from AD")
         
+        # Debug: Check if departmentNumber is in first result and find attribute with "K1IT00"
+        if results and len(results) > 0:
+            first_entry = results[0]
+            first_dn, first_attrs = first_entry
+            dept_num_in_first = first_attrs.get("departmentNumber", [None])[0] if first_attrs.get("departmentNumber") else None
+            
+            # Find which attribute contains "K1IT00" or similar
+            target_value = "K1IT00"
+            found_attr = None
+            for attr_name, attr_values in first_attrs.items():
+                if attr_values:
+                    attr_value = attr_values[0] if isinstance(attr_values, list) else attr_values
+                    if attr_value and isinstance(attr_value, str) and target_value.upper() in attr_value.upper():
+                        found_attr = attr_name
+                        logger.info(f"🎯 FOUND! Attribute '{attr_name}' contains '{target_value}': {attr_value}")
+                        break
+            
+            if not found_attr:
+                logger.warning(f"⚠️ Could not find attribute containing '{target_value}'")
+                # Show all attributes with values that might match
+                logger.info(f"🔍 First user - All attributes with values:")
+                for attr_name, attr_values in sorted(first_attrs.items()):
+                    if attr_values:
+                        attr_value = attr_values[0] if isinstance(attr_values, list) else attr_values
+                        if attr_value and isinstance(attr_value, str) and len(attr_value) > 0:
+                            logger.info(f"  {attr_name} = {attr_value}")
+            
+            logger.info(f"🔍 First user sample - DN: {first_dn}, departmentNumber in raw attrs: {dept_num_in_first}")
+            logger.info(f"🔍 First user - All available attribute names: {sorted(list(first_attrs.keys()))}")
+        
         # ⚡ PERFORMANCE: Use lightweight format (faster processing!)
         # Filter out computer accounts (safety check - already filtered in LDAP query)
         users_all = []
+        dept_num_count = 0
         for entry in results:
             dn, attrs = entry
             username = (attrs.get("sAMAccountName") or [None])[0]
@@ -514,7 +648,15 @@ async def get_users(
             # Additional safety check using is_likely_system_account
             if is_likely_system_account(username, display_name, email):
                 continue
-            users_all.append(format_user_data(entry, full_details=False))
+            
+            # Check if departmentNumber exists in raw attributes
+            if attrs.get("departmentNumber"):
+                dept_num_count += 1
+            
+            formatted_user = format_user_data(entry, full_details=False)
+            users_all.append(formatted_user)
+        
+        logger.info(f"📊 Users with departmentNumber in raw LDAP: {dept_num_count} out of {len(users_all)}")
         
         # ⚡ Sort by whenCreated (newest first)
         users_all.sort(key=lambda u: u.get('whenCreated') or '', reverse=True)
@@ -889,6 +1031,8 @@ async def create_user(user_data: UserCreate, request: Request, token_data = Depe
             user_attrs["company"] = [user_data.company]
         if user_data.employeeID:
             user_attrs["employeeID"] = [user_data.employeeID]
+        if user_data.departmentNumber:
+            user_attrs["departmentNumber"] = [user_data.departmentNumber]
         if user_data.physicalDeliveryOfficeName:
             user_attrs["physicalDeliveryOfficeName"] = [user_data.physicalDeliveryOfficeName]
         if user_data.streetAddress:
@@ -1719,70 +1863,48 @@ async def get_user_groups(dn: str, token_data = Depends(verify_token)):
 @router.get("/{dn}/permissions", response_model=List[Dict[str, Any]])
 async def get_user_permissions(dn: str, token_data = Depends(verify_token)):
     """Get permissions for a user based on AD groups"""
+    from urllib.parse import unquote
+    
     ldap_conn = get_ldap_connection()
     
     try:
+        # URL decode the DN to handle special characters
+        try:
+            decoded_dn = unquote(dn)
+        except Exception as decode_error:
+            logger.warning(f"Failed to URL decode DN, using original: {decode_error}")
+            decoded_dn = dn
+        
         results = ldap_conn.search(
-            dn,
+            decoded_dn,
             "(objectClass=user)",
-            ["memberOf", "userAccountControl"]
+            ["memberOf"]
         )
         
         if not results:
-            raise NotFoundError("User", dn)
+            raise NotFoundError("User", decoded_dn)
         
         _, attrs = results[0]
         member_of = attrs.get("memberOf", [])
-        user_account_control = int(attrs.get("userAccountControl", ["0"])[0])
         
         permissions = []
-        
-        # Check if user is admin based on groups
-        admin_groups = ["Domain Admins", "Administrators", "Enterprise Admins"]
-        is_admin = any(
-            any(admin_group.lower() in group.lower() for admin_group in admin_groups)
-            for group in member_of
-        )
-        
-        # Add permissions based on groups
-        if is_admin:
-            permissions.append({
-                "id": 1,
-                "name": "domain_admin",
-                "description": "ผู้ดูแลระบบโดเมน",
-                "level": "admin",
-                "source": "AD Group"
-            })
-        
-        # Add group-based permissions
-        for idx, group_dn in enumerate(member_of, start=len(permissions) + 1):
+        for group_dn in member_of:
+            # Extract CN from DN
             match = re.match(r'CN=([^,]+)', group_dn)
-            group_name = match.group(1) if match else group_dn
+            cn = match.group(1) if match else group_dn
             
             # Determine permission level based on group name
-            if any(admin in group_name.lower() for admin in ["admin", "administrator"]):
+            level = "user"
+            if "admin" in cn.lower() or "administrator" in cn.lower():
                 level = "admin"
-            elif any(mgr in group_name.lower() for mgr in ["manager", "supervisor"]):
+            elif "manager" in cn.lower() or "head" in cn.lower():
                 level = "manager"
-            else:
-                level = "user"
             
             permissions.append({
-                "id": idx,
-                "name": group_name,
-                "description": f"สมาชิกกลุ่ม {group_name}",
+                "name": cn,
                 "level": level,
-                "source": "AD Group"
-            })
-        
-        # If no groups, add basic user permission
-        if not permissions:
-            permissions.append({
-                "id": 1,
-                "name": "domain_user",
-                "description": "ผู้ใช้ในโดเมน",
-                "level": "user",
-                "source": "AD Default"
+                "source": "AD Group",
+                "description": f"Permission from group: {cn}"
             })
         
         return permissions
@@ -1790,5 +1912,111 @@ async def get_user_permissions(dn: str, token_data = Depends(verify_token)):
     except (NotFoundError, InternalServerError, ValidationError):
         raise
     except Exception as e:
-        logger.error(f"Error getting permissions for {dn}: {e}")
-        raise InternalServerError("Failed to retrieve permissions")
+        logger.error(f"Error getting permissions for {dn}: {e}", exc_info=True)
+        raise InternalServerError("Failed to retrieve user permissions")
+
+
+@router.get("/{dn}/debug-attributes", response_model=Dict[str, Any])
+async def debug_user_attributes(
+    dn: str,
+    token_data = Depends(verify_token)
+):
+    """Debug endpoint to check raw LDAP attributes for a user"""
+    from urllib.parse import unquote
+    
+    ldap_conn = get_ldap_connection()
+    
+    try:
+        # URL decode the DN to handle special characters
+        try:
+            decoded_dn = unquote(dn)
+        except Exception as decode_error:
+            logger.warning(f"Failed to URL decode DN, using original: {decode_error}")
+            decoded_dn = dn
+        
+        # Try to search for the user by DN first
+        results = ldap_conn.search(
+            decoded_dn,
+            "(objectClass=user)",
+            ["*"]  # Get all attributes
+        )
+        
+        # If not found by DN, try searching by sAMAccountName or CN
+        if not results or len(results) == 0:
+            # Extract CN from DN if possible
+            cn_match = re.match(r'CN=([^,]+)', decoded_dn)
+            if cn_match:
+                cn_value = cn_match.group(1)
+                # Try searching by CN
+                search_filter = f"(&(objectClass=user)(cn={cn_value}))"
+                results = ldap_conn.search(
+                    settings.LDAP_BASE_DN,
+                    search_filter,
+                    ["*"]
+                )
+            
+            if not results or len(results) == 0:
+                raise NotFoundError(f"User not found: {decoded_dn}")
+        
+        entry = results[0]
+        user_dn, attrs = entry
+        
+        # Get formatted user data
+        formatted_user = format_user_data(entry, full_details=True)
+        
+        # Check for departmentNumber in raw attributes
+        dept_number_raw = None
+        if attrs.get("departmentNumber"):
+            try:
+                dept_number_raw = attrs.get("departmentNumber", [None])[0]
+                # Handle encoding issues
+                if isinstance(dept_number_raw, bytes):
+                    dept_number_raw = dept_number_raw.decode('utf-8', errors='ignore')
+            except Exception as e:
+                logger.warning(f"Error reading departmentNumber: {e}")
+                dept_number_raw = None
+        
+        # Get all attribute names
+        all_attr_names = sorted(list(attrs.keys()))
+        
+        # Find department-related attributes (with encoding handling)
+        dept_related_attrs = {}
+        for k in all_attr_names:
+            if 'dept' in k.lower() or 'number' in k.lower():
+                try:
+                    val = attrs.get(k, [None])[0] if attrs.get(k) else None
+                    if isinstance(val, bytes):
+                        val = val.decode('utf-8', errors='ignore')
+                    dept_related_attrs[k] = val
+                except Exception as e:
+                    logger.warning(f"Error reading attribute {k}: {e}")
+                    dept_related_attrs[k] = None
+        
+        # Get sample attributes with encoding handling
+        raw_attributes_sample = {}
+        for k in ["departmentNumber", "department", "extensionName", "extensionAttribute1", "extensionAttribute2"]:
+            try:
+                val = attrs.get(k, [None])[0] if attrs.get(k) else None
+                if isinstance(val, bytes):
+                    val = val.decode('utf-8', errors='ignore')
+                raw_attributes_sample[k] = val
+            except Exception as e:
+                logger.warning(f"Error reading attribute {k}: {e}")
+                raw_attributes_sample[k] = None
+        
+        return {
+            "dn": user_dn,
+            "sAMAccountName": formatted_user.get("sAMAccountName"),
+            "displayName": formatted_user.get("displayName"),
+            "departmentNumber_in_formatted": formatted_user.get("departmentNumber"),
+            "departmentNumber_in_raw_attrs": dept_number_raw,
+            "departmentNumber_exists": "departmentNumber" in attrs,
+            "all_department_related_attributes": dept_related_attrs,
+            "all_attribute_names": all_attr_names,
+            "raw_attributes_sample": raw_attributes_sample
+        }
+    except NotFoundError:
+        raise
+    except Exception as e:
+        logger.error(f"Error debugging user attributes: {e}", exc_info=True)
+        raise InternalServerError(f"Failed to debug user attributes: {str(e)}")

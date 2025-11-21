@@ -20,6 +20,7 @@ class UserCreate(BaseModel):
     department: Optional[str] = None
     company: Optional[str] = None
     employeeID: Optional[str] = None
+    departmentNumber: Optional[str] = None
     physicalDeliveryOfficeName: Optional[str] = None
     streetAddress: Optional[str] = None
     l: Optional[str] = None  # city/locality in AD
@@ -51,6 +52,7 @@ class UserUpdate(BaseModel):
     department: Optional[str] = None
     company: Optional[str] = None
     employeeID: Optional[str] = None
+    departmentNumber: Optional[str] = None
     physicalDeliveryOfficeName: Optional[str] = None
     streetAddress: Optional[str] = None
     l: Optional[str] = None  # city/locality in AD
@@ -103,6 +105,7 @@ class UserResponse(BaseModel):
     userPrincipalName: Optional[str] = None
     manager: Optional[str] = None
     accountExpires: Optional[str] = None
+    departmentNumber: Optional[str] = None
 
 class UserStatsResponse(BaseModel):
     """User statistics response model"""

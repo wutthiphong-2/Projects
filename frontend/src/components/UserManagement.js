@@ -235,7 +235,8 @@ const UserManagement = () => {
     manager: false,
     lastLogon: false,
     pwdLastSet: false,
-    accountExpires: false
+    accountExpires: false,
+    departmentNumber: true
   });
   const [isColumnSettingsVisible, setIsColumnSettingsVisible] = useState(false);
   const [currentPage, setCurrentPage] = useState(1);
@@ -494,6 +495,13 @@ const UserManagement = () => {
       // Generate cache key
       const cacheKey = apiCache.generateKey('/api/users/', params);
       
+      // Invalidate cache if force refresh
+      if (forceRefresh) {
+        apiCache.invalidate('/api/users');
+        // Add timestamp to bypass cache
+        params._t = Date.now();
+      }
+      
       // Check cache first (unless force refresh)
       if (!forceRefresh) {
         const cachedData = apiCache.get(cacheKey);
@@ -508,16 +516,26 @@ const UserManagement = () => {
       const result = await userService.getUsers(params);
       const userData = result || [];
       
-      // Debug: Check if accountExpires is in the data
+      // Debug: Check if departmentNumber is in the data
       if (process.env.NODE_ENV === 'development' && userData.length > 0) {
         const sampleUser = userData[0];
         console.log('Sample user data:', {
           dn: sampleUser.dn,
           sAMAccountName: sampleUser.sAMAccountName,
-          accountExpires: sampleUser.accountExpires,
-          hasAccountExpires: 'accountExpires' in sampleUser,
+          departmentNumber: sampleUser.departmentNumber,
+          hasDepartmentNumber: 'departmentNumber' in sampleUser,
           allKeys: Object.keys(sampleUser)
         });
+        
+        // Check if any user has departmentNumber
+        const usersWithDeptNum = userData.filter(u => u.departmentNumber);
+        console.log(`Users with departmentNumber: ${usersWithDeptNum.length} out of ${userData.length}`);
+        if (usersWithDeptNum.length > 0) {
+          console.log('Sample departmentNumber values:', usersWithDeptNum.slice(0, 5).map(u => ({
+            username: u.sAMAccountName,
+            departmentNumber: u.departmentNumber
+          })));
+        }
       }
       
       setUsers(userData);
@@ -941,6 +959,15 @@ const UserManagement = () => {
                   {selectedUser.employeeID ? (
                     <Text code style={{ background: '#f3f4f6', padding: '4px 8px', borderRadius: 4 }}>
                       {selectedUser.employeeID}
+                    </Text>
+                  ) : (
+                    <Text type="secondary" style={{ fontSize: 13, fontStyle: 'italic' }}>ไม่มีข้อมูล</Text>
+                  )}
+                </Descriptions.Item>
+                <Descriptions.Item label="Department Number">
+                  {selectedUser.departmentNumber ? (
+                    <Text code style={{ background: '#f3f4f6', padding: '4px 8px', borderRadius: 4 }}>
+                      {selectedUser.departmentNumber}
                     </Text>
                   ) : (
                     <Text type="secondary" style={{ fontSize: 13, fontStyle: 'italic' }}>ไม่มีข้อมูล</Text>
@@ -2968,9 +2995,9 @@ const UserManagement = () => {
             {record.cn || record.displayName || '-'}
           </div>
         </Tooltip>
-        {record.title && (
+        {record.departmentNumber && (
           <Text type="secondary" style={{ fontSize: 12 }} className="table-cell-supporting">
-            {record.title}
+            {record.departmentNumber}
           </Text>
         )}
       </div>
@@ -3500,6 +3527,18 @@ const UserManagement = () => {
       responsive: ['xl'],
       ellipsis: true,
       render: renderEmployeeIdCell
+    },
+    {
+      title: 'Department Number',
+      dataIndex: 'departmentNumber',
+      key: 'departmentNumber',
+      width: 180,
+      className: 'col-department-number',
+      responsive: ['md'],
+      ellipsis: true,
+      sorter: (a, b) => (a.departmentNumber || '').localeCompare(b.departmentNumber || ''),
+      sortOrder: sortedInfo.columnKey === 'departmentNumber' ? sortedInfo.order : null,
+      render: renderTextCell
     },
     {
       title: 'Phone',
@@ -4206,31 +4245,13 @@ const UserManagement = () => {
       {/* Create User Modal - Step Wizard */}
       <Modal
         title={
-          <div style={{
-            padding: '12px 0',
-            borderBottom: '2px solid #e5e7eb'
-          }}>
-            <Space size="middle" align="center">
-              <div style={{
-                background: '#f0fdf4',
-                borderRadius: 8,
-                padding: 10,
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'center'
-              }}>
-                <UserAddOutlined style={{ fontSize: 22, color: '#10b981' }} />
-              </div>
-              <div>
-                <div style={{ fontSize: 17, fontWeight: 700, color: '#1f2937', marginBottom: 2 }}>
-                  Create New User
-                </div>
-                <Text style={{ fontSize: 12, color: '#6b7280', textTransform: 'uppercase', letterSpacing: '0.5px' }}>
-                  Step {currentStep + 1} of 3
-                </Text>
-              </div>
-            </Space>
-          </div>
+          <Space>
+            <UserAddOutlined />
+            <span>Create New User</span>
+            <Text type="secondary" style={{ fontSize: 12 }}>
+              (Step {currentStep + 1} of 3)
+            </Text>
+          </Space>
         }
         open={isCreateModalVisible}
         onCancel={() => {
@@ -4240,40 +4261,28 @@ const UserManagement = () => {
         destroyOnHidden
         width={getResponsiveWidth(720, 560, '95%')}
         footer={
-          <div style={{ display: 'flex', justifyContent: 'space-between', padding: '12px 0' }}>
+          <div style={{ display: 'flex', justifyContent: 'space-between' }}>
             <Button
               onClick={handleBackStep}
               disabled={currentStep === 0}
-              style={{ fontWeight: 600, borderRadius: 8 }}
             >
-              ← Back
+              Back
             </Button>
             <div>
               {currentStep < 2 ? (
                 <Button
                   type="primary"
                   onClick={handleNextStep}
-                  style={{
-                    background: 'linear-gradient(135deg, #3b82f6, #2563eb)',
-                    border: 'none',
-                    fontWeight: 600,
-                    borderRadius: 8
-                  }}
                 >
-                  Next Step →
+                  Next Step
                 </Button>
               ) : (
                 <Button
                   type="primary"
                   onClick={handleCreateModalOk}
-                  style={{
-                    background: 'linear-gradient(135deg, #10b981, #059669)',
-                    border: 'none',
-                    fontWeight: 600,
-                    borderRadius: 8
-                  }}
+                  icon={<CheckCircleOutlined />}
                 >
-                  <CheckCircleOutlined /> Create User
+                  Create User
                 </Button>
               )}
             </div>
@@ -4282,16 +4291,16 @@ const UserManagement = () => {
       >
         <div style={{ padding: '20px 0' }}>
           {/* Progress Steps */}
-          <Steps current={currentStep} style={{ marginBottom: 32 }}>
+          <Steps current={currentStep} style={{ marginBottom: 24 }}>
             <Step 
               title="Account" 
               icon={<UserOutlined />}
-              description="Essential info"
+              description="Basic Information"
             />
             <Step 
               title="Groups" 
               icon={<TeamOutlined />}
-              description="Permissions"
+              description="Group Membership"
             />
             <Step 
               title="Review" 
@@ -4311,464 +4320,362 @@ const UserManagement = () => {
               <div className="umx-step-wrapper">
                 <div className="umx-step-columns">
                   <Card
-                    className="umx-form-card"
-                    title="Account Basics"
+                    title="Account Information"
                     extra={<Tag color="blue">Required</Tag>}
-                    styles={{ body: { padding: 0 } }}
+                    style={{ marginBottom: 16 }}
                   >
-                    <div className="umx-form-card-body">
-                      <Row gutter={16}>
-                        <Col xs={24} md={12}>
-                          <Form.Item
-                            name="cn"
-                            label={
-                              <Space>
-                                <Text strong style={{ fontSize: 13 }}>Common Name (CN)</Text>
-                                <Tooltip title="Full name as it will appear in Active Directory">
-                                  <QuestionCircleOutlined style={{ color: '#6b7280', fontSize: 12 }} />
-                                </Tooltip>
-                              </Space>
-                            }
-                            rules={[{ required: true, message: 'Please enter CN' }]}
-                          >
-                            <Input placeholder="e.g., Wutthiphong Chaiyaphoom" size="large" />
-                          </Form.Item>
-                        </Col>
-                        <Col xs={24} md={12}>
-                          <Form.Item
-                            name="sAMAccountName"
-                            label={
-                              <Space>
-                                <Text strong style={{ fontSize: 13 }}>Username (Login)</Text>
-                                <Tooltip title="This will be used to login. Cannot be changed later.">
-                                  <QuestionCircleOutlined style={{ color: '#6b7280', fontSize: 12 }} />
-                                </Tooltip>
-                              </Space>
-                            }
-                            rules={[{ required: true, message: 'Please enter username' }]}
-                          >
-                            <Input placeholder="e.g., wutthiphong.c" size="large" />
-                          </Form.Item>
-                        </Col>
-                      </Row>
-
-                      <Row gutter={16}>
-                        <Col xs={24} md={12}>
-                          <Form.Item
-                            name="password"
-                            label={<Text strong style={{ fontSize: 13 }}>Password</Text>}
-                            rules={[
-                              { required: true, message: 'Please enter password' },
-                              { min: 8, message: 'Password must be at least 8 characters' },
-                              {
-                                pattern: /^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)(?=.*[@$!%*?&#^()_+\-=\[\]{};:'",.<>\/\\|`~])[A-Za-z\d@$!%*?&#^()_+\-=\[\]{};:'",.<>\/\\|`~]{8,}$/,
-                                message: 'Password must contain: uppercase, lowercase, number, and special character'
-                              }
-                            ]}
-                          >
-                            <Input.Password 
-                              placeholder="Enter strong password" 
-                              size="large"
-                              autoComplete="new-password"
-                            />
-                          </Form.Item>
-                        </Col>
-                        <Col xs={24} md={12}>
-                          <Form.Item
-                            name="confirmPassword"
-                            label={<Text strong style={{ fontSize: 13 }}>Confirm Password</Text>}
-                            dependencies={['password']}
-                            rules={[
-                              { required: true, message: 'Please confirm your password' },
-                              ({ getFieldValue }) => ({
-                                validator(_, value) {
-                                  if (!value || getFieldValue('password') === value) {
-                                    return Promise.resolve();
-                                  }
-                                  return Promise.reject(new Error('The two passwords do not match!'));
-                                },
-                              }),
-                            ]}
-                          >
-                            <Input.Password
-                              placeholder="Re-enter password"
-                              size="large"
-                              autoComplete="new-password"
-                            />
-                          </Form.Item>
-                        </Col>
-                      </Row>
-
-                      <Divider style={{ margin: '24px 0' }} />
-
-                      {/* Account Options Section */}
-                      <Card
-                        title={
-                          <Space>
-                            <div style={{
-                              background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
-                              borderRadius: 8,
-                              padding: 8,
-                              display: 'flex',
-                              alignItems: 'center',
-                              justifyContent: 'center'
-                            }}>
-                              <SettingOutlined style={{ fontSize: 16, color: '#fff' }} />
-                            </div>
-                            <div>
-                              <Text strong style={{ fontSize: 14, color: '#1f2937' }}>Account Options</Text>
-                              <div style={{ fontSize: 11, color: '#6b7280', fontWeight: 400, marginTop: 2 }}>
-                                Select one password policy option
-                              </div>
-                            </div>
-                          </Space>
-                        }
-                        size="small"
-                        style={{
-                          marginBottom: 16,
-                          background: 'linear-gradient(to bottom, #ffffff, #f8fafc)',
-                          border: '1px solid #e2e8f0',
-                          borderRadius: 12,
-                          boxShadow: '0 2px 8px rgba(0, 0, 0, 0.04)'
-                        }}
-                        styles={{ body: { padding: '16px' } }}
-                      >
+                    <Row gutter={16}>
+                      <Col xs={24} md={12}>
                         <Form.Item
-                          name="accountOption"
-                          rules={[{ required: false }]}
-                          style={{ marginBottom: 0 }}
-                        >
-                          <Radio.Group>
-                            <Space direction="vertical" style={{ width: '100%' }} size="middle">
-                              <Radio value="passwordMustChange" style={{ 
-                                padding: '12px 16px',
-                                borderRadius: 8,
-                                border: '1px solid #e5e7eb',
-                                background: '#ffffff',
-                                transition: 'all 0.2s',
-                                width: '100%',
-                                margin: 0
-                              }}>
-                                <Space>
-                                  <LockOutlined style={{ color: '#3b82f6', fontSize: 14 }} />
-                                  <Text strong style={{ fontSize: 13, color: '#374151' }}>User must change password at next logon</Text>
-                                  <Tooltip title="Forces the user to change their password the next time they log in">
-                                    <QuestionCircleOutlined style={{ color: '#9ca3af', fontSize: 11 }} />
-                                  </Tooltip>
-                                </Space>
-                              </Radio>
-                              <Radio value="userCannotChangePassword" style={{ 
-                                padding: '12px 16px',
-                                borderRadius: 8,
-                                border: '1px solid #e5e7eb',
-                                background: '#ffffff',
-                                transition: 'all 0.2s',
-                                width: '100%',
-                                margin: 0
-                              }}>
-                                <Space>
-                                  <UnlockOutlined style={{ color: '#ef4444', fontSize: 14 }} />
-                                  <Text strong style={{ fontSize: 13, color: '#374151' }}>User cannot change password</Text>
-                                  <Tooltip title="Prevents the user from changing their own password">
-                                    <QuestionCircleOutlined style={{ color: '#9ca3af', fontSize: 11 }} />
-                                  </Tooltip>
-                                </Space>
-                              </Radio>
-                              <Radio value="passwordNeverExpires" style={{ 
-                                padding: '12px 16px',
-                                borderRadius: 8,
-                                border: '1px solid #e5e7eb',
-                                background: '#ffffff',
-                                transition: 'all 0.2s',
-                                width: '100%',
-                                margin: 0
-                              }}>
-                                <Space>
-                                  <ClockCircleOutlined style={{ color: '#10b981', fontSize: 14 }} />
-                                  <Text strong style={{ fontSize: 13, color: '#374151' }}>Password never expires</Text>
-                                  <Tooltip title="The password will not expire according to the password policy">
-                                    <QuestionCircleOutlined style={{ color: '#9ca3af', fontSize: 11 }} />
-                                  </Tooltip>
-                                </Space>
-                              </Radio>
-                              <Radio value="storePasswordReversible" style={{ 
-                                padding: '12px 16px',
-                                borderRadius: 8,
-                                border: '1px solid #e5e7eb',
-                                background: '#ffffff',
-                                transition: 'all 0.2s',
-                                width: '100%',
-                                margin: 0
-                              }}>
-                                <Space>
-                                  <SafetyCertificateOutlined style={{ color: '#f59e0b', fontSize: 14 }} />
-                                  <Text strong style={{ fontSize: 13, color: '#374151' }}>Store password using reversible encryption</Text>
-                                  <Tooltip title="Stores the password using reversible encryption (less secure, required for some applications)">
-                                    <QuestionCircleOutlined style={{ color: '#9ca3af', fontSize: 11 }} />
-                                  </Tooltip>
-                                </Space>
-                              </Radio>
-                              <Radio value="none" style={{ 
-                                padding: '12px 16px',
-                                borderRadius: 8,
-                                border: '1px dashed #d1d5db',
-                                background: '#f9fafb',
-                                transition: 'all 0.2s',
-                                width: '100%',
-                                margin: 0
-                              }}>
-                                <Text type="secondary" style={{ fontSize: 13, fontStyle: 'italic' }}>None (default settings)</Text>
-                              </Radio>
+                          name="cn"
+                          label={
+                            <Space>
+                              <span>Common Name (CN)</span>
+                              <Tooltip title="Full name as it will appear in Active Directory">
+                                <QuestionCircleOutlined style={{ color: '#9ca3af', fontSize: 12 }} />
+                              </Tooltip>
                             </Space>
-                          </Radio.Group>
-                        </Form.Item>
-                      </Card>
-
-                      <Row gutter={16}>
-                        <Col xs={24} md={12}>
-                          <Form.Item
-                            name="mail"
-                            label={
-                              <Space>
-                                <Text strong style={{ fontSize: 13 }}>Email</Text>
-                                <Tooltip title="Corporate email address">
-                                  <QuestionCircleOutlined style={{ color: '#6b7280', fontSize: 12 }} />
-                                </Tooltip>
-                              </Space>
-                            }
-                            rules={[
-                              { required: true, message: 'Please enter email' },
-                              { type: 'email', message: 'Please enter valid email' }
-                            ]}
-                          >
-                            <Input placeholder="user@tbkk.co.th" size="large" suffix={<MailOutlined />} />
-                          </Form.Item>
-                        </Col>
-                        <Col xs={24} md={12}>
-                          <Form.Item
-                            name="displayName"
-                            label={<Text strong style={{ fontSize: 13 }}>Display Name</Text>}
-                          >
-                            <Input placeholder="Auto-filled from CN" size="large" />
-                          </Form.Item>
-                        </Col>
-                      </Row>
-                    </div>
-                  </Card>
-
-                  <Card
-                    className="umx-form-card"
-                    title="Profile & Contact"
-                    styles={{ body: { padding: 0 } }}
-                  >
-                    <div className="umx-form-card-body">
-                      <Collapse
-                        defaultActiveKey={['personal', 'contact']}
-                        ghost
-                        className="umx-form-collapse"
-                      >
-                        <Collapse.Panel header="Personal Details" key="personal">
-                          <Row gutter={16}>
-                            <Col xs={24} md={12}>
-                              <Form.Item
-                                name="givenName"
-                                label={<Text strong style={{ fontSize: 13 }}>First Name</Text>}
-                              >
-                                <Input placeholder="Enter first name" size="large" />
-                              </Form.Item>
-                            </Col>
-                            <Col xs={24} md={12}>
-                              <Form.Item
-                                name="sn"
-                                label={<Text strong style={{ fontSize: 13 }}>Last Name</Text>}
-                              >
-                                <Input placeholder="Enter last name" size="large" />
-                              </Form.Item>
-                            </Col>
-                          </Row>
-                          <Row gutter={16}>
-                            <Col xs={24} md={12}>
-                              <Form.Item
-                                name="title"
-                                label={<Text strong style={{ fontSize: 13 }}>Job Title</Text>}
-                              >
-                                <Input placeholder="Enter job title" size="large" />
-                              </Form.Item>
-                            </Col>
-                            <Col xs={24} md={12}>
-                              <Form.Item
-                                name="department"
-                                label={<Text strong style={{ fontSize: 13 }}>Department</Text>}
-                              >
-                                <Input placeholder="Enter department name" size="large" />
-                              </Form.Item>
-                            </Col>
-                          </Row>
-                          <Row gutter={16}>
-                            <Col xs={24} md={12}>
-                              <Form.Item
-                                name="company"
-                                label={<Text strong style={{ fontSize: 13 }}>Company</Text>}
-                              >
-                                <Input placeholder="Enter company name" size="large" />
-                              </Form.Item>
-                            </Col>
-                            <Col xs={24} md={12}>
-                              <Form.Item
-                                name="employeeID"
-                                label={<Text strong style={{ fontSize: 13 }}>Employee ID</Text>}
-                              >
-                                <Input placeholder="Enter employee ID" size="large" />
-                              </Form.Item>
-                            </Col>
-                          </Row>
-                        </Collapse.Panel>
-
-                        <Collapse.Panel header="Contact & Office" key="contact">
-                          <Row gutter={16}>
-                            <Col xs={24} md={12}>
-                              <Form.Item
-                                name="telephoneNumber"
-                                label={<Text strong style={{ fontSize: 13 }}>Phone</Text>}
-                              >
-                                <Input placeholder="Enter phone number" size="large" />
-                              </Form.Item>
-                            </Col>
-                            <Col xs={24} md={12}>
-                              <Form.Item
-                                name="mobile"
-                                label={<Text strong style={{ fontSize: 13 }}>Mobile</Text>}
-                              >
-                                <Input placeholder="Enter mobile number" size="large" />
-                              </Form.Item>
-                            </Col>
-                          </Row>
-                          <Row gutter={16}>
-                            <Col xs={24} md={12}>
-                              <Form.Item
-                                name="physicalDeliveryOfficeName"
-                                label={<Text strong style={{ fontSize: 13 }}>Office Location</Text>}
-                              >
-                                <Input placeholder="Enter office location" size="large" />
-                              </Form.Item>
-                            </Col>
-                            <Col xs={24} md={12}>
-                              <Form.Item
-                                name="description"
-                                label={<Text strong style={{ fontSize: 13 }}>Description</Text>}
-                              >
-                                <Input.TextArea rows={3} placeholder="Enter description or notes" />
-                              </Form.Item>
-                            </Col>
-                          </Row>
-                        </Collapse.Panel>
-                      </Collapse>
-                    </div>
-                  </Card>
-                </div>
-
-                <div className="umx-step-lower">
-                  <Card
-                    className="umx-form-card"
-                    title="Organizational Placement"
-                    styles={{ body: { padding: 0 } }}
-                  >
-                    <div className="umx-form-card-body">
-                      <Form.Item
-                        label={
-                          <Space>
-                            <Text strong style={{ fontSize: 13 }}>Organizational Unit (OU)</Text>
-                            <Tooltip title="Select where this user will be created. This will auto-select appropriate groups.">
-                              <QuestionCircleOutlined style={{ color: '#6b7280', fontSize: 12 }} />
-                            </Tooltip>
-                          </Space>
-                        }
-                      >
-                        <TreeSelect
-                          placeholder="Select OU (optional - defaults to CN=Users)"
-                          size="large"
-                          allowClear
-                          showSearch
-                          value={selectedOU}
-                          onChange={handleOUChange}
-                          treeData={ouTreeData}
-                          treeDefaultExpandAll={false}
-                          treeDefaultExpandedKeys={[]}
-                          style={{ width: '100%' }}
-                          styles={{ 
-                            popup: { 
-                              root: { 
-                                maxHeight: 500, 
-                                overflow: 'auto',
-                                minWidth: 400,
-                                padding: 0
-                              } 
-                            } 
-                          }}
-                          listHeight={500}
-                          loading={loadingOUs}
-                          notFoundContent={
-                            loadingOUs ? (
-                              <div style={{ padding: '40px 20px', textAlign: 'center' }}>
-                                <Spin size="large" />
-                                <div style={{ marginTop: 16, color: '#6b7280', fontSize: 15, fontWeight: 500 }}>
-                                  กำลังโหลด...
-                                </div>
-                              </div>
-                            ) : (
-                              <Empty
-                                image={Empty.PRESENTED_IMAGE_SIMPLE}
-                                description={
-                                  <Text type="secondary" style={{ fontSize: 15 }}>
-                                    ไม่พบ OU
-                                  </Text>
-                                }
-                                style={{ padding: '40px 20px' }}
-                              />
-                            )
                           }
-                          filterTreeNode={(input, node) => {
-                            const title = typeof node.title === 'string' ? node.title : (node.name || '');
-                            const fullPath = node.fullPath || '';
-                            const searchText = input.toLowerCase();
-                            return title.toLowerCase().includes(searchText) ||
-                                   fullPath.toLowerCase().includes(searchText);
-                          }}
-                          treeNodeLabelProp="fullPath"
-                          suffixIcon={<BankOutlined />}
-                        />
-                        {selectedOU && (
-                          <div className="umx-ou-preview">
-                            <Space direction="vertical" size={4}>
-                              <Text style={{ fontSize: 12, color: '#059669', fontWeight: 600 }}>
-                                ✓ OU Selected: {availableOUs.find(ou => ou.dn === selectedOU)?.name}
-                              </Text>
-                              <Text style={{ fontSize: 11, color: '#6b7280' }}>
-                                💡 Groups will be auto-selected in the next step
-                              </Text>
+                          rules={[{ required: true, message: 'Please enter CN' }]}
+                        >
+                          <Input placeholder="e.g., Wutthiphong Chaiyaphoom" />
+                        </Form.Item>
+                      </Col>
+                      <Col xs={24} md={12}>
+                        <Form.Item
+                          name="sAMAccountName"
+                          label={
+                            <Space>
+                              <span>Username (Login)</span>
+                              <Tooltip title="This will be used to login. Cannot be changed later.">
+                                <QuestionCircleOutlined style={{ color: '#9ca3af', fontSize: 12 }} />
+                              </Tooltip>
                             </Space>
-                          </div>
-                        )}
-                      </Form.Item>
-                    </div>
+                          }
+                          rules={[{ required: true, message: 'Please enter username' }]}
+                        >
+                          <Input placeholder="e.g., wutthiphong.c" />
+                        </Form.Item>
+                      </Col>
+                    </Row>
+
+                    <Row gutter={16}>
+                      <Col xs={24} md={12}>
+                        <Form.Item
+                          name="password"
+                          label="Password"
+                          rules={[
+                            { required: true, message: 'Please enter password' },
+                            { min: 8, message: 'Password must be at least 8 characters' },
+                            {
+                              pattern: /^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)(?=.*[@$!%*?&#^()_+\-=\[\]{};:'",.<>\/\\|`~])[A-Za-z\d@$!%*?&#^()_+\-=\[\]{};:'",.<>\/\\|`~]{8,}$/,
+                              message: 'Password must contain: uppercase, lowercase, number, and special character'
+                            }
+                          ]}
+                        >
+                          <Input.Password 
+                            placeholder="Enter strong password" 
+                            autoComplete="new-password"
+                          />
+                        </Form.Item>
+                      </Col>
+                      <Col xs={24} md={12}>
+                        <Form.Item
+                          name="confirmPassword"
+                          label="Confirm Password"
+                          dependencies={['password']}
+                          rules={[
+                            { required: true, message: 'Please confirm your password' },
+                            ({ getFieldValue }) => ({
+                              validator(_, value) {
+                                if (!value || getFieldValue('password') === value) {
+                                  return Promise.resolve();
+                                }
+                                return Promise.reject(new Error('The two passwords do not match!'));
+                              },
+                            }),
+                          ]}
+                        >
+                          <Input.Password
+                            placeholder="Re-enter password"
+                            autoComplete="new-password"
+                          />
+                        </Form.Item>
+                      </Col>
+                    </Row>
+
+                    <Row gutter={16}>
+                      <Col xs={24} md={12}>
+                        <Form.Item
+                          name="mail"
+                          label={
+                            <Space>
+                              <span>Email</span>
+                              <Tooltip title="Corporate email address">
+                                <QuestionCircleOutlined style={{ color: '#9ca3af', fontSize: 12 }} />
+                              </Tooltip>
+                            </Space>
+                          }
+                          rules={[
+                            { required: true, message: 'Please enter email' },
+                            { type: 'email', message: 'Please enter valid email' }
+                          ]}
+                        >
+                          <Input placeholder="user@tbkk.co.th" suffix={<MailOutlined />} />
+                        </Form.Item>
+                      </Col>
+                      <Col xs={24} md={12}>
+                        <Form.Item
+                          name="displayName"
+                          label="Display Name"
+                        >
+                          <Input placeholder="Auto-filled from CN" />
+                        </Form.Item>
+                      </Col>
+                    </Row>
+
+                    <Divider style={{ margin: '16px 0' }} />
+
+                    <Form.Item
+                      name="accountOption"
+                      label={
+                        <Space>
+                          <SettingOutlined />
+                          <span>Account Options</span>
+                        </Space>
+                      }
+                      rules={[{ required: false }]}
+                    >
+                      <Radio.Group>
+                        <Space direction="vertical" style={{ width: '100%' }}>
+                          <Radio value="passwordMustChange">
+                            <Space>
+                              <LockOutlined />
+                              <span>User must change password at next logon</span>
+                            </Space>
+                          </Radio>
+                          <Radio value="userCannotChangePassword">
+                            <Space>
+                              <UnlockOutlined />
+                              <span>User cannot change password</span>
+                            </Space>
+                          </Radio>
+                          <Radio value="passwordNeverExpires">
+                            <Space>
+                              <ClockCircleOutlined />
+                              <span>Password never expires</span>
+                            </Space>
+                          </Radio>
+                          <Radio value="storePasswordReversible">
+                            <Space>
+                              <SafetyCertificateOutlined />
+                              <span>Store password using reversible encryption</span>
+                            </Space>
+                          </Radio>
+                          <Radio value="none">
+                            <Text type="secondary">None (default settings)</Text>
+                          </Radio>
+                        </Space>
+                      </Radio.Group>
+                    </Form.Item>
+                  </Card>
+
+                  <Card
+                    title="Profile & Contact Information"
+                    style={{ marginBottom: 16 }}
+                  >
+                    <Collapse defaultActiveKey={['personal', 'contact']}>
+                      <Collapse.Panel header="Personal Details" key="personal">
+                        <Row gutter={16}>
+                          <Col xs={24} md={12}>
+                            <Form.Item
+                              name="givenName"
+                              label="First Name"
+                            >
+                              <Input placeholder="Enter first name" />
+                            </Form.Item>
+                          </Col>
+                          <Col xs={24} md={12}>
+                            <Form.Item
+                              name="sn"
+                              label="Last Name"
+                            >
+                              <Input placeholder="Enter last name" />
+                            </Form.Item>
+                          </Col>
+                        </Row>
+                        <Row gutter={16}>
+                          <Col xs={24} md={12}>
+                            <Form.Item
+                              name="title"
+                              label="Job Title"
+                            >
+                              <Input placeholder="Enter job title" />
+                            </Form.Item>
+                          </Col>
+                          <Col xs={24} md={12}>
+                            <Form.Item
+                              name="department"
+                              label="Department"
+                            >
+                              <Input placeholder="Enter department name" />
+                            </Form.Item>
+                          </Col>
+                        </Row>
+                        <Row gutter={16}>
+                          <Col xs={24} md={12}>
+                            <Form.Item
+                              name="company"
+                              label="Company"
+                            >
+                              <Input placeholder="Enter company name" />
+                            </Form.Item>
+                          </Col>
+                          <Col xs={24} md={12}>
+                            <Form.Item
+                              name="employeeID"
+                              label="Employee ID"
+                            >
+                              <Input placeholder="Enter employee ID" />
+                            </Form.Item>
+                          </Col>
+                        </Row>
+                        <Row gutter={16}>
+                          <Col xs={24} md={12}>
+                            <Form.Item
+                              name="departmentNumber"
+                              label="Department Number"
+                            >
+                              <Input placeholder="e.g., K1IT00" />
+                            </Form.Item>
+                          </Col>
+                        </Row>
+                      </Collapse.Panel>
+
+                      <Collapse.Panel header="Contact & Office" key="contact">
+                        <Row gutter={16}>
+                          <Col xs={24} md={12}>
+                            <Form.Item
+                              name="telephoneNumber"
+                              label="Phone"
+                            >
+                              <Input placeholder="Enter phone number" />
+                            </Form.Item>
+                          </Col>
+                          <Col xs={24} md={12}>
+                            <Form.Item
+                              name="mobile"
+                              label="Mobile"
+                            >
+                              <Input placeholder="Enter mobile number" />
+                            </Form.Item>
+                          </Col>
+                        </Row>
+                        <Row gutter={16}>
+                          <Col xs={24} md={12}>
+                            <Form.Item
+                              name="physicalDeliveryOfficeName"
+                              label="Office Location"
+                            >
+                              <Input placeholder="Enter office location" />
+                            </Form.Item>
+                          </Col>
+                          <Col xs={24} md={12}>
+                            <Form.Item
+                              name="description"
+                              label="Description"
+                            >
+                              <Input.TextArea rows={3} placeholder="Enter description or notes" />
+                            </Form.Item>
+                          </Col>
+                        </Row>
+                      </Collapse.Panel>
+                    </Collapse>
                   </Card>
                 </div>
+
+                <Card
+                  title="Organizational Placement"
+                  style={{ marginBottom: 16 }}
+                >
+                  <Form.Item
+                    label={
+                      <Space>
+                        <span>Organizational Unit (OU)</span>
+                        <Tooltip title="Select where this user will be created. This will auto-select appropriate groups.">
+                          <QuestionCircleOutlined style={{ color: '#9ca3af', fontSize: 12 }} />
+                        </Tooltip>
+                      </Space>
+                    }
+                  >
+                    <TreeSelect
+                      placeholder="Select OU (optional - defaults to CN=Users)"
+                      allowClear
+                      showSearch
+                      value={selectedOU}
+                      onChange={handleOUChange}
+                      treeData={ouTreeData}
+                      treeDefaultExpandAll={false}
+                      treeDefaultExpandedKeys={[]}
+                      style={{ width: '100%' }}
+                      listHeight={400}
+                      loading={loadingOUs}
+                      notFoundContent={
+                        loadingOUs ? (
+                          <div style={{ padding: '40px 20px', textAlign: 'center' }}>
+                            <Spin size="large" />
+                            <div style={{ marginTop: 16, color: '#6b7280' }}>
+                              กำลังโหลด...
+                            </div>
+                          </div>
+                        ) : (
+                          <Empty
+                            image={Empty.PRESENTED_IMAGE_SIMPLE}
+                            description="ไม่พบ OU"
+                            style={{ padding: '40px 20px' }}
+                          />
+                        )
+                      }
+                      filterTreeNode={(input, node) => {
+                        const title = typeof node.title === 'string' ? node.title : (node.name || '');
+                        const fullPath = node.fullPath || '';
+                        const searchText = input.toLowerCase();
+                        return title.toLowerCase().includes(searchText) ||
+                               fullPath.toLowerCase().includes(searchText);
+                      }}
+                      treeNodeLabelProp="fullPath"
+                      suffixIcon={<BankOutlined />}
+                    />
+                    {selectedOU && (
+                      <div style={{ marginTop: 8 }}>
+                        <Text type="success" style={{ fontSize: 12 }}>
+                          OU Selected: {availableOUs.find(ou => ou.dn === selectedOU)?.name}
+                        </Text>
+                        <div>
+                          <Text type="secondary" style={{ fontSize: 12 }}>
+                            Groups will be auto-selected in the next step
+                          </Text>
+                        </div>
+                      </div>
+                    )}
+                  </Form.Item>
+                </Card>
               </div>
             </div>
 
             {/* Step 2: Groups & Permissions */}
             <div style={{ display: currentStep === 1 ? 'block' : 'none' }}>
               <Alert
-                message="Step 2: Group Membership & Permissions"
+                message="Group Membership & Permissions"
                 description="Review and customize the groups that will be assigned to this user"
-                type="success"
+                type="info"
                 showIcon
-                style={{ marginBottom: 24 }}
+                style={{ marginBottom: 16 }}
               />
 
-              <Divider orientation="left">
+              <div style={{ marginBottom: 16 }}>
                 <Text strong>Group Membership ({selectedGroups.length} selected)</Text>
-              </Divider>
+              </div>
 
               {Object.keys(categorizedGroups).map(category => {
                 let groups = categorizedGroups[category] || [];
@@ -4790,17 +4697,17 @@ const UserManagement = () => {
                 if (groups.length === 0) return null;
 
                 return (
-                  <div key={category} style={{ marginBottom: 24 }}>
-                    <Divider orientation="left">
+                  <div key={category} style={{ marginBottom: 16 }}>
+                    <div style={{ marginBottom: 8 }}>
                       <Text strong>{category}</Text>
                       <Text type="secondary" style={{ marginLeft: 8, fontSize: 12 }}>
                         ({groups.length} groups)
                       </Text>
-                    </Divider>
+                    </div>
                     <div style={{
                       background: '#f9fafb',
                       padding: '12px',
-                      borderRadius: 8,
+                      borderRadius: 6,
                       border: '1px solid #e5e7eb'
                     }}>
                       <Space wrap size="small">
@@ -4823,40 +4730,10 @@ const UserManagement = () => {
                                   setSelectedGroups(selectedGroups.filter(dn => dn !== group.dn));
                                 }
                               }}
-                              style={{
-                                padding: '8px 16px',
-                                fontSize: 13,
-                                fontWeight: 500,
-                                borderRadius: 6,
-                                border: selectedGroups.includes(group.dn) 
-                                  ? '2px solid #10b981' 
-                                  : isSuggested 
-                                  ? '2px dashed #3b82f6'
-                                  : '1px solid #d1d5db',
-                                background: selectedGroups.includes(group.dn) 
-                                  ? '#ecfdf5' 
-                                  : isSuggested
-                                  ? '#eff6ff'
-                                  : '#fff',
-                                color: selectedGroups.includes(group.dn) 
-                                  ? '#059669' 
-                                  : isSuggested
-                                  ? '#1e40af'
-                                  : '#374151'
-                              }}
                             >
                               {isSuggested && '⭐ '}
                               {group.cn}
-                              {isSuggested && percentage > 0 && (
-                                <span style={{ 
-                                  marginLeft: 6, 
-                                  fontSize: 11, 
-                                  opacity: 0.8,
-                                  fontWeight: 700
-                                }}>
-                                  {percentage}%
-                                </span>
-                              )}
+                              {isSuggested && percentage > 0 && ` ${percentage}%`}
                             </Tag.CheckableTag>
                           );
                         })}
@@ -4867,177 +4744,90 @@ const UserManagement = () => {
               })}
 
               {selectedGroups.length > 0 && (
-                <div style={{
-                  background: '#ecfdf5',
-                  padding: '16px',
-                  borderRadius: 8,
-                  border: '1px solid #10b981',
-                  marginTop: 16
-                }}>
-                  <Text strong style={{ color: '#059669' }}>
-                    ✓ {selectedGroups.length} group(s) selected
-                  </Text>
-                </div>
+                <Alert
+                  message={`${selectedGroups.length} group(s) selected`}
+                  type="success"
+                  style={{ marginTop: 16 }}
+                />
               )}
             </div>
 
             {/* Step 3: Review & Confirm */}
             <div style={{ display: currentStep === 2 ? 'block' : 'none' }}>
               <Alert
-                message="Step 3: Review & Confirm"
+                message="Review & Confirm"
                 description="Review all information before creating the user"
                 type="warning"
                 showIcon
-                style={{ marginBottom: 24 }}
+                style={{ marginBottom: 16 }}
               />
 
               {/* Summary Card */}
               <Form.Item shouldUpdate noStyle>
                 {() => (
               <Card
-                title={<Text strong style={{ fontSize: 15 }}>📋 User Information Summary</Text>}
-                style={{
-                  background: '#fafbfc',
-                  border: '2px solid #e5e7eb',
-                  borderRadius: 12
-                }}
-                styles={{ body: { padding: '20px' } }}
+                title="User Information Summary"
+                style={{ marginBottom: 16 }}
               >
-                <Descriptions column={1} bordered size="middle">
-                  <Descriptions.Item 
-                    label={<Text strong>Common Name</Text>}
-                        styles={{ label: { width: '35%', background: '#f8fafc' } }}
-                  >
-                    <Text strong style={{ fontSize: 14 }}>
-                      {createForm.getFieldValue('cn') || '-'}
-                    </Text>
+                <Descriptions column={1} bordered>
+                  <Descriptions.Item label="Common Name">
+                    <Text strong>{createForm.getFieldValue('cn') || '-'}</Text>
                   </Descriptions.Item>
-                  <Descriptions.Item 
-                    label={<Text strong>Username (Login)</Text>}
-                        styles={{ label: { background: '#f8fafc' } }}
-                  >
-                    <Text code style={{ fontSize: 13 }}>
-                      {createForm.getFieldValue('sAMAccountName') || '-'}
-                    </Text>
+                  <Descriptions.Item label="Username (Login)">
+                    <Text code>{createForm.getFieldValue('sAMAccountName') || '-'}</Text>
                   </Descriptions.Item>
-                  <Descriptions.Item 
-                    label={<Text strong>Email</Text>}
-                        styles={{ label: { background: '#f8fafc' } }}
-                  >
-                    <Text style={{ fontSize: 13 }}>
-                      <MailOutlined style={{ marginRight: 6, color: '#3b82f6' }} />
-                      {createForm.getFieldValue('mail') || '-'}
-                    </Text>
+                  <Descriptions.Item label="Email">
+                    <Space>
+                      <MailOutlined />
+                      <span>{createForm.getFieldValue('mail') || '-'}</span>
+                    </Space>
                   </Descriptions.Item>
-                  <Descriptions.Item 
-                    label={<Text strong>Display Name</Text>}
-                        styles={{ label: { background: '#f8fafc' } }}
-                  >
-                    <Text style={{ fontSize: 13 }}>
-                      {createForm.getFieldValue('displayName') || createForm.getFieldValue('cn') || '-'}
-                    </Text>
+                  <Descriptions.Item label="Display Name">
+                    {createForm.getFieldValue('displayName') || createForm.getFieldValue('cn') || '-'}
                   </Descriptions.Item>
-                  <Descriptions.Item 
-                    label={<Text strong>First Name</Text>}
-                        styles={{ label: { background: '#f8fafc' } }}
-                  >
-                    <Text style={{ fontSize: 13 }}>
-                      {createForm.getFieldValue('givenName') || '-'}
-                    </Text>
+                  <Descriptions.Item label="First Name">
+                    {createForm.getFieldValue('givenName') || '-'}
                   </Descriptions.Item>
-                  <Descriptions.Item 
-                    label={<Text strong>Last Name</Text>}
-                        styles={{ label: { background: '#f8fafc' } }}
-                  >
-                    <Text style={{ fontSize: 13 }}>
-                      {createForm.getFieldValue('sn') || '-'}
-                    </Text>
+                  <Descriptions.Item label="Last Name">
+                    {createForm.getFieldValue('sn') || '-'}
                   </Descriptions.Item>
-                  <Descriptions.Item 
-                    label={<Text strong>Job Title</Text>}
-                        styles={{ label: { background: '#f8fafc' } }}
-                  >
-                    <Text style={{ fontSize: 13 }}>
-                      {createForm.getFieldValue('title') || '-'}
-                    </Text>
+                  <Descriptions.Item label="Job Title">
+                    {createForm.getFieldValue('title') || '-'}
                   </Descriptions.Item>
-                  <Descriptions.Item 
-                    label={<Text strong>Department</Text>}
-                        styles={{ label: { background: '#f8fafc' } }}
-                  >
-                    <Text style={{ fontSize: 13 }}>
-                      {createForm.getFieldValue('department') || '-'}
-                    </Text>
+                  <Descriptions.Item label="Department">
+                    {createForm.getFieldValue('department') || '-'}
                   </Descriptions.Item>
-                  <Descriptions.Item 
-                    label={<Text strong>Company</Text>}
-                        styles={{ label: { background: '#f8fafc' } }}
-                  >
-                    <Text style={{ fontSize: 13 }}>
-                      {createForm.getFieldValue('company') || '-'}
-                    </Text>
+                  <Descriptions.Item label="Company">
+                    {createForm.getFieldValue('company') || '-'}
                   </Descriptions.Item>
-                  <Descriptions.Item 
-                    label={<Text strong>Employee ID</Text>}
-                        styles={{ label: { background: '#f8fafc' } }}
-                  >
-                    <Text style={{ fontSize: 13 }}>
-                      {createForm.getFieldValue('employeeID') || '-'}
-                    </Text>
+                  <Descriptions.Item label="Employee ID">
+                    {createForm.getFieldValue('employeeID') || '-'}
                   </Descriptions.Item>
-                  <Descriptions.Item 
-                    label={<Text strong>Phone</Text>}
-                        styles={{ label: { background: '#f8fafc' } }}
-                  >
-                    <Text style={{ fontSize: 13 }}>
-                      {createForm.getFieldValue('telephoneNumber') || '-'}
-                    </Text>
+                  <Descriptions.Item label="Phone">
+                    {createForm.getFieldValue('telephoneNumber') || '-'}
                   </Descriptions.Item>
-                  <Descriptions.Item 
-                    label={<Text strong>Mobile</Text>}
-                        styles={{ label: { background: '#f8fafc' } }}
-                  >
-                    <Text style={{ fontSize: 13 }}>
-                      {createForm.getFieldValue('mobile') || '-'}
-                    </Text>
+                  <Descriptions.Item label="Mobile">
+                    {createForm.getFieldValue('mobile') || '-'}
                   </Descriptions.Item>
-                  <Descriptions.Item 
-                    label={<Text strong>Office Location</Text>}
-                        styles={{ label: { background: '#f8fafc' } }}
-                  >
-                    <Text style={{ fontSize: 13 }}>
-                      {createForm.getFieldValue('physicalDeliveryOfficeName') || '-'}
-                    </Text>
+                  <Descriptions.Item label="Office Location">
+                    {createForm.getFieldValue('physicalDeliveryOfficeName') || '-'}
                   </Descriptions.Item>
-                  <Descriptions.Item 
-                    label={<Text strong>Description</Text>}
-                        styles={{ label: { background: '#f8fafc' } }}
-                  >
-                    <Text style={{ fontSize: 13 }}>
-                      {createForm.getFieldValue('description') || '-'}
-                    </Text>
+                  <Descriptions.Item label="Description">
+                    {createForm.getFieldValue('description') || '-'}
                   </Descriptions.Item>
-                  <Descriptions.Item 
-                    label={<Text strong>Organizational Unit</Text>}
-                    styles={{ label: { background: '#f8fafc' } }}
-                  >
+                  <Descriptions.Item label="Organizational Unit">
                     {selectedOU ? (
-                      <div>
-                        <Text style={{ fontSize: 13 }}>
-                          <BankOutlined style={{ marginRight: 6, color: '#10b981' }} />
-                          {availableOUs.find(ou => ou.dn === selectedOU)?.fullPath}
-                        </Text>
-                      </div>
+                      <Space>
+                        <BankOutlined />
+                        <span>{availableOUs.find(ou => ou.dn === selectedOU)?.fullPath}</span>
+                      </Space>
                     ) : (
                       <Text type="secondary">Default (CN=Users)</Text>
                     )}
                   </Descriptions.Item>
-                  <Descriptions.Item 
-                    label={<Text strong>Groups</Text>}
-                    styles={{ label: { background: '#f8fafc' } }}
-                  >
+                  <Descriptions.Item label="Groups">
                     <div>
-                      <Text strong style={{ color: '#10b981', marginBottom: 8, display: 'block' }}>
+                      <Text strong style={{ display: 'block', marginBottom: 8 }}>
                         {selectedGroups.length} group(s) will be assigned
                       </Text>
                       <Space wrap size="small">
@@ -5045,7 +4835,6 @@ const UserManagement = () => {
                           let groupName = 'Unknown';
                           let percentage = 0;
                           
-                          // Find group name and percentage
                           Object.values(categorizedGroups).forEach(categoryGroups => {
                             const group = categoryGroups.find(g => g.dn === groupDn);
                             if (group) groupName = group.cn;
@@ -5057,11 +4846,7 @@ const UserManagement = () => {
                           if (suggestedGroup) percentage = suggestedGroup.percentage;
                           
                           return (
-                            <Tag 
-                              key={groupDn}
-                              color={percentage > 0 ? 'blue' : 'default'}
-                              style={{ marginBottom: 4 }}
-                            >
+                            <Tag key={groupDn} color={percentage > 0 ? 'blue' : 'default'}>
                               {percentage > 0 && '⭐ '}
                               {groupName}
                               {percentage > 0 && ` ${percentage}%`}
@@ -5074,18 +4859,6 @@ const UserManagement = () => {
                       </Space>
                     </div>
                   </Descriptions.Item>
-                  <Descriptions.Item 
-                    label={<Text strong>Status</Text>}
-                    styles={{ label: { background: '#f8fafc' } }}
-                  >
-                    <Space direction="vertical" size={4}>
-                      {editingUser?.isEnabled ? (
-                        <Tag color="success">Active</Tag>
-                      ) : (
-                        <Tag color="default">Disabled</Tag>
-                      )}
-                    </Space>
-                  </Descriptions.Item>
                 </Descriptions>
               </Card>
                 )}
@@ -5093,18 +4866,16 @@ const UserManagement = () => {
 
               {/* Action Buttons to Edit */}
               <div style={{ marginTop: 16, textAlign: 'center' }}>
-                <Space size="middle">
+                <Space>
                   <Button 
                     onClick={() => setCurrentStep(0)} 
                     icon={<EditOutlined />}
-                    aria-label="แก้ไขข้อมูลบัญชี"
                   >
                     Edit Account Info
                   </Button>
                   <Button 
                     onClick={() => setCurrentStep(1)} 
                     icon={<TeamOutlined />}
-                    aria-label="แก้ไขกลุ่มผู้ใช้"
                   >
                     Edit Groups
                   </Button>
@@ -5760,8 +5531,9 @@ const UserManagement = () => {
               userPrincipalName: false,
               manager: false,
               lastLogon: false,
-              pwdLastSet: false,
-              accountExpires: false
+                  pwdLastSet: false,
+                  accountExpires: false,
+                  departmentNumber: true
             });
           }}>
             รีเซ็ต
@@ -5807,7 +5579,8 @@ const UserManagement = () => {
                   manager: 'Manager',
                   lastLogon: 'เข้าสู่ระบบล่าสุด (Last Login)',
                   pwdLastSet: 'รหัสผ่านล่าสุด (Last Password Set)',
-                  accountExpires: 'หมดอายุ (Account Expires)'
+                  accountExpires: 'หมดอายุ (Account Expires)',
+                  departmentNumber: 'Department Number'
                 };
                 
                 return (
