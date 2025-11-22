@@ -44,7 +44,7 @@ class UserCreate(BaseModel):
     department: Optional[str] = Field(None, max_length=64, description="Department name")
     company: Optional[str] = Field(None, max_length=64, description="Company name")
     employeeID: Optional[str] = Field(None, max_length=64, description="Employee ID")
-    departmentNumber: Optional[str] = Field(None, max_length=64, description="Department number")
+    extensionName: Optional[str] = Field(None, max_length=64, description="Extension name")
     physicalDeliveryOfficeName: Optional[str] = Field(None, max_length=128, description="Office location")
     streetAddress: Optional[str] = Field(None, max_length=1024, description="Street address")
     l: Optional[str] = Field(None, max_length=128, description="City/locality")  # city/locality in AD
@@ -83,7 +83,7 @@ class UserUpdate(BaseModel):
     department: Optional[str] = Field(None, max_length=64, description="Department name")
     company: Optional[str] = Field(None, max_length=64, description="Company name")
     employeeID: Optional[str] = Field(None, max_length=64, description="Employee ID")
-    departmentNumber: Optional[str] = Field(None, max_length=64, description="Department number")
+    extensionName: Optional[str] = Field(None, max_length=64, description="Extension name")
     physicalDeliveryOfficeName: Optional[str] = Field(None, max_length=128, description="Office location")
     streetAddress: Optional[str] = Field(None, max_length=1024, description="Street address")
     l: Optional[str] = Field(None, max_length=128, description="City/locality")  # city/locality in AD
@@ -150,7 +150,7 @@ class UserResponse(BaseModel):
     userPrincipalName: Optional[str] = None
     manager: Optional[str] = None
     accountExpires: Optional[str] = None
-    departmentNumber: Optional[str] = None
+    extensionName: Optional[str] = None
 
 class UserStatsResponse(BaseModel):
     """User statistics response model"""

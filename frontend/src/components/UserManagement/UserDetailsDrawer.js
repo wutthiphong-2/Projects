@@ -196,14 +196,32 @@ const UserDetailsDrawer = ({
                     <Text type="secondary" style={{ fontSize: 13, fontStyle: 'italic' }}>ไม่มีข้อมูล</Text>
                   )}
                 </Descriptions.Item>
-                <Descriptions.Item label="Department Number">
-                  {user.departmentNumber ? (
-                    <Text code style={{ background: '#f3f4f6', padding: '4px 8px', borderRadius: 4 }}>
-                      {user.departmentNumber}
-                    </Text>
-                  ) : (
-                    <Text type="secondary" style={{ fontSize: 13, fontStyle: 'italic' }}>ไม่มีข้อมูล</Text>
-                  )}
+                <Descriptions.Item label="Extension Name">
+                  {(() => {
+                    // Debug: Log extensionName in development
+                    if (process.env.NODE_ENV === 'development') {
+                      console.debug('[UserDetailsDrawer] Extension Name Debug (Basic Info)', {
+                        hasExtensionName: 'extensionName' in user,
+                        extensionName: user.extensionName,
+                        extensionNameType: typeof user.extensionName,
+                        isEmpty: !user.extensionName || user.extensionName === '',
+                        isNull: user.extensionName === null,
+                        isUndefined: user.extensionName === undefined,
+                        allKeys: Object.keys(user).filter(k => k.toLowerCase().includes('ext') || k.toLowerCase().includes('dept'))
+                      });
+                    }
+                    
+                    // Check for extensionName with multiple possible field names
+                    const extensionName = user.extensionName || user.extension_name || user.departmentNumber || user.department_number;
+                    
+                    return extensionName ? (
+                      <Text code style={{ background: '#f3f4f6', padding: '4px 8px', borderRadius: 4 }}>
+                        {extensionName}
+                      </Text>
+                    ) : (
+                      <Text type="secondary" style={{ fontSize: 13, fontStyle: 'italic' }}>ไม่มีข้อมูล</Text>
+                    );
+                  })()}
                 </Descriptions.Item>
                 <Descriptions.Item label="Phone">
                   {user.telephoneNumber ? (
@@ -508,42 +526,19 @@ const UserDetailsDrawer = ({
                   }
                 }}
               >
-                <Descriptions.Item label="Street Address">
-                  {user.streetAddress ? (
-                    <Text style={{ fontSize: 13 }}>{user.streetAddress}</Text>
-                  ) : (
-                    <Text type="secondary" style={{ fontSize: 13, fontStyle: 'italic' }}>ไม่มีข้อมูล</Text>
-                  )}
-                </Descriptions.Item>
-                <Descriptions.Item label="City">
-                  {user.l ? (
-                    <Text style={{ fontSize: 13 }}>{user.l}</Text>
-                  ) : (
-                    <Text type="secondary" style={{ fontSize: 13, fontStyle: 'italic' }}>ไม่มีข้อมูล</Text>
-                  )}
-                </Descriptions.Item>
-                <Descriptions.Item label="State/Province">
-                  {user.st ? (
-                    <Text style={{ fontSize: 13 }}>{user.st}</Text>
-                  ) : (
-                    <Text type="secondary" style={{ fontSize: 13, fontStyle: 'italic' }}>ไม่มีข้อมูล</Text>
-                  )}
-                </Descriptions.Item>
-                <Descriptions.Item label="Postal Code">
-                  {user.postalCode ? (
-                    <Text code style={{ background: '#f3f4f6', padding: '4px 8px', borderRadius: 4 }}>
-                      {user.postalCode}
-                    </Text>
-                  ) : (
-                    <Text type="secondary" style={{ fontSize: 13, fontStyle: 'italic' }}>ไม่มีข้อมูล</Text>
-                  )}
-                </Descriptions.Item>
-                <Descriptions.Item label="Country">
-                  {user.co ? (
-                    <Text style={{ fontSize: 13 }}>{user.co}</Text>
-                  ) : (
-                    <Text type="secondary" style={{ fontSize: 13, fontStyle: 'italic' }}>ไม่มีข้อมูล</Text>
-                  )}
+                <Descriptions.Item label="Extension Name">
+                  {(() => {
+                    // Check for extensionName with multiple possible field names
+                    const extensionName = user.extensionName || user.extension_name || user.departmentNumber || user.department_number;
+                    
+                    return extensionName ? (
+                      <Text code style={{ background: '#f3f4f6', padding: '4px 8px', borderRadius: 4 }}>
+                        {extensionName}
+                      </Text>
+                    ) : (
+                      <Text type="secondary" style={{ fontSize: 13, fontStyle: 'italic' }}>ไม่มีข้อมูล</Text>
+                    );
+                  })()}
                 </Descriptions.Item>
               </Descriptions>
             </Card>

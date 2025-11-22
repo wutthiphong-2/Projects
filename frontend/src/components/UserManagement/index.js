@@ -241,7 +241,7 @@ const UserManagement = () => {
     lastLogon: false,              // Last Logon
     pwdLastSet: false,             // Password Last Set
     accountExpires: false,         // Account Expires
-    departmentNumber: false        // Department Number
+    extensionName: false        // Extension Name
   });
   const [isColumnSettingsVisible, setIsColumnSettingsVisible] = useState(false);
   const [currentPage, setCurrentPage] = useState(1);
@@ -267,7 +267,6 @@ const UserManagement = () => {
   const [filterPresets, setFilterPresets] = useState([]);
   const [filterHistory, setFilterHistory] = useState([]);
   const [isFilterPresetModalVisible, setIsFilterPresetModalVisible] = useState(false);
-  const [presetForm] = Form.useForm();
   
   // Table views & customization
   const [tableView, setTableView] = useState('table'); // 'table', 'grid', 'compact'
@@ -558,6 +557,46 @@ const UserManagement = () => {
         userData = [];
       }
       
+      // Debug: Check if employeeID exists in API response (only in development)
+      if (process.env.NODE_ENV === 'development' && userData.length > 0) {
+        const sampleUser = userData[0];
+        const hasEmployeeID = 'employeeID' in sampleUser;
+        const employeeIDValue = sampleUser.employeeID;
+        
+        console.debug('[UserManagement] Employee ID Check', {
+          hasEmployeeID,
+          employeeIDValue,
+          employeeIDType: typeof employeeIDValue,
+          isEmpty: !employeeIDValue || employeeIDValue === '' || employeeIDValue === null,
+          sampleUserKeys: Object.keys(sampleUser).filter(k => k.toLowerCase().includes('employee')),
+          firstUser: {
+            username: sampleUser.sAMAccountName,
+            employeeID: sampleUser.employeeID,
+            allKeys: Object.keys(sampleUser)
+          }
+        });
+        
+        // Count users with employeeID
+        const usersWithEmployeeID = userData.filter(u => u.employeeID && String(u.employeeID).trim() !== '');
+        if (usersWithEmployeeID.length > 0) {
+          console.debug('[UserManagement] Users with Employee ID', {
+            total: userData.length,
+            withEmployeeID: usersWithEmployeeID.length,
+            percentage: ((usersWithEmployeeID.length / userData.length) * 100).toFixed(1) + '%',
+            samples: usersWithEmployeeID.slice(0, 5).map(u => ({
+              username: u.sAMAccountName,
+              employeeID: u.employeeID,
+              type: typeof u.employeeID
+            }))
+          });
+        } else {
+          console.warn('[UserManagement] No users have employeeID data', {
+            total: userData.length,
+            sampleUserKeys: Object.keys(sampleUser)
+          });
+        }
+      }
+      
       // Ensure userData is always an array
       if (!Array.isArray(userData)) {
         console.error('[UserManagement] userData is not an array after processing', {
@@ -569,24 +608,59 @@ const UserManagement = () => {
         userData = [];
       }
       
-      // Debug: Check if departmentNumber is in the data (only in development)
+      // Debug: Check if extensionName and employeeID are in the data (only in development)
       if (process.env.NODE_ENV === 'development' && userData.length > 0) {
         const sampleUser = userData[0];
-        const hasDepartmentNumber = 'departmentNumber' in sampleUser;
+        const hasExtensionName = 'extensionName' in sampleUser;
+        const hasEmployeeID = 'employeeID' in sampleUser;
         
-        if (hasDepartmentNumber) {
-          const usersWithDeptNum = userData.filter(u => u.departmentNumber);
-          if (usersWithDeptNum.length > 0) {
-            console.debug('[UserManagement] Department Number Stats', {
+        if (hasExtensionName) {
+          const usersWithExtName = userData.filter(u => u.extensionName);
+          if (usersWithExtName.length > 0) {
+            console.debug('[UserManagement] Extension Name Stats', {
               total: userData.length,
-              withDeptNum: usersWithDeptNum.length,
-              percentage: ((usersWithDeptNum.length / userData.length) * 100).toFixed(1) + '%',
-              sample: usersWithDeptNum.slice(0, 3).map(u => ({
+              withExtName: usersWithExtName.length,
+              percentage: ((usersWithExtName.length / userData.length) * 100).toFixed(1) + '%',
+              sample: usersWithExtName.slice(0, 3).map(u => ({
                 username: u.sAMAccountName,
-                departmentNumber: u.departmentNumber
+                extensionName: u.extensionName
               }))
             });
           }
+        }
+        
+        if (hasEmployeeID) {
+          const usersWithEmployeeID = userData.filter(u => {
+            const empId = u.employeeID;
+            return empId && String(empId).trim() !== '';
+          });
+          
+          console.debug('[UserManagement] Employee ID Stats', {
+            total: userData.length,
+            withEmployeeID: usersWithEmployeeID.length,
+            withoutEmployeeID: userData.length - usersWithEmployeeID.length,
+            percentage: ((usersWithEmployeeID.length / userData.length) * 100).toFixed(1) + '%',
+            sample: usersWithEmployeeID.slice(0, 5).map(u => ({
+              username: u.sAMAccountName,
+              employeeID: u.employeeID,
+              employeeIDType: typeof u.employeeID
+            })),
+            sampleWithout: userData.filter(u => !u.employeeID || String(u.employeeID).trim() === '').slice(0, 3).map(u => ({
+              username: u.sAMAccountName,
+              employeeID: u.employeeID,
+              employeeIDType: typeof u.employeeID
+            })),
+            sampleUserKeys: Object.keys(sampleUser).filter(k => k.toLowerCase().includes('employee'))
+          });
+        } else {
+          console.warn('[UserManagement] employeeID field not found in user data', {
+            sampleUserKeys: Object.keys(sampleUser),
+            hasEmployeeID: hasEmployeeID,
+            sampleUser: {
+              username: sampleUser.sAMAccountName,
+              keys: Object.keys(sampleUser)
+            }
+          });
         }
       }
       
@@ -705,7 +779,36 @@ const UserManagement = () => {
   const fetchUserDetails = useCallback(async (userDn) => {
     try {
       // Fetch full user details first
-      const userDetails = await userService.getUser(userDn).catch(() => selectedUser);
+      const response = await userService.getUser(userDn).catch(() => null);
+      
+      // Handle different response formats
+      let userDetails = null;
+      if (response) {
+        // Check if response has data property (wrapped response)
+        if (response.data && typeof response.data === 'object' && !Array.isArray(response.data)) {
+          userDetails = response.data;
+        } else if (response.data) {
+          userDetails = response.data;
+        } else {
+          userDetails = response;
+        }
+      }
+      
+      // Fallback to selectedUser if no details fetched
+      if (!userDetails && selectedUser) {
+        userDetails = selectedUser;
+      }
+
+      // Debug: Log extensionName in development
+      if (process.env.NODE_ENV === 'development' && userDetails) {
+        console.debug('[UserManagement] User details loaded for drawer', {
+          username: userDetails.sAMAccountName,
+          hasExtensionName: 'extensionName' in userDetails,
+          extensionName: userDetails.extensionName,
+          extensionNameType: typeof userDetails.extensionName,
+          allKeys: Object.keys(userDetails).filter(k => k.toLowerCase().includes('ext') || k.toLowerCase().includes('dept'))
+        });
+      }
 
       // Update selected user with full details
       if (userDetails) {
@@ -833,35 +936,71 @@ const UserManagement = () => {
 
   // Handler function for opening edit modal
   const handleEditUser = useCallback(async (user) => {
-    // First set the user from table (for immediate feedback)
-    setEditingUser(user);
-    setIsEditModalVisible(true);
+    if (!user?.dn) {
+      message.error('ไม่พบข้อมูลผู้ใช้');
+      return;
+    }
     
-    // Fetch full user details with all fields (including employeeID) from API
-    if (user?.dn) {
-      try {
-        const fullUserDetails = await userService.getUser(user.dn);
-        if (fullUserDetails) {
-          // Update with full details (this will trigger useEffect in EditUserModal)
-          setEditingUser(fullUserDetails);
-          
-          if (process.env.NODE_ENV === 'development') {
-            console.debug('[UserManagement] User details loaded for edit', {
-              hasEmployeeID: !!fullUserDetails.employeeID,
-              employeeID: fullUserDetails.employeeID,
-              username: fullUserDetails.sAMAccountName
-            });
-          }
+    // Fetch full user details FIRST before opening modal
+    // This ensures all data is available when modal opens
+    try {
+      const response = await userService.getUser(user.dn);
+      
+      // Handle different response formats
+      let fullUserDetails = null;
+      if (response) {
+        // Check if response has data property (wrapped response)
+        if (response.data && typeof response.data === 'object' && !Array.isArray(response.data)) {
+          fullUserDetails = response.data;
+        } else if (response.data) {
+          fullUserDetails = response.data;
+        } else {
+          fullUserDetails = response;
         }
-      } catch (error) {
-        console.error('[UserManagement] Error fetching user details for edit', {
-          error: error.message,
-          userDn: user.dn,
-          username: user.sAMAccountName
+      }
+      
+      // Debug: Log full user details
+      if (process.env.NODE_ENV === 'development' && fullUserDetails) {
+        console.debug('[UserManagement] Full user details loaded for edit', {
+          username: fullUserDetails.sAMAccountName,
+          hasEmployeeID: !!fullUserDetails.employeeID,
+          employeeID: fullUserDetails.employeeID,
+          hasExtensionName: 'extensionName' in fullUserDetails,
+          extensionName: fullUserDetails.extensionName,
+          extensionNameType: typeof fullUserDetails.extensionName,
+          isEmpty: !fullUserDetails.extensionName || fullUserDetails.extensionName === '',
+          isNull: fullUserDetails.extensionName === null,
+          isUndefined: fullUserDetails.extensionName === undefined,
+          hasDepartment: !!fullUserDetails.department,
+          department: fullUserDetails.department,
+          hasCompany: !!fullUserDetails.company,
+          company: fullUserDetails.company,
+          allKeys: Object.keys(fullUserDetails),
+          extensionRelatedKeys: Object.keys(fullUserDetails).filter(k => k.toLowerCase().includes('ext') || k.toLowerCase().includes('dept'))
         });
-        // Continue with original user data if fetch fails
+      }
+      
+      if (fullUserDetails) {
+        // Set full user details and open modal
+        setEditingUser(fullUserDetails);
+        setIsEditModalVisible(true);
+      } else {
+        // Fallback to table data if API returns null
+        console.warn('[UserManagement] API returned null, using table data');
+        setEditingUser(user);
+        setIsEditModalVisible(true);
         message.warning('ไม่สามารถโหลดข้อมูลเพิ่มเติมได้ ใช้ข้อมูลจากตารางแทน');
       }
+    } catch (error) {
+      console.error('[UserManagement] Error fetching user details for edit', {
+        error: error.message,
+        userDn: user.dn,
+        username: user.sAMAccountName
+      });
+      // Fallback to table data if fetch fails
+      setEditingUser(user);
+      setIsEditModalVisible(true);
+      message.warning('ไม่สามารถโหลดข้อมูลเพิ่มเติมได้ ใช้ข้อมูลจากตารางแทน');
     }
   }, [message]);
 
@@ -1015,46 +1154,46 @@ const UserManagement = () => {
           </span>
         ),
         children: (
-          <Card
-            size="small"
-            style={{
-              marginBottom: 16,
-              background: '#ffffff',
-              border: '1px solid #e5e7eb',
-              borderRadius: 8
-            }}
-            styles={{ body: { padding: 0 } }}
-          >
-            <Descriptions
-              column={1}
-              bordered
-              size="middle"
-              styles={{
-                label: {
-                  background: '#f8fafc',
-                  color: '#374151',
-                  fontWeight: 600,
-                  fontSize: 13,
-                  width: '35%'
-                },
-                content: {
-                  background: '#ffffff',
-                  color: '#1f2937'
-                }
+            <Card
+              size="small"
+              style={{
+                marginBottom: 16,
+                background: '#ffffff',
+                border: '1px solid #e5e7eb',
+                borderRadius: 8
               }}
+              styles={{ body: { padding: 0 } }}
             >
-              <Descriptions.Item label="Display Name">
-                <Text strong style={{ fontSize: 14 }}>
+              <Descriptions
+                column={1}
+                bordered
+                size="middle"
+                styles={{
+                  label: {
+                    background: '#f8fafc',
+                    color: '#374151',
+                    fontWeight: 600,
+                    fontSize: 13,
+                    width: '35%'
+                  },
+                  content: {
+                    background: '#ffffff',
+                    color: '#1f2937'
+                  }
+                }}
+              >
+                <Descriptions.Item label="Display Name">
+                  <Text strong style={{ fontSize: 14 }}>
                   {managingUser.displayName || managingUser.cn || 'N/A'}
-                </Text>
-              </Descriptions.Item>
-              <Descriptions.Item label="Username">
-                <Text copyable code style={{ background: '#f3f4f6', padding: '4px 8px', borderRadius: 4 }}>
+                  </Text>
+                </Descriptions.Item>
+                <Descriptions.Item label="Username">
+                  <Text copyable code style={{ background: '#f3f4f6', padding: '4px 8px', borderRadius: 4 }}>
                   {managingUser.sAMAccountName}
-                </Text>
-              </Descriptions.Item>
-            </Descriptions>
-          </Card>
+                  </Text>
+                </Descriptions.Item>
+              </Descriptions>
+            </Card>
         )
       }
     ];
@@ -1219,7 +1358,7 @@ const UserManagement = () => {
     Object.entries(updates).forEach(([key, value]) => {
       if (value && value !== '' && value !== 'all') {
         newParams.set(key, value);
-      } else {
+                              } else {
         newParams.delete(key);
       }
     });
@@ -1406,9 +1545,9 @@ const UserManagement = () => {
       
       if (!selectedUser?.dn) {
         message.error('No user selected');
-        return;
-      }
-      
+      return;
+    }
+    
       await userService.resetPassword(selectedUser.dn, values.password);
       
       notifyPasswordReset(getUserDisplayName(selectedUser));
@@ -1681,153 +1820,135 @@ const UserManagement = () => {
     return buildTreeStructure(regularOUs);
   }, [regularOUs, buildTreeStructure]);
 
+  // Combined tree data for CreateUserModal (all OUs)
+  const ouTreeData = useMemo(() => {
+    return buildTreeStructure(availableOUs);
+  }, [availableOUs, buildTreeStructure]);
+
   // (Render functions and table columns moved to UserTable.js component)
   
   // ==================== RENDER ====================
-  
-  return (
+
+    return (
     <div className="umx-root">
-      {/* Modern Page Header */}
+      {/* Modern Page Header - Compact Design */}
       <header className={`umx-sticky-header ${isHeaderSticky ? 'umx-sticky-active' : ''}`}>
         <div className="umx-hero-compact">
           {/* Header Top Row: Title & Actions */}
           <div style={{ 
             display: 'flex', 
             justifyContent: 'space-between', 
-            alignItems: 'center',
-            marginBottom: 24
+            alignItems: 'flex-start',
+            marginBottom: 16,
+            gap: 16
           }}>
-            <div>
-              <Space size={12} align="center" style={{ marginBottom: 8 }}>
-                <Tag color="blue" className="umx-hero-badge-compact">
+            <div style={{ flex: 1, minWidth: 0 }}>
+              <Space size={12} align="center" style={{ marginBottom: 4 }}>
+                <Tag color="blue" className="umx-hero-badge-compact" style={{ fontSize: 10, padding: '2px 8px' }}>
                   DIRECTORY
                 </Tag>
-                <div className="umx-hero-title-compact">User Management</div>
+                <div className="umx-hero-title-compact" style={{ fontSize: 28, margin: 0 }}>User Management</div>
               </Space>
-              <Text type="secondary" style={{ fontSize: 14, marginLeft: 140 }}>
+              <Text type="secondary" style={{ fontSize: 13, display: 'block', marginTop: 4 }}>
                 Manage and organize user accounts in your Active Directory
-              </Text>
-            </div>
+        </Text>
+      </div>
             
-            {/* Action Buttons */}
-            <Space size={12}>
-              <Tooltip 
-                title="รีเฟรชข้อมูล" 
-                placement="bottom"
-                getPopupContainer={(trigger) => document.body}
-                overlayStyle={{ pointerEvents: 'none' }}
-                overlayInnerStyle={{ pointerEvents: 'none' }}
-                mouseEnterDelay={0.1}
-                destroyTooltipOnHide
-              >
-                <span style={{ display: 'inline-block', lineHeight: 0 }}>
-                  <Button 
-                    icon={<ReloadOutlined />} 
-                    onClick={(e) => {
-                      if (e && e.stopPropagation) {
-                        e.stopPropagation();
-                      }
-                      fetchUsers(true);
-                    }} 
-                    loading={loading}
-                    size="large"
-                    type="text"
-                    style={{ 
-                      borderRadius: 8, 
-                      pointerEvents: 'auto',
-                      cursor: 'pointer',
-                      zIndex: 10,
-                      position: 'relative'
-                    }}
-                  />
-                </span>
-              </Tooltip>
-              <Tooltip 
-                title="ตัวกรองขั้นสูง" 
-                placement="bottom"
-                getPopupContainer={(trigger) => document.body}
-                overlayStyle={{ pointerEvents: 'none' }}
-                overlayInnerStyle={{ pointerEvents: 'none' }}
-                mouseEnterDelay={0.1}
-                destroyTooltipOnHide
-              >
-                <span style={{ display: 'inline-block', lineHeight: 0 }}>
-                  <Button 
-                    icon={<FilterOutlined />} 
-                    onClick={(e) => {
-                      if (e && e.stopPropagation) {
-                        e.stopPropagation();
-                      }
-                      openAdvancedFilterDrawer();
-                    }}
-                    size="large"
-                    type="text"
-                    style={{ 
-                      borderRadius: 8, 
-                      pointerEvents: 'auto',
-                      cursor: 'pointer',
-                      zIndex: 10,
-                      position: 'relative'
-                    }}
-                  />
-                </span>
-              </Tooltip>
-              <Tooltip 
-                title="ตั้งค่าคอลัมน์" 
-                placement="bottom"
-                getPopupContainer={(trigger) => document.body}
-                overlayStyle={{ pointerEvents: 'none' }}
-                overlayInnerStyle={{ pointerEvents: 'none' }}
-                mouseEnterDelay={0.1}
-                destroyTooltipOnHide
-              >
-                <span style={{ display: 'inline-block', lineHeight: 0 }}>
-                  <Button 
-                    icon={<TagOutlined />} 
-                    onClick={(e) => {
-                      if (e && e.stopPropagation) {
-                        e.stopPropagation();
-                      }
-                      setIsColumnSettingsVisible(true);
-                    }}
-                    size="large"
-                    type="text"
-                    style={{ 
-                      borderRadius: 8, 
-                      pointerEvents: 'auto',
-                      cursor: 'pointer',
-                      zIndex: 10,
-                      position: 'relative'
-                    }}
-                  />
-                </span>
-              </Tooltip>
+            {/* Action Buttons - Grouped */}
+            <Space size={8} wrap>
+              {/* Primary Action */}
               <Button 
                 type="primary" 
                 icon={<UserAddOutlined />} 
                 onClick={handleCreateUser}
                 size="large"
-                style={{ 
+        style={{
                   borderRadius: 8,
                   fontWeight: 600,
-                  boxShadow: '0 2px 4px rgba(37, 99, 235, 0.2)'
+                  boxShadow: '0 2px 4px rgba(37, 99, 235, 0.2)',
+                  height: 40
                 }}
               >
                 สร้างผู้ใช้
               </Button>
+              
+              {/* Secondary Actions - Dropdown */}
+          <Dropdown
+            menu={{
+              items: [
+                {
+                      key: 'refresh',
+                      icon: <ReloadOutlined />,
+                      label: 'รีเฟรชข้อมูล',
+                      onClick: () => fetchUsers(true)
+                    },
+                    {
+                      key: 'filter',
+                      icon: <FilterOutlined />,
+                      label: 'ตัวกรองขั้นสูง',
+                      onClick: () => openAdvancedFilterDrawer()
+                    },
+                    {
+                      key: 'columns',
+                      icon: <TagOutlined />,
+                      label: 'ตั้งค่าคอลัมน์',
+                      onClick: () => setIsColumnSettingsVisible(true)
+                    },
+                    {
+                      type: 'divider'
+                    },
+                    {
+                      key: 'export',
+                      icon: <ExportOutlined />,
+                      label: 'ส่งออกข้อมูล',
+                      disabled: true
+                }
+              ]
+            }}
+            trigger={['click']}
+            placement="bottomRight"
+          >
+            <Button
+                  icon={<SettingOutlined />}
+                  size="large"
+                  type="text"
+                style={{ 
+                  borderRadius: 8,
+                    height: 40,
+                    width: 40,
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center'
+                  }}
+                />
+              </Dropdown>
             </Space>
           </div>
           
-          {/* Metrics Cards Grid */}
-          <div className="umx-hero-metrics-compact">
+          {/* Metrics Cards Grid - Compact Horizontal Layout */}
+          <div className="umx-hero-metrics-compact" style={{ 
+            display: 'grid',
+            gridTemplateColumns: 'repeat(auto-fit, minmax(140px, 1fr))',
+            gap: 12
+          }}>
             {heroMetrics.map((metric) => (
               <div 
                 key={metric.key} 
                 className="umx-metric-card-compact"
                 onClick={metric.onClick}
+                style={{
+                  padding: '12px 16px',
+                  cursor: 'pointer'
+                }}
               >
-                <div className="umx-metric-label-compact">{metric.label}</div>
-                <div className="umx-metric-value-compact" style={{ color: metric.accent }}>
+                <div className="umx-metric-label-compact" style={{ fontSize: 11, marginBottom: 4 }}>
+                  {metric.label}
+                </div>
+                <div className="umx-metric-value-compact" style={{ 
+                  color: metric.accent,
+                  fontSize: 22,
+                  fontWeight: 700
+                }}>
                   {metric.value}
                 </div>
               </div>
@@ -1906,7 +2027,7 @@ const UserManagement = () => {
             filteredUsers={filteredUsers}
             selectedRowKeys={selectedRowKeys}
             setSelectedRowKeys={setSelectedRowKeys}
-            loading={loading}
+          loading={loading}
             screens={screens}
             visibleColumns={visibleColumns}
             sortedInfo={sortedInfo}
@@ -1929,9 +2050,9 @@ const UserManagement = () => {
             handleResetPassword={handleResetPassword}
             handleClearAllFilters={handleClearAllFilters}
           />
-        </Card>
+      </Card>
       </main>
-      
+
       {/* Modals and Drawers */}
       <CreateUserModal
         visible={isCreateModalVisible}
@@ -1939,6 +2060,8 @@ const UserManagement = () => {
         fetchUsers={fetchUsers}
         availableOUs={availableOUs}
         categorizedGroups={categorizedGroups}
+        ouTreeData={ouTreeData}
+        loadingOUs={loadingOUs}
         screens={screens}
       />
       
@@ -1955,7 +2078,7 @@ const UserManagement = () => {
         }}
         screens={screens}
       />
-      
+
       {/* Password Reset Modal */}
       <Modal
         title={
@@ -2057,7 +2180,7 @@ const UserManagement = () => {
           </Form>
         </div>
       </Modal>
-      
+
       {/* Manage Groups Modal */}
       <Modal
         title={
@@ -2162,7 +2285,7 @@ const UserManagement = () => {
                 <Text strong style={{ fontSize: 14, color: '#374151' }}>
                   WiFi OUs
                 </Text>
-              </div>
+          </div>
               <TreeSelect
                 placeholder="เลือก WiFi OU"
                 allowClear
@@ -2200,8 +2323,8 @@ const UserManagement = () => {
               <div style={{ marginBottom: 8 }}>
                 <Text strong style={{ fontSize: 14, color: '#374151' }}>
                   Regular OUs
-                </Text>
-              </div>
+                      </Text>
+                    </div>
               <TreeSelect
                 placeholder="เลือก Regular OU"
                 allowClear
@@ -2262,7 +2385,7 @@ const UserManagement = () => {
           )}
         </div>
       </Modal>
-      
+
       {/* Column Settings Modal */}
       <Modal
         title={
@@ -2289,7 +2412,7 @@ const UserManagement = () => {
                   เลือกคอลัมน์ที่จะแสดงในตาราง
                 </Text>
               </div>
-            </Space>
+          </Space>
           </div>
         }
         open={isColumnSettingsVisible}
@@ -2314,7 +2437,7 @@ const UserManagement = () => {
               lastLogon: false,              // Last Logon
               pwdLastSet: false,             // Password Last Set
               accountExpires: false,         // Account Expires
-              departmentNumber: false        // Department Number
+              extensionName: false        // Extension Name
             });
             message.success('รีเซ็ตการตั้งค่าคอลัมน์เป็นค่าเริ่มต้นแล้ว');
           }}>
@@ -2350,7 +2473,7 @@ const UserManagement = () => {
           <div>
             <div style={{ marginBottom: 16 }}>
               <Text strong style={{ fontSize: 14, color: '#374151' }}>ข้อมูลพื้นฐาน</Text>
-            </div>
+                  </div>
             <Space direction="vertical" style={{ width: '100%' }} size={12}>
               <Checkbox
                 checked={visibleColumns.user}
@@ -2371,17 +2494,17 @@ const UserManagement = () => {
                 Email
               </Checkbox>
               <Checkbox
-                checked={visibleColumns.departmentNumber}
-                onChange={(e) => setVisibleColumns({ ...visibleColumns, departmentNumber: e.target.checked })}
+                checked={visibleColumns.extensionName}
+                onChange={(e) => setVisibleColumns({ ...visibleColumns, extensionName: e.target.checked })}
               >
-                Department Number
+                Extension Name
               </Checkbox>
-            </Space>
-          </div>
+          </Space>
+        </div>
 
           <Divider />
 
-          <div>
+                <div>
             <div style={{ marginBottom: 16 }}>
               <Text strong style={{ fontSize: 14, color: '#374151' }}>ข้อมูลงาน</Text>
             </div>
@@ -2412,9 +2535,9 @@ const UserManagement = () => {
               </Checkbox>
             </Space>
           </div>
-
-          <Divider />
-
+                  
+                  <Divider />
+                  
           <div>
             <div style={{ marginBottom: 16 }}>
               <Text strong style={{ fontSize: 14, color: '#374151' }}>ข้อมูลติดต่อ</Text>
@@ -2439,11 +2562,11 @@ const UserManagement = () => {
                 Office Location
               </Checkbox>
             </Space>
-          </div>
+                </div>
 
           <Divider />
 
-          <div>
+                <div>
             <div style={{ marginBottom: 16 }}>
               <Text strong style={{ fontSize: 14, color: '#374151' }}>ข้อมูลระบบ</Text>
             </div>
@@ -2485,7 +2608,7 @@ const UserManagement = () => {
                 Account Expires
               </Checkbox>
             </Space>
-          </div>
+                </div>
 
           <Divider />
 

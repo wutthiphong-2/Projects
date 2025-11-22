@@ -340,20 +340,20 @@ def format_user_data(entry: tuple, full_details: bool = True) -> Dict[str, Any]:
     # Get userPrincipalName
     user_principal_name = get_attr("userPrincipalName") or None
     
-    # Get departmentNumber
-    department_number = get_attr("departmentNumber") or None
+    # Get extensionName
+    extension_name = get_attr("extensionName") or None
     
     # Clean up the value (remove whitespace, handle empty strings)
-    if department_number:
-        department_number = str(department_number).strip()
-        if not department_number:  # Empty after strip
-            department_number = None
+    if extension_name:
+        extension_name = str(extension_name).strip()
+        if not extension_name:  # Empty after strip
+            extension_name = None
     
-    # Debug: Log departmentNumber status (only log if not found, to reduce log spam)
-    if not department_number:
+    # Debug: Log extensionName status (only log if not found, to reduce log spam)
+    if not extension_name:
         # Check if attribute exists but is empty
-        if "departmentNumber" in attrs:
-            attr_values = attrs.get("departmentNumber", [])
+        if "extensionName" in attrs:
+            attr_values = attrs.get("extensionName", [])
             if attr_values and len(attr_values) > 0:
                 raw_value = attr_values[0]
                 if isinstance(raw_value, bytes):
@@ -364,28 +364,28 @@ def format_user_data(entry: tuple, full_details: bool = True) -> Dict[str, Any]:
                 # Only log if it's actually empty, not just whitespace
                 if raw_value and str(raw_value).strip():
                     # Value exists but get_attr didn't return it - this shouldn't happen
-                    department_number = str(raw_value).strip()
-                    logger.debug(f"✅ Found departmentNumber (from raw) for {get_attr('sAMAccountName')}: {department_number}")
+                    extension_name = str(raw_value).strip()
+                    logger.debug(f"✅ Found extensionName (from raw) for {get_attr('sAMAccountName')}: {extension_name}")
                 else:
                     # Attribute exists but is empty
-                    logger.debug(f"ℹ️ departmentNumber exists but is empty for {get_attr('sAMAccountName')}")
+                    logger.debug(f"ℹ️ extensionName exists but is empty for {get_attr('sAMAccountName')}")
             else:
                 # Attribute exists but has no values
-                logger.debug(f"ℹ️ departmentNumber attribute exists but has no values for {get_attr('sAMAccountName')}")
+                logger.debug(f"ℹ️ extensionName attribute exists but has no values for {get_attr('sAMAccountName')}")
         else:
             # Attribute doesn't exist at all - only log in debug mode to reduce spam
             if logger.isEnabledFor(logging.DEBUG):
-                available_dept_attrs = [k for k in attrs.keys() if 'dept' in k.lower() or 'number' in k.lower()]
-                if available_dept_attrs:
-                    logger.debug(f"⚠️ departmentNumber attribute not found for {get_attr('sAMAccountName')}, but found related attrs: {available_dept_attrs}")
+                available_ext_attrs = [k for k in attrs.keys() if 'ext' in k.lower() or 'name' in k.lower()]
+                if available_ext_attrs:
+                    logger.debug(f"⚠️ extensionName attribute not found for {get_attr('sAMAccountName')}, but found related attrs: {available_ext_attrs}")
     else:
         # Found successfully - only log first few to confirm it's working
         username = get_attr('sAMAccountName')
-        if not hasattr(format_user_data, '_dept_num_logged'):
-            format_user_data._dept_num_logged = set()
-        if username and username not in format_user_data._dept_num_logged and len(format_user_data._dept_num_logged) < 5:
-            format_user_data._dept_num_logged.add(username)
-            logger.info(f"✅ Found departmentNumber for {username}: {department_number}")
+        if not hasattr(format_user_data, '_ext_name_logged'):
+            format_user_data._ext_name_logged = set()
+        if username and username not in format_user_data._ext_name_logged and len(format_user_data._ext_name_logged) < 5:
+            format_user_data._ext_name_logged.add(username)
+            logger.info(f"✅ Found extensionName for {username}: {extension_name}")
     
     # Always include basic info
     result = {
@@ -410,7 +410,7 @@ def format_user_data(entry: tuple, full_details: bool = True) -> Dict[str, Any]:
         "userPrincipalName": user_principal_name,
         "manager": manager_dn,
         "accountExpires": account_expires_dt.isoformat() if account_expires_dt else None,  # Always include (None = never expires)
-        "departmentNumber": department_number,
+        "extensionName": extension_name,
     }
 
     # Only include full details when requested (single user view)
@@ -444,6 +444,7 @@ def format_user_data(entry: tuple, full_details: bool = True) -> Dict[str, Any]:
             "lastLogon": last_logon_dt.isoformat() if last_logon_dt else None,  # Include for display
             "pwdLastSet": pwd_last_set_dt.isoformat() if pwd_last_set_dt else None,  # Include for display
             "logonCount": logon_count,  # Include for display
+            "employeeID": get_attr("employeeID") or None,  # Include employeeID for table display
             # accountExpires is already included in result (line 278) - no need to duplicate
         })
     
@@ -618,7 +619,7 @@ async def get_users(
             "userPrincipalName",
             "manager",
             "accountExpires",
-            "departmentNumber"
+            "extensionName"
         ]
         
         # ⚡ PERFORMANCE: Field selection - only fetch requested fields
@@ -666,7 +667,7 @@ async def get_users(
                 "userprincipalname": "userPrincipalName",
                 "manager": "manager",
                 "accountexpires": "accountExpires",
-                "departmentnumber": "departmentNumber"
+                "extensionname": "extensionName"
             }
             
             # Always include essential fields for filtering/sorting
@@ -753,14 +754,14 @@ async def get_users(
             if is_likely_system_account(username, display_name, email):
                 continue
             
-            # Check if departmentNumber exists in raw attributes
-            if attrs.get("departmentNumber"):
+            # Check if extensionName exists in raw attributes
+            if attrs.get("extensionName"):
                 dept_num_count += 1
             
             formatted_user = format_user_data(entry, full_details=False)
             users_all.append(formatted_user)
         
-        logger.info(f"📊 Users with departmentNumber in raw LDAP: {dept_num_count} out of {len(users_all)}")
+        logger.info(f"📊 Users with extensionName in raw LDAP: {dept_num_count} out of {len(users_all)}")
         
         # ⚡ Sort by whenCreated (newest first)
         users_all.sort(key=lambda u: u.get('whenCreated') or '', reverse=True)
@@ -1062,7 +1063,7 @@ async def get_user(dn: str, token_data = Depends(verify_token)):
             "(objectClass=user)",
             ["cn", "sAMAccountName", "mail", "displayName", "givenName", "sn", 
              "title", "telephoneNumber", "mobile", "department", "company", 
-             "employeeID", "physicalDeliveryOfficeName", "streetAddress", "l", 
+             "employeeID", "extensionName", "physicalDeliveryOfficeName", "streetAddress", "l", 
              "st", "postalCode", "co", "description",
              "userAccountControl", "memberOf", "whenCreated", "whenChanged", 
              "lastLogon", "lastLogonTimestamp", "pwdLastSet", "logonCount",
@@ -1166,8 +1167,8 @@ async def create_user(user_data: UserCreate, request: Request, token_data = Depe
             user_attrs["company"] = [user_data.company]
         if user_data.employeeID:
             user_attrs["employeeID"] = [user_data.employeeID]
-        if user_data.departmentNumber:
-            user_attrs["departmentNumber"] = [user_data.departmentNumber]
+        if user_data.extensionName:
+            user_attrs["extensionName"] = [user_data.extensionName]
         if user_data.physicalDeliveryOfficeName:
             user_attrs["physicalDeliveryOfficeName"] = [user_data.physicalDeliveryOfficeName]
         if user_data.streetAddress:
@@ -2120,37 +2121,37 @@ async def debug_user_attributes(
         # Get formatted user data
         formatted_user = format_user_data(entry, full_details=True)
         
-        # Check for departmentNumber in raw attributes
-        dept_number_raw = None
-        if attrs.get("departmentNumber"):
+        # Check for extensionName in raw attributes
+        ext_name_raw = None
+        if attrs.get("extensionName"):
             try:
-                dept_number_raw = attrs.get("departmentNumber", [None])[0]
+                ext_name_raw = attrs.get("extensionName", [None])[0]
                 # Handle encoding issues
-                if isinstance(dept_number_raw, bytes):
-                    dept_number_raw = dept_number_raw.decode('utf-8', errors='ignore')
+                if isinstance(ext_name_raw, bytes):
+                    ext_name_raw = ext_name_raw.decode('utf-8', errors='ignore')
             except Exception as e:
-                logger.warning(f"Error reading departmentNumber: {e}")
-                dept_number_raw = None
+                logger.warning(f"Error reading extensionName: {e}")
+                ext_name_raw = None
         
         # Get all attribute names
         all_attr_names = sorted(list(attrs.keys()))
         
-        # Find department-related attributes (with encoding handling)
-        dept_related_attrs = {}
+        # Find extension-related attributes (with encoding handling)
+        ext_related_attrs = {}
         for k in all_attr_names:
-            if 'dept' in k.lower() or 'number' in k.lower():
+            if 'ext' in k.lower() or 'name' in k.lower():
                 try:
                     val = attrs.get(k, [None])[0] if attrs.get(k) else None
                     if isinstance(val, bytes):
                         val = val.decode('utf-8', errors='ignore')
-                    dept_related_attrs[k] = val
+                    ext_related_attrs[k] = val
                 except Exception as e:
                     logger.warning(f"Error reading attribute {k}: {e}")
-                    dept_related_attrs[k] = None
+                    ext_related_attrs[k] = None
         
         # Get sample attributes with encoding handling
         raw_attributes_sample = {}
-        for k in ["departmentNumber", "department", "extensionName", "extensionAttribute1", "extensionAttribute2"]:
+        for k in ["extensionName", "extensionAttribute1", "extensionAttribute2", "department", "departmentNumber"]:
             try:
                 val = attrs.get(k, [None])[0] if attrs.get(k) else None
                 if isinstance(val, bytes):
@@ -2164,10 +2165,10 @@ async def debug_user_attributes(
             "dn": user_dn,
             "sAMAccountName": formatted_user.get("sAMAccountName"),
             "displayName": formatted_user.get("displayName"),
-            "departmentNumber_in_formatted": formatted_user.get("departmentNumber"),
-            "departmentNumber_in_raw_attrs": dept_number_raw,
-            "departmentNumber_exists": "departmentNumber" in attrs,
-            "all_department_related_attributes": dept_related_attrs,
+            "extensionName_in_formatted": formatted_user.get("extensionName"),
+            "extensionName_in_raw_attrs": ext_name_raw,
+            "extensionName_exists": "extensionName" in attrs,
+            "all_extension_related_attributes": ext_related_attrs,
             "all_attribute_names": all_attr_names,
             "raw_attributes_sample": raw_attributes_sample
         }
