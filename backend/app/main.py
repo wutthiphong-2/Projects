@@ -14,10 +14,10 @@ from app.routers import users as users_router
 from app.routers import groups as groups_router
 from app.routers import ous as ous_router
 from app.routers import activity_logs as activity_logs_router
-from app.routers import api_keys as api_keys_router
 from app.routers import api_docs as api_docs_router
 from app.core.rate_limit_middleware import RateLimitMiddleware
 from app.core.api_logging_middleware import APILoggingMiddleware
+from app.core.response_headers_middleware import ResponseHeadersMiddleware
 import logging
 
 # Setup logging
@@ -148,9 +148,12 @@ app.add_middleware(
     allow_origins=settings.CORS_ORIGINS if settings.CORS_ORIGINS else ["http://localhost:3000"],
     allow_credentials=True,
     allow_methods=["GET", "POST", "PUT", "DELETE", "PATCH", "OPTIONS"],
-    allow_headers=["*"],
-    expose_headers=["*", "X-RateLimit-Limit", "X-RateLimit-Remaining", "X-RateLimit-Reset", "X-Request-ID"]
+    allow_headers=["*", "X-Request-ID"],  # Allow clients to send X-Request-ID
+    expose_headers=["*", "X-RateLimit-Limit", "X-RateLimit-Remaining", "X-RateLimit-Reset", "X-Request-ID", "X-Response-Time"]
 )
+
+# Response Headers Middleware - Add X-Request-ID and X-Response-Time (must be first)
+app.add_middleware(ResponseHeadersMiddleware)
 
 # API Logging Middleware - Log detailed request/response
 app.add_middleware(APILoggingMiddleware)
@@ -164,14 +167,10 @@ app.include_router(users_router.router, prefix="/api/users", tags=["users"])
 app.include_router(groups_router.router, prefix="/api/groups", tags=["groups"])
 app.include_router(ous_router.router, prefix="/api/ous", tags=["ous"])
 app.include_router(activity_logs_router.router, prefix="/api/activity-logs", tags=["activity-logs"])
-app.include_router(api_keys_router.router, prefix="/api/api-keys", tags=["api-keys"])
 app.include_router(api_docs_router.router, prefix="/api/docs", tags=["api-docs"])
 
-# API Versioning - Add versioned routes
-# v1 routes (current)
-app.include_router(users_router.router, prefix="/api/v1/users", tags=["users-v1"])
-app.include_router(groups_router.router, prefix="/api/v1/groups", tags=["groups-v1"])
-app.include_router(ous_router.router, prefix="/api/v1/ous", tags=["ous-v1"])
+# Note: API versioning removed - using non-versioned endpoints only
+# If versioning is needed in the future, create separate routers for each version
 
 @app.get("/")
 async def root():
@@ -183,11 +182,40 @@ async def root():
 
 @app.get("/api/health")
 async def health_check():
-    return {
+    """Health check endpoint with system status"""
+    from datetime import datetime, timezone
+    from app.core.database import get_ldap_connection
+    
+    health_status = {
         "status": "healthy",
-        "timestamp": "2024-01-01T00:00:00Z",
-        "version": "1.0.0"
+        "timestamp": datetime.now(timezone.utc).isoformat(),
+        "version": "1.0.0",
+        "checks": {
+            "ldap": "unknown"
+        }
     }
+    
+    # Check LDAP connection
+    try:
+        ldap_conn = get_ldap_connection()
+        if ldap_conn and ldap_conn.connection and ldap_conn.connection.bound:
+            health_status["checks"]["ldap"] = "connected"
+        else:
+            health_status["checks"]["ldap"] = "disconnected"
+            health_status["status"] = "degraded"
+    except Exception as e:
+        logger.warning(f"LDAP health check failed: {e}")
+        health_status["checks"]["ldap"] = "error"
+        health_status["checks"]["ldap_error"] = str(e)
+        health_status["status"] = "degraded"
+    
+    # Return appropriate status code
+    status_code = status.HTTP_200_OK if health_status["status"] == "healthy" else status.HTTP_503_SERVICE_UNAVAILABLE
+    
+    return JSONResponse(
+        status_code=status_code,
+        content=health_status
+    )
 
 if __name__ == "__main__":
     uvicorn.run(

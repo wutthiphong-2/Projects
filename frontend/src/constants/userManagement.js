@@ -28,11 +28,13 @@ export const TIMING = {
  * Pagination constants
  */
 export const PAGINATION = {
-  // Default page size for initial load (no filters)
-  DEFAULT_PAGE_SIZE: 500,
+  // Default page size for initial load (no filters) - Set high enough to get all users
+  // Backend returns all users when page_size >= 1000, so we use 10000 to ensure we get everything
+  DEFAULT_PAGE_SIZE: 10000,
   
   // Page size when filters are applied (load more for client-side filtering)
-  FILTERED_PAGE_SIZE: 1000,
+  // Backend returns all users when page_size >= 1000, so we use 10000 to ensure we get everything
+  FILTERED_PAGE_SIZE: 10000,
   
   // Client-side pagination page size (display)
   CLIENT_PAGE_SIZE: 30,
@@ -167,4 +169,6 @@ export const VALIDATION_ERRORS = {
   PASSWORD_TOO_SHORT: 'รหัสผ่านต้องมีอย่างน้อย 8 ตัวอักษร',
   PASSWORD_REQUIREMENTS: 'Password ต้องมี: ตัวพิมพ์ใหญ่, ตัวพิมพ์เล็ก, ตัวเลข, และอักขระพิเศษ'
 };
+
+
 

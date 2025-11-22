@@ -54,7 +54,9 @@ class APILoggingMiddleware(BaseHTTPMiddleware):
             try:
                 body_bytes = await request.body()
                 if body_bytes:
-                    request_body = body_bytes.decode('utf-8', errors='ignore')
+                    request_body_raw = body_bytes.decode('utf-8', errors='ignore')
+                    # Mask sensitive data in request body
+                    request_body = self._mask_sensitive_data(request_body_raw)
                     # Re-create request with body for downstream handlers
                     async def receive():
                         return {"type": "http.request", "body": body_bytes}
@@ -70,7 +72,9 @@ class APILoggingMiddleware(BaseHTTPMiddleware):
             # Capture response body
             if hasattr(response, 'body'):
                 try:
-                    response_body = response.body.decode('utf-8', errors='ignore')
+                    response_body_raw = response.body.decode('utf-8', errors='ignore')
+                    # Mask sensitive data in response body
+                    response_body = self._mask_sensitive_data(response_body_raw)
                 except:
                     pass
             elif isinstance(response, StreamingResponse):
@@ -156,4 +160,72 @@ class APILoggingMiddleware(BaseHTTPMiddleware):
                     logger.error(f"Error logging API error: {log_error}")
             
             raise
+    
+    def _mask_sensitive_data(self, data: str) -> str:
+        """Mask sensitive data in request/response bodies"""
+        if not data:
+            return data
+        
+        try:
+            import json
+            # Try to parse as JSON
+            try:
+                parsed = json.loads(data)
+                masked = self._mask_json_data(parsed)
+                return json.dumps(masked, ensure_ascii=False)
+            except (json.JSONDecodeError, TypeError):
+                # Not JSON, check for common patterns
+                return self._mask_string_data(data)
+        except Exception:
+            # If anything fails, return original (better than breaking)
+            return data
+    
+    def _mask_json_data(self, obj: dict) -> dict:
+        """Recursively mask sensitive fields in JSON object"""
+        if not isinstance(obj, dict):
+            return obj
+        
+        masked = {}
+        sensitive_keys = [
+            'password', 'pwd', 'passwd', 'secret', 'token', 'api_key', 
+            'apikey', 'authorization', 'auth', 'credential', 'credentials',
+            'private_key', 'privatekey', 'access_token', 'refresh_token'
+        ]
+        
+        for key, value in obj.items():
+            key_lower = key.lower()
+            # Check if key contains sensitive keywords
+            is_sensitive = any(sensitive in key_lower for sensitive in sensitive_keys)
+            
+            if is_sensitive:
+                masked[key] = "***REDACTED***"
+            elif isinstance(value, dict):
+                masked[key] = self._mask_json_data(value)
+            elif isinstance(value, list):
+                masked[key] = [
+                    self._mask_json_data(item) if isinstance(item, dict) else item
+                    for item in value
+                ]
+            else:
+                masked[key] = value
+        
+        return masked
+    
+    def _mask_string_data(self, data: str) -> str:
+        """Mask sensitive patterns in string data"""
+        import re
+        # Patterns to mask
+        patterns = [
+            (r'("password"\s*:\s*")[^"]*(")', r'\1***REDACTED***\2'),
+            (r'("pwd"\s*:\s*")[^"]*(")', r'\1***REDACTED***\2'),
+            (r'("token"\s*:\s*")[^"]*(")', r'\1***REDACTED***\2'),
+            (r'("api_key"\s*:\s*")[^"]*(")', r'\1***REDACTED***\2'),
+            (r'("secret"\s*:\s*")[^"]*(")', r'\1***REDACTED***\2'),
+        ]
+        
+        masked = data
+        for pattern, replacement in patterns:
+            masked = re.sub(pattern, replacement, masked, flags=re.IGNORECASE)
+        
+        return masked
 

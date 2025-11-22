@@ -34,14 +34,32 @@ export const AuthProvider = ({ children }) => {
         setIsAuthenticated(true);
         setUser(data.user);
       } else {
+        // Token is invalid, clear it
         localStorage.removeItem('token');
       }
     } catch (error) {
-      // Only log error if it's not a connection refused (backend might be starting)
-      if (error.code !== 'ECONNREFUSED' && error.message && !error.message.includes('ERR_CONNECTION_REFUSED')) {
-        console.error('Token verification failed:', error);
+      // Token verification failed - this is normal if:
+      // 1. Token expired (normal after 8 hours)
+      // 2. Token is invalid/corrupt
+      // 3. Backend restarted and JWT_SECRET_KEY changed
+      // Only log error if it's not a connection/authentication issue
+      if (error.code === 'ECONNREFUSED' || error.message?.includes('ERR_CONNECTION_REFUSED')) {
+        // Backend might be starting - silent fail
+      } else if (error.response?.status === 401) {
+        // 401 Unauthorized - token expired or invalid (normal case)
+        // Don't log as error, just silently clear token
+        // This is expected behavior when token expires
+      } else {
+        // Other errors - only log in development mode
+        if (process.env.NODE_ENV === 'development') {
+          console.warn('Token verification failed:', error.response?.status, error.message);
+        }
       }
+      
+      // Always clear invalid token
       localStorage.removeItem('token');
+      setIsAuthenticated(false);
+      setUser(null);
     } finally {
       setLoading(false);
     }

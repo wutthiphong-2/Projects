@@ -1,9 +1,10 @@
-from fastapi import APIRouter, HTTPException, Depends, status, Query
+from fastapi import APIRouter, Depends, status, Query
 from typing import Optional
 import logging
 
 from app.core.api_usage import api_usage_logger
 from app.routers.auth import verify_token, TokenData
+from app.core.exceptions import InternalServerError
 
 router = APIRouter()
 logger = logging.getLogger(__name__)
@@ -21,10 +22,7 @@ async def get_usage_stats(
         return stats
     except Exception as e:
         logger.error(f"Error getting usage stats: {e}")
-        raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail="Failed to get usage statistics"
-        )
+        raise InternalServerError("Failed to get usage statistics")
 
 
 @router.get("/by-key/{key_id}")
@@ -39,10 +37,7 @@ async def get_usage_by_key(
         return stats
     except Exception as e:
         logger.error(f"Error getting usage by key: {e}")
-        raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail="Failed to get usage statistics"
-        )
+        raise InternalServerError("Failed to get usage statistics")
 
 
 @router.get("/endpoints")
@@ -57,8 +52,5 @@ async def get_endpoint_stats(
         return stats
     except Exception as e:
         logger.error(f"Error getting endpoint stats: {e}")
-        raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail="Failed to get endpoint statistics"
-        )
+        raise InternalServerError("Failed to get endpoint statistics")
 

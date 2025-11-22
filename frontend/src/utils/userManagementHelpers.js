@@ -85,8 +85,22 @@ export const deduplicateUsers = (
     scoreFn = scoreUserRecord,
   } = {}
 ) => {
+  // Validate input: ensure userList is an array
+  if (!Array.isArray(userList)) {
+    console.warn('deduplicateUsers: userList is not an array, returning empty array', { userList });
+    return [];
+  }
+  
+  // Return empty array if userList is empty
+  if (userList.length === 0) {
+    return [];
+  }
+  
   const map = new Map();
   userList.forEach((user) => {
+    // Skip null/undefined users
+    if (!user) return;
+    
     const key = getKey(user);
     const candidateScore = scoreFn(user);
     const existing = map.get(key);

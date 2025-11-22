@@ -1,5 +1,5 @@
-from fastapi import APIRouter, Depends, Query, Request
-from typing import List, Optional, Dict, Any
+from fastapi import APIRouter, Depends, Query, Request, status
+from typing import List, Optional, Dict, Any, Union
 from ldap3 import MODIFY_REPLACE, MODIFY_ADD, MODIFY_DELETE
 import logging
 import json
@@ -12,6 +12,8 @@ from app.core.exceptions import NotFoundError, InternalServerError, ValidationEr
 from app.routers.auth import verify_token, verify_token_or_api_key, get_client_ip
 from app.core.activity_log import activity_log_manager
 from app.core.cache import cached_response, invalidate_cache
+from app.core.responses import create_paginated_response
+from app.schemas.common import PaginatedResponse
 from datetime import datetime, timedelta, timezone
 from app.schemas.groups import (
     GroupCreate, GroupUpdate, GroupResponse, GroupMemberAdd, GroupMemberRemove,
@@ -152,26 +154,27 @@ def format_user_data(entry: tuple) -> Dict[str, Any]:
     }
 
 # Routes
-@router.get("/", response_model=List[GroupResponse])
+@router.get(
+    "/",
+    response_model=Union[PaginatedResponse[GroupResponse], List[GroupResponse]],
+    summary="Get all groups",
+    description="Retrieve a paginated list of groups from Active Directory with search capabilities",
+    tags=["groups"]
+)
 @cached_response(ttl_seconds=600)  # ⚡ Cache for 10 minutes
 async def get_groups(
     token_data = Depends(verify_token_or_api_key),
     q: str | None = Query(default=None, description="Search text for cn/description"),
     page: int = Query(default=1, ge=1),
     page_size: int = Query(default=50, ge=1, le=50000),  # Increased to 50000
+    format: Optional[str] = Query("paginated", regex="^(paginated|simple)$"),  # Backward compatibility
 ):
     """Get all groups from Active Directory with real-time data"""
     ldap_conn = get_ldap_connection()
     
     try:
-        def ldap_escape(value: str) -> str:
-            return (
-                value.replace("\\", r"\\5c")
-                .replace("*", r"\\2a")
-                .replace("(", r"\\28")
-                .replace(")", r"\\29")
-                .replace("\x00", r"\\00")
-            )
+        # Use centralized LDAP escape function from security module
+        from app.core.ldap_security import ldap_escape
 
         if q:
             s = ldap_escape(q)
@@ -200,13 +203,24 @@ async def get_groups(
         unique_ous = set([g['parentOU'] for g in groups_all])
         logger.info(f"📁 Found {len(unique_ous)} unique containers: {sorted(unique_ous)}")
         
-        # Return all groups if page_size is 1000 or more (frontend requests)
-        if page_size >= 1000:
-            logger.info(f"🚀 Returning ALL {len(groups_all)} groups to frontend (no pagination)")
+        total_groups = len(groups_all)
+        
+        # Backward compatibility: Return simple array if format=simple or page_size >= 1000
+        if format == "simple" or page_size >= 1000:
+            logger.info(f"🚀 Returning ALL {total_groups} groups to frontend (simple format)")
             return groups_all
+        
+        # Return paginated response
         start = (page - 1) * page_size
         end = start + page_size
-        return groups_all[start:end]
+        paginated_items = groups_all[start:end]
+        
+        return create_paginated_response(
+            items=paginated_items,
+            total=total_groups,
+            page=page,
+            page_size=page_size
+        )
         
     except Exception as e:
         logger.error(f"Error getting groups: {e}")
@@ -330,7 +344,7 @@ async def get_group(dn: str, token_data = Depends(verify_token)):
         logger.error(f"Error getting group {dn}: {e}")
         raise InternalServerError("Failed to retrieve group")
 
-@router.post("/", response_model=GroupCreateResponse)
+@router.post("/", response_model=GroupCreateResponse, status_code=status.HTTP_201_CREATED)
 async def create_group(group_data: GroupCreate, token_data = Depends(verify_token)):
     """Create new group in Active Directory with full AD support"""
     ldap_conn = get_ldap_connection()
@@ -534,7 +548,7 @@ async def get_group_members(group_dn: str, token_data = Depends(verify_token)):
         logger.error(f"Error getting group members for {group_dn}: {e}")
         raise InternalServerError("Failed to retrieve group members")
 
-@router.post("/{group_dn}/members", response_model=GroupMemberAddResponse)
+@router.post("/{group_dn}/members", response_model=GroupMemberAddResponse, status_code=status.HTTP_201_CREATED)
 async def add_group_member(group_dn: str, member_data: GroupMemberAdd, request: Request, token_data = Depends(verify_token)):
     """Add a user to a group and verify memberOf is updated in AD"""
     ldap_conn = get_ldap_connection()

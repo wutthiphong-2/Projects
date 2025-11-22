@@ -5,11 +5,10 @@ import { LoadingOutlined, HomeOutlined } from '@ant-design/icons';
 import { useLocation } from 'react-router-dom';
 import Login from './components/Login';
 import Dashboard from './components/Dashboard';
-import UserManagement from './components/UserManagement';
+import UserManagement from './components/UserManagement/index';
 import GroupManagement from './components/GroupManagement';
 import OUManagement from './components/OUManagement';
 import ActivityLog from './components/ActivityLog';
-import ApiManagement from './components/ApiManagement';
 import Sidebar from './components/Sidebar';
 import { AuthProvider, useAuth } from './contexts/AuthContext';
 import { NotificationProvider } from './contexts/NotificationContext';
@@ -28,7 +27,6 @@ function AppContent() {
     '/groups': 'จัดการกลุ่ม',
     '/ous': 'จัดการ OU',
     '/activity-log': 'Activity Log',
-    '/api-management': 'API Management'
   };
 
   const getBreadcrumbItems = () => {
@@ -85,7 +83,8 @@ function AppContent() {
                 <Route path="/groups" element={<GroupManagement />} />
                 <Route path="/ous" element={<OUManagement />} />
                 <Route path="/activity-log" element={<ActivityLog />} />
-                <Route path="/api-management" element={<ApiManagement />} />
+                {/* Catch-all route for unknown paths */}
+                <Route path="*" element={<Navigate to="/dashboard" replace />} />
               </Routes>
             </div>
           </div>

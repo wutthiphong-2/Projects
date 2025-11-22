@@ -41,10 +41,14 @@ api.interceptors.response.use(
       // Server responded with error status
       const { status, data } = error.response;
       
-      // Handle 401 Unauthorized - Clear token and redirect to login
+      // Handle 401 Unauthorized - Clear token (normal if token expired)
       if (status === 401) {
-        localStorage.removeItem('token');
+        // Only clear token if it exists (avoid unnecessary localStorage operations)
+        if (localStorage.getItem('token')) {
+          localStorage.removeItem('token');
+        }
         // Don't redirect here - let components handle it
+        // This is normal behavior when token expires (after 8 hours)
       }
       
       // Handle 403 Forbidden
@@ -63,7 +67,11 @@ api.interceptors.response.use(
       }
     } else if (error.request) {
       // Request was made but no response received
-      console.error('Network error:', error.message);
+      if (error.code === 'ECONNABORTED' || error.message?.includes('timeout')) {
+        console.error('Network error: timeout of', error.config?.timeout || 10000, 'ms exceeded');
+      } else {
+        console.error('Network error:', error.message);
+      }
     } else {
       // Something else happened
       console.error('Error:', error.message);

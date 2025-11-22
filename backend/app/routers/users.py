@@ -1,5 +1,5 @@
-from fastapi import APIRouter, Depends, Query, Request
-from typing import List, Optional, Dict, Any
+from fastapi import APIRouter, Depends, Query, Request, status
+from typing import List, Optional, Dict, Any, Union
 from ldap3 import MODIFY_REPLACE, MODIFY_ADD
 import ldap3
 from datetime import datetime, timedelta, timezone
@@ -15,6 +15,9 @@ from app.core.exceptions import NotFoundError, InternalServerError, ValidationEr
 from app.routers.auth import verify_token, verify_token_or_api_key, get_client_ip
 from app.core.cache import cached_response, invalidate_cache
 from app.core.activity_log import activity_log_manager
+from app.core.responses import create_paginated_response
+from app.schemas.common import PaginatedResponse
+from app.core.ldap_security import ldap_escape, sanitize_dn, validate_search_filter
 from app.schemas.users import (
     UserCreate, UserUpdate, UserResponse, UserStatsResponse, LoginInsightEntry,
     UserCreateResponse, UserUpdateResponse, UserStatusToggleResponse, UserDeleteResponse,
@@ -447,13 +450,22 @@ def format_user_data(entry: tuple, full_details: bool = True) -> Dict[str, Any]:
     return result
 
 # Routes
-@router.get("/", response_model=List[UserResponse])
+@router.get(
+    "/",
+    response_model=Union[PaginatedResponse[UserResponse], List[UserResponse]],
+    summary="Get all users",
+    description="Retrieve a paginated list of users from Active Directory with advanced search and filtering capabilities. Use 'fields' parameter to select specific attributes for better performance.",
+    tags=["users"]
+)
 @cached_response(ttl_seconds=600)  # ⚡ Cache for 10 minutes (เพิ่มความเร็ว)
 async def get_users(
     q: Optional[str] = None,
     department: Optional[str] = None,
+    ou: Optional[str] = None,  # Filter by Organizational Unit DN
     page: int = Query(1, ge=1),
-    page_size: int = Query(10, ge=1, le=50000),  # Increased limit to 50000
+    page_size: int = Query(500, ge=1, le=50000),  # Default 500 for better UX (was 10)
+    format: Optional[str] = Query("paginated", regex="^(paginated|simple)$"),  # Backward compatibility
+    fields: Optional[str] = Query(None, description="Comma-separated list of fields to return (e.g., 'cn,mail,displayName'). If not specified, returns all fields."),
     # Advanced search parameters
     search_mode: Optional[str] = Query("contains", regex="^(contains|starts_with|exact|ends_with)$"),
     search_name: Optional[str] = None,
@@ -467,6 +479,14 @@ async def get_users(
 ):
     """Get all users from Active Directory with advanced search support
     
+    Parameters:
+    - q: General search across name, username, and email
+    - department: Filter by department (legacy parameter)
+    - ou: Filter by Organizational Unit DN (e.g., "OU=IT-K1IT00,OU=Phase10,OU=TBKK-Users,DC=tbkk,DC=co,DC=th")
+    - page: Page number (default: 1)
+    - page_size: Number of results per page (default: 500, max: 50000)
+    - fields: Comma-separated list of fields to return (e.g., 'cn,mail,displayName'). Improves performance by fetching only needed attributes.
+    
     Search Modes:
     - contains: *text* (default)
     - starts_with: text*
@@ -475,18 +495,15 @@ async def get_users(
     
     Advanced Search: Use search_name, search_username, search_email, etc. for field-specific search
     Basic Search: Use 'q' for general search across name, username, and email
+    
+    OU Filter: When 'ou' parameter is provided, searches only within that OU and its sub-OUs
+    
+    Performance: Use 'fields' parameter to reduce response size and improve query performance
     """
     ldap_conn = get_ldap_connection()
     
     try:
-        def ldap_escape(value: str) -> str:
-            return (
-                value.replace("\\", r"\\5c")
-                .replace("*", r"\\2a")
-                .replace("(", r"\\28")
-                .replace(")", r"\\29")
-                .replace("\x00", r"\\00")
-            )
+        # Use centralized LDAP escape function from security module
         
         def apply_search_mode(value: str, mode: str) -> str:
             """Apply search mode to value (add wildcards)"""
@@ -552,11 +569,25 @@ async def get_users(
         else:
             filter_str = base_filter
 
-        # ⚡ PERFORMANCE: Fetch essential fields + metadata for filtering/sorting
-        logger.info(f"🔍 Searching users with filter: {filter_str} (mode: {search_mode})")
+        # Determine search base: Use OU DN if provided, otherwise use LDAP_BASE_DN
+        # Sanitize OU DN to prevent injection
+        if ou:
+            try:
+                search_base = sanitize_dn(ou)
+            except ValueError as e:
+                logger.warning(f"Invalid OU DN provided: {e}")
+                raise ValidationError(f"Invalid OU DN format: {str(e)}")
+        else:
+            search_base = settings.LDAP_BASE_DN
         
-        # List of attributes to fetch from LDAP
-        attributes_to_fetch = [
+        # ⚡ PERFORMANCE: Fetch essential fields + metadata for filtering/sorting
+        if ou:
+            logger.info(f"🔍 Searching users in OU: {ou} with filter: {filter_str} (mode: {search_mode})")
+        else:
+            logger.info(f"🔍 Searching users with filter: {filter_str} (mode: {search_mode})")
+        
+        # Define all available attributes
+        all_attributes = [
             "cn",
             "sAMAccountName",
             "mail",
@@ -590,10 +621,83 @@ async def get_users(
             "departmentNumber"
         ]
         
-        logger.debug(f"Fetching attributes: {attributes_to_fetch}")
+        # ⚡ PERFORMANCE: Field selection - only fetch requested fields
+        if fields:
+            # Parse comma-separated field list
+            requested_fields = [f.strip().lower() for f in fields.split(",")]
+            # Map common field names to LDAP attributes
+            field_mapping = {
+                "cn": "cn",
+                "samaccountname": "sAMAccountName",
+                "username": "sAMAccountName",
+                "mail": "mail",
+                "email": "mail",
+                "displayname": "displayName",
+                "name": "displayName",
+                "title": "title",
+                "department": "department",
+                "company": "company",
+                "office": "physicalDeliveryOfficeName",
+                "description": "description",
+                "useraccountcontrol": "userAccountControl",
+                "isenabled": "userAccountControl",
+                "pwdlastset": "pwdLastSet",
+                "givenname": "givenName",
+                "firstname": "givenName",
+                "sn": "sn",
+                "surname": "sn",
+                "lastname": "sn",
+                "telephone": "telephoneNumber",
+                "phone": "telephoneNumber",
+                "mobile": "mobile",
+                "employeeid": "employeeID",
+                "address": "streetAddress",
+                "city": "l",
+                "state": "st",
+                "postalcode": "postalCode",
+                "country": "co",
+                "whencreated": "whenCreated",
+                "whenchanged": "whenChanged",
+                "lastlogon": "lastLogon",
+                "lastlogin": "lastLogon",
+                "logoncount": "logonCount",
+                "memberof": "memberOf",
+                "groups": "memberOf",
+                "userprincipalname": "userPrincipalName",
+                "manager": "manager",
+                "accountexpires": "accountExpires",
+                "departmentnumber": "departmentNumber"
+            }
+            
+            # Always include essential fields for filtering/sorting
+            essential_fields = {"cn", "sAMAccountName", "userAccountControl", "whenCreated"}
+            attributes_to_fetch = list(essential_fields)
+            
+            # Add requested fields
+            for field in requested_fields:
+                ldap_attr = field_mapping.get(field)
+                if ldap_attr and ldap_attr not in attributes_to_fetch:
+                    attributes_to_fetch.append(ldap_attr)
+            
+            logger.debug(f"⚡ Field selection: Fetching {len(attributes_to_fetch)} attributes (requested: {len(requested_fields)})")
+        else:
+            # Fetch all attributes (default behavior)
+            attributes_to_fetch = all_attributes
+            logger.debug(f"📋 Fetching all {len(attributes_to_fetch)} attributes")
         
+        logger.debug(f"Search base: {search_base}")
+        
+        # Validate search filter before executing
+        try:
+            validate_search_filter(filter_str)
+        except ValueError as e:
+            logger.warning(f"Invalid search filter: {e}")
+            raise ValidationError(f"Invalid search filter: {str(e)}")
+        
+        # Use OU DN as search base if provided (searches in OU and all sub-OUs)
+        # The ldap_conn.search() wrapper already uses SUBTREE scope by default
         results = ldap_conn.search(
-            settings.LDAP_BASE_DN,
+            search_base,
             filter_str,
             attributes_to_fetch
         )
@@ -662,13 +766,24 @@ async def get_users(
         users_all.sort(key=lambda u: u.get('whenCreated') or '', reverse=True)
         logger.info(f"📊 Formatted and sorted {len(users_all)} users by creation date (newest first)")
         
-        # Return all users if page_size is 1000 or more (frontend requests)
-        if page_size >= 1000:
-            logger.info(f"🚀 Returning ALL {len(users_all)} users to frontend (no pagination)")
+        total_users = len(users_all)
+        
+        # Backward compatibility: Return simple array if format=simple or page_size >= 1000
+        if format == "simple" or page_size >= 1000:
+            logger.info(f"🚀 Returning ALL {total_users} users to frontend (simple format)")
             return users_all
+        
+        # Return paginated response
         start = (page - 1) * page_size
         end = start + page_size
-        return users_all[start:end]
+        paginated_items = users_all[start:end]
+        
+        return create_paginated_response(
+            items=paginated_items,
+            total=total_users,
+            page=page,
+            page_size=page_size
+        )
         
     except Exception as e:
         logger.error(f"Error getting users: {e}")
@@ -922,9 +1037,22 @@ async def get_group_members(group_dn: str, token: str = Depends(verify_token)):
         logger.error(f"Error getting members for group {group_dn}: {e}")
         raise InternalServerError("Failed to retrieve group members")
 
-@router.get("/{dn}", response_model=UserResponse)
+@router.get(
+    "/{dn}",
+    response_model=UserResponse,
+    status_code=status.HTTP_200_OK,
+    summary="Get user by DN",
+    description="Retrieve detailed information about a specific user by Distinguished Name (DN)",
+    tags=["users"]
+)
 async def get_user(dn: str, token_data = Depends(verify_token)):
     """Get specific user by DN with full details"""
+    # Sanitize DN to prevent injection
+    try:
+        dn = sanitize_dn(dn)
+    except ValueError as e:
+        raise ValidationError(f"Invalid DN format: {str(e)}")
+    
     ldap_conn = get_ldap_connection()
     
     try:
@@ -950,7 +1078,14 @@ async def get_user(dn: str, token_data = Depends(verify_token)):
         logger.error(f"Error getting user {dn}: {e}")
         raise InternalServerError("Failed to retrieve user")
 
-@router.post("/", response_model=UserCreateResponse)
+@router.post(
+    "/",
+    response_model=UserCreateResponse,
+    status_code=status.HTTP_201_CREATED,
+    summary="Create new user",
+    description="Create a new user account in Active Directory with optional group assignments and password settings",
+    tags=["users"]
+)
 async def create_user(user_data: UserCreate, request: Request, token_data = Depends(verify_token)):
     """Create new user in Active Directory"""
     # 🔍 DEBUG: Log incoming data (without password for security)
@@ -1192,7 +1327,14 @@ async def create_user(user_data: UserCreate, request: Request, token_data = Depe
         logger.error(f"Error creating user: {e}")
         raise InternalServerError("Failed to create user")
 
-@router.put("/{dn}", response_model=UserUpdateResponse)
+@router.put(
+    "/{dn}",
+    response_model=UserUpdateResponse,
+    status_code=status.HTTP_200_OK,
+    summary="Update user",
+    description="Update user attributes in Active Directory. Supports password reset and account options modification.",
+    tags=["users"]
+)
 async def update_user(dn: str, user_data: UserUpdate, request: Request, token_data = Depends(verify_token)):
     """Update user in Active Directory"""
     ldap_conn = get_ldap_connection()
@@ -1459,7 +1601,14 @@ async def update_user(dn: str, user_data: UserUpdate, request: Request, token_da
         logger.error(f"Exception details: {str(e)}")
         raise InternalServerError(f"Failed to update user: {str(e)}")
 
-@router.patch("/{dn}/toggle-status", response_model=UserStatusToggleResponse)
+@router.patch(
+    "/{dn}/toggle-status",
+    response_model=UserStatusToggleResponse,
+    status_code=status.HTTP_200_OK,
+    summary="Toggle user status",
+    description="Enable or disable a user account in Active Directory",
+    tags=["users"]
+)
 async def toggle_user_status(dn: str, request: Request, token_data = Depends(verify_token)):
     """Enable/Disable user account"""
     ldap_conn = get_ldap_connection()
@@ -1512,7 +1661,14 @@ async def toggle_user_status(dn: str, request: Request, token_data = Depends(ver
         logger.error(f"Error toggling user status for {dn}: {e}")
         raise InternalServerError("Failed to toggle user status")
 
-@router.delete("/{dn}", response_model=UserDeleteResponse)
+@router.delete(
+    "/{dn}",
+    response_model=UserDeleteResponse,
+    status_code=status.HTTP_200_OK,
+    summary="Delete user",
+    description="Permanently delete a user account from Active Directory",
+    tags=["users"]
+)
 async def delete_user(dn: str, request: Request, token_data = Depends(verify_token)):
     """Delete user from Active Directory"""
     ldap_conn = get_ldap_connection()

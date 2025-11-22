@@ -206,8 +206,8 @@ async def get_quick_start():
             {
                 "step": 1,
                 "title": "Get Your API Key",
-                "description": "Create an API key from the API Management page",
-                "code": "# Go to API Management > Create API Key"
+                "description": "Contact administrator to get an API key",
+                "code": "# Contact administrator for API key access"
             },
             {
                 "step": 2,

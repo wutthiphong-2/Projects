@@ -128,7 +128,8 @@ async def login(login_data: LoginRequest, request: Request):
 
         if not user_conn:
             logger.error(f"LDAP bind failed for user {login_data.username}: {last_error}")
-            raise Exception('LDAP authentication failed')
+            from app.core.exceptions import UnauthorizedError
+            raise UnauthorizedError("Invalid username or password")
         
         # If successful, create JWT token
         access_token_expires_delta = timedelta(minutes=settings.ACCESS_TOKEN_EXPIRE_MINUTES)

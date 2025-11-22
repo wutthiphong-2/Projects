@@ -301,8 +301,17 @@ const Dashboard = () => {
 
   if (loading) {
     return (
-      <div className="dashboard-loading">
-        <Spin size="large" tip="Loading data..." />
+      <div className="dashboard-loading" style={{ 
+        display: 'flex', 
+        flexDirection: 'column', 
+        alignItems: 'center', 
+        justifyContent: 'center', 
+        minHeight: '400px' 
+      }}>
+        <Spin size="large" />
+        <div style={{ marginTop: 16, color: '#6b7280', fontSize: 14 }}>
+          Loading data...
+        </div>
       </div>
     );
   }

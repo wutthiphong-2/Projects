@@ -1,5 +1,5 @@
-from fastapi import APIRouter, Depends, Query, Request
-from typing import List, Optional, Dict, Any
+from fastapi import APIRouter, Depends, Query, Request, status
+from typing import List, Optional, Dict, Any, Union
 from ldap3 import MODIFY_REPLACE
 import logging
 
@@ -9,6 +9,9 @@ from app.core.exceptions import NotFoundError, InternalServerError, ValidationEr
 from app.routers.auth import verify_token, verify_token_or_api_key, get_client_ip
 from app.core.activity_log import activity_log_manager
 from app.core.cache import cached_response, invalidate_cache
+from app.core.responses import create_paginated_response
+from app.schemas.common import PaginatedResponse
+from app.core.ldap_security import ldap_escape
 from app.schemas.ous import (
     OUCreate, OUUpdate, OUResponse, OUCreateResponse, OUUpdateResponse,
     OUDeleteResponse, UserOUResponse, SuggestedGroupsResponse, DefaultGroupsByOUResponse
@@ -29,27 +32,25 @@ def format_ou_data(entry: tuple) -> Dict[str, Any]:
     }
 
 # Routes
-@router.get("/", response_model=List[OUResponse])
+@router.get(
+    "/",
+    response_model=Union[PaginatedResponse[OUResponse], List[OUResponse]],
+    summary="Get all OUs",
+    description="Retrieve a paginated list of Organizational Units from Active Directory with search capabilities",
+    tags=["ous"]
+)
 @cached_response(ttl_seconds=600)  # ⚡ Cache for 10 minutes
 async def get_ous(
     token_data = Depends(verify_token_or_api_key),
     q: str | None = Query(default=None, description="Search text for ou/description"),
     page: int = Query(default=1, ge=1),
     page_size: int = Query(default=50, ge=1, le=50000),  # Increased to support large OU lists
+    format: Optional[str] = Query("paginated", regex="^(paginated|simple)$"),  # Backward compatibility
 ):
     """Get all Organizational Units from Active Directory"""
     ldap_conn = get_ldap_connection()
     
     try:
-        def ldap_escape(value: str) -> str:
-            return (
-                value.replace("\\", r"\\5c")
-                .replace("*", r"\\2a")
-                .replace("(", r"\\28")
-                .replace(")", r"\\29")
-                .replace("\x00", r"\\00")
-            )
-
         if q:
             s = ldap_escape(q)
             filter_str = f"(&(objectClass=organizationalUnit)(|(ou=*{s}*)(description=*{s}*)))"
@@ -66,12 +67,24 @@ async def get_ous(
             raise InternalServerError("Failed to search OUs")
         
         ous_all = [format_ou_data(entry) for entry in results]
-        # Return all OUs if page_size is 1000 or more (frontend requests)
-        if page_size >= 1000:
+        total_ous = len(ous_all)
+        
+        # Backward compatibility: Return simple array if format=simple or page_size >= 1000
+        if format == "simple" or page_size >= 1000:
+            logger.info(f"🚀 Returning ALL {total_ous} OUs to frontend (simple format)")
             return ous_all
+        
+        # Return paginated response
         start = (page - 1) * page_size
         end = start + page_size
-        return ous_all[start:end]
+        paginated_items = ous_all[start:end]
+        
+        return create_paginated_response(
+            items=paginated_items,
+            total=total_ous,
+            page=page,
+            page_size=page_size
+        )
         
     except Exception as e:
         logger.error(f"Error getting OUs: {e}")
@@ -273,7 +286,7 @@ async def get_ou(dn: str, token_data = Depends(verify_token)):
         logger.error(f"Error getting OU {dn}: {e}")
         raise InternalServerError("Failed to retrieve OU")
 
-@router.post("/", response_model=OUCreateResponse)
+@router.post("/", response_model=OUCreateResponse, status_code=status.HTTP_201_CREATED)
 async def create_ou(ou_data: OUCreate, request: Request, token_data = Depends(verify_token)):
     """Create new Organizational Unit in Active Directory"""
     ldap_conn = get_ldap_connection()

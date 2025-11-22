@@ -50,13 +50,15 @@ class APIKeyAuth:
         
         # Check rate limit (simple implementation)
         if not self._check_rate_limit(key_info["id"], key_info["rate_limit"]):
-            raise HTTPException(
+            from app.core.exceptions import APIException
+            from app.core.error_codes import APIErrorCode
+            raise APIException(
                 status_code=status.HTTP_429_TOO_MANY_REQUESTS,
-                detail="Rate limit exceeded",
-                headers={
-                    "X-RateLimit-Limit": str(key_info["rate_limit"]),
-                    "X-RateLimit-Remaining": "0",
-                    "Retry-After": "60"
+                error_code=APIErrorCode.RATE_LIMIT_EXCEEDED,
+                message="Rate limit exceeded. Please try again later.",
+                details={
+                    "rate_limit": key_info["rate_limit"],
+                    "retry_after": 60
                 }
             )
         

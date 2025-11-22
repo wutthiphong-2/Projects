@@ -24,9 +24,6 @@ from app.schemas.activity_logs import (
     EventLogData, ActivityLogResponse, ActivityLogListResponse, StatsResponse,
     EventLogResponse, ActionTypeResponse
 )
-from app.schemas.api_keys import (
-    APIKeyCreate, APIKeyUpdate, APIKeyResponse, APIKeyCreateResponse, APIKeyUsageStats
-)
 
 __all__ = [
     # Common
@@ -80,11 +77,5 @@ __all__ = [
     "StatsResponse",
     "EventLogResponse",
     "ActionTypeResponse",
-    # API Keys
-    "APIKeyCreate",
-    "APIKeyUpdate",
-    "APIKeyResponse",
-    "APIKeyCreateResponse",
-    "APIKeyUsageStats",
 ]
 

@@ -946,11 +946,10 @@ const OUManagement = () => {
         <div style={{ padding: '24px' }}>
           {loading ? (
             <div style={{ textAlign: 'center', padding: '100px 0' }}>
-              <Spin size="large" tip={
-                <span style={{ color: '#6b7280', fontSize: 14, marginTop: 12, display: 'block' }}>
-                  Loading Active Directory structure...
-                </span>
-              } />
+              <Spin size="large" />
+              <div style={{ color: '#6b7280', fontSize: 14, marginTop: 16 }}>
+                Loading Active Directory structure...
+              </div>
             </div>
           ) : filteredTreeData.length === 0 ? (
             <Empty 
