@@ -133,7 +133,7 @@ import {
   ERROR_MESSAGES,
   EMPTY_CATEGORIZED_GROUPS
 } from '../../constants/userManagement';
-import FilterBar from '../FilterBar';
+import FilterBar from './FilterBar';
 import BulkActionBar from '../BulkActionBar';
 import CreateUserModal from './CreateUserModal';
 import EditUserModal from './EditUserModal';
@@ -253,25 +253,8 @@ const UserManagement = () => {
   const [openDropdownKey, setOpenDropdownKey] = useState(null);
   
   // Level 3: Premium Features States
-  // Real-time updates
-  const [autoRefreshEnabled, setAutoRefreshEnabled] = useState(false);
-  const [autoRefreshInterval, setAutoRefreshInterval] = useState(30); // seconds
-  const [lastRefreshTime, setLastRefreshTime] = useState(null);
-  
-  // Activity feed
-  const [isActivityFeedVisible, setIsActivityFeedVisible] = useState(false);
-  const [recentActivities, setRecentActivities] = useState([]);
-  const [activityLoading, setActivityLoading] = useState(false);
-  
-  // Filter presets & history
-  const [filterPresets, setFilterPresets] = useState([]);
-  const [filterHistory, setFilterHistory] = useState([]);
-  const [isFilterPresetModalVisible, setIsFilterPresetModalVisible] = useState(false);
-  
-  // Table views & customization
-  const [tableView, setTableView] = useState('table'); // 'table', 'grid', 'compact'
-  const [columnOrder, setColumnOrder] = useState([]);
-  const [isColumnCustomizationVisible, setIsColumnCustomizationVisible] = useState(false);
+  // Note: Some features are planned but not yet implemented
+  // Removed unused states: autoRefreshEnabled, analyticsData, filterPresets, tableView, etc.
   
   // Bulk actions
   const [bulkActionLoading, setBulkActionLoading] = useState(false);
@@ -280,10 +263,6 @@ const UserManagement = () => {
   // Smart search
   const [searchSuggestions, setSearchSuggestions] = useState([]);
   const [showSearchSuggestions, setShowSearchSuggestions] = useState(false);
-  
-  // Analytics
-  const [analyticsData, setAnalyticsData] = useState(null);
-  const [isAnalyticsVisible, setIsAnalyticsVisible] = useState(false);
   
   // OU Modal state
   const [isOuModalVisible, setIsOuModalVisible] = useState(false);
@@ -321,6 +300,8 @@ const UserManagement = () => {
   
   const [editForm] = Form.useForm();
   const [passwordForm] = Form.useForm();
+  // filterForm is used programmatically but not connected to Form element
+  // This will cause a warning - we'll suppress it or create a hidden Form
   const [filterForm] = Form.useForm();
   const { message } = App.useApp();
   
@@ -416,7 +397,10 @@ const UserManagement = () => {
       );
       setIsFilterDrawerVisible(false);
     } catch (error) {
-      // Silently fail - form validation will show errors
+      // Form validation will show errors, but log for debugging
+      if (process.env.NODE_ENV === 'development') {
+        console.warn('[UserManagement] Filter validation error', error);
+      }
     }
   }, [filterForm]);
 
@@ -515,13 +499,15 @@ const UserManagement = () => {
             : (cachedData?.items || cachedData?.data || cachedData?.users || []);
           
           if (!Array.isArray(userData)) {
-            console.warn('[UserManagement] Cached data is not an array, clearing cache', {
-              cacheKey,
-              cachedDataType: typeof cachedData,
-              hasItems: !!cachedData?.items,
-              hasData: !!cachedData?.data,
-              keys: cachedData ? Object.keys(cachedData) : []
-            });
+            if (process.env.NODE_ENV === 'development') {
+              console.warn('[UserManagement] Cached data is not an array, clearing cache', {
+                cacheKey,
+                cachedDataType: typeof cachedData,
+                hasItems: !!cachedData?.items,
+                hasData: !!cachedData?.data,
+                keys: cachedData ? Object.keys(cachedData) : []
+              });
+            }
             apiCache.delete(cacheKey);
           } else {
             setUsers(userData);
@@ -544,13 +530,15 @@ const UserManagement = () => {
         userData = result.items;
       } else if (result && typeof result === 'object') {
         // Fallback: try to extract array from object
-        console.warn('[UserManagement] Unexpected response format, attempting to extract array', {
-          resultType: typeof result,
-          hasItems: !!result.items,
-          hasData: !!result.data,
-          hasUsers: !!result.users,
-          keys: result ? Object.keys(result) : []
-        });
+        if (process.env.NODE_ENV === 'development') {
+          console.warn('[UserManagement] Unexpected response format, attempting to extract array', {
+            resultType: typeof result,
+            hasItems: !!result.items,
+            hasData: !!result.data,
+            hasUsers: !!result.users,
+            keys: result ? Object.keys(result) : []
+          });
+        }
         userData = result.data || result.users || [];
       } else {
         // Fallback to empty array
@@ -558,44 +546,7 @@ const UserManagement = () => {
       }
       
       // Debug: Check if employeeID exists in API response (only in development)
-      if (process.env.NODE_ENV === 'development' && userData.length > 0) {
-        const sampleUser = userData[0];
-        const hasEmployeeID = 'employeeID' in sampleUser;
-        const employeeIDValue = sampleUser.employeeID;
-        
-        console.debug('[UserManagement] Employee ID Check', {
-          hasEmployeeID,
-          employeeIDValue,
-          employeeIDType: typeof employeeIDValue,
-          isEmpty: !employeeIDValue || employeeIDValue === '' || employeeIDValue === null,
-          sampleUserKeys: Object.keys(sampleUser).filter(k => k.toLowerCase().includes('employee')),
-          firstUser: {
-            username: sampleUser.sAMAccountName,
-            employeeID: sampleUser.employeeID,
-            allKeys: Object.keys(sampleUser)
-          }
-        });
-        
-        // Count users with employeeID
-        const usersWithEmployeeID = userData.filter(u => u.employeeID && String(u.employeeID).trim() !== '');
-        if (usersWithEmployeeID.length > 0) {
-          console.debug('[UserManagement] Users with Employee ID', {
-            total: userData.length,
-            withEmployeeID: usersWithEmployeeID.length,
-            percentage: ((usersWithEmployeeID.length / userData.length) * 100).toFixed(1) + '%',
-            samples: usersWithEmployeeID.slice(0, 5).map(u => ({
-              username: u.sAMAccountName,
-              employeeID: u.employeeID,
-              type: typeof u.employeeID
-            }))
-          });
-        } else {
-          console.warn('[UserManagement] No users have employeeID data', {
-            total: userData.length,
-            sampleUserKeys: Object.keys(sampleUser)
-          });
-        }
-      }
+      // Removed verbose debug logs for production
       
       // Ensure userData is always an array
       if (!Array.isArray(userData)) {
@@ -609,60 +560,7 @@ const UserManagement = () => {
       }
       
       // Debug: Check if extensionName and employeeID are in the data (only in development)
-      if (process.env.NODE_ENV === 'development' && userData.length > 0) {
-        const sampleUser = userData[0];
-        const hasExtensionName = 'extensionName' in sampleUser;
-        const hasEmployeeID = 'employeeID' in sampleUser;
-        
-        if (hasExtensionName) {
-          const usersWithExtName = userData.filter(u => u.extensionName);
-          if (usersWithExtName.length > 0) {
-            console.debug('[UserManagement] Extension Name Stats', {
-              total: userData.length,
-              withExtName: usersWithExtName.length,
-              percentage: ((usersWithExtName.length / userData.length) * 100).toFixed(1) + '%',
-              sample: usersWithExtName.slice(0, 3).map(u => ({
-                username: u.sAMAccountName,
-                extensionName: u.extensionName
-              }))
-            });
-          }
-        }
-        
-        if (hasEmployeeID) {
-          const usersWithEmployeeID = userData.filter(u => {
-            const empId = u.employeeID;
-            return empId && String(empId).trim() !== '';
-          });
-          
-          console.debug('[UserManagement] Employee ID Stats', {
-            total: userData.length,
-            withEmployeeID: usersWithEmployeeID.length,
-            withoutEmployeeID: userData.length - usersWithEmployeeID.length,
-            percentage: ((usersWithEmployeeID.length / userData.length) * 100).toFixed(1) + '%',
-            sample: usersWithEmployeeID.slice(0, 5).map(u => ({
-              username: u.sAMAccountName,
-              employeeID: u.employeeID,
-              employeeIDType: typeof u.employeeID
-            })),
-            sampleWithout: userData.filter(u => !u.employeeID || String(u.employeeID).trim() === '').slice(0, 3).map(u => ({
-              username: u.sAMAccountName,
-              employeeID: u.employeeID,
-              employeeIDType: typeof u.employeeID
-            })),
-            sampleUserKeys: Object.keys(sampleUser).filter(k => k.toLowerCase().includes('employee'))
-          });
-        } else {
-          console.warn('[UserManagement] employeeID field not found in user data', {
-            sampleUserKeys: Object.keys(sampleUser),
-            hasEmployeeID: hasEmployeeID,
-            sampleUser: {
-              username: sampleUser.sAMAccountName,
-              keys: Object.keys(sampleUser)
-            }
-          });
-        }
-      }
+      // Removed verbose debug logs for production
       
       setUsers(userData);
       await fetchDirectoryCounts();
@@ -986,7 +884,9 @@ const UserManagement = () => {
         setIsEditModalVisible(true);
       } else {
         // Fallback to table data if API returns null
-        console.warn('[UserManagement] API returned null, using table data');
+        if (process.env.NODE_ENV === 'development') {
+          console.warn('[UserManagement] API returned null, using table data');
+        }
         setEditingUser(user);
         setIsEditModalVisible(true);
         message.warning('ไม่สามารถโหลดข้อมูลเพิ่มเติมได้ ใช้ข้อมูลจากตารางแทน');
@@ -1831,52 +1731,35 @@ const UserManagement = () => {
 
     return (
     <div className="umx-root">
-      {/* Modern Page Header - Compact Design */}
-      <header className={`umx-sticky-header ${isHeaderSticky ? 'umx-sticky-active' : ''}`}>
-        <div className="umx-hero-compact">
-          {/* Header Top Row: Title & Actions */}
-          <div style={{ 
-            display: 'flex', 
-            justifyContent: 'space-between', 
-            alignItems: 'flex-start',
-            marginBottom: 16,
-            gap: 16
-          }}>
-            <div style={{ flex: 1, minWidth: 0 }}>
-              <Space size={12} align="center" style={{ marginBottom: 4 }}>
-                <Tag color="blue" className="umx-hero-badge-compact" style={{ fontSize: 10, padding: '2px 8px' }}>
-                  DIRECTORY
-                </Tag>
-                <div className="umx-hero-title-compact" style={{ fontSize: 28, margin: 0 }}>User Management</div>
-              </Space>
-              <Text type="secondary" style={{ fontSize: 13, display: 'block', marginTop: 4 }}>
-                Manage and organize user accounts in your Active Directory
-        </Text>
-      </div>
+      {/* Header Section - Match Image Design */}
+      <header className={`umx-header-redesign ${isHeaderSticky ? 'umx-header-sticky' : ''}`}>
+        <div className="umx-header-wrapper">
+          {/* Top Row: Badge, Title, Buttons */}
+          <div className="umx-header-top-row">
+            <div className="umx-header-left-section">
+              <Button 
+                type="primary" 
+                icon={<GlobalOutlined />}
+                className="umx-directory-badge"
+              >
+                DIRECTORY
+              </Button>
+            </div>
             
-            {/* Action Buttons - Grouped */}
-            <Space size={8} wrap>
-              {/* Primary Action */}
+            <div className="umx-header-right-section">
               <Button 
                 type="primary" 
                 icon={<UserAddOutlined />} 
                 onClick={handleCreateUser}
-                size="large"
-        style={{
-                  borderRadius: 8,
-                  fontWeight: 600,
-                  boxShadow: '0 2px 4px rgba(37, 99, 235, 0.2)',
-                  height: 40
-                }}
+                className="umx-create-user-btn"
               >
                 สร้างผู้ใช้
               </Button>
               
-              {/* Secondary Actions - Dropdown */}
-          <Dropdown
-            menu={{
-              items: [
-                {
+              <Dropdown
+                menu={{
+                  items: [
+                    {
                       key: 'refresh',
                       icon: <ReloadOutlined />,
                       label: 'รีเฟรชข้อมูล',
@@ -1902,57 +1785,57 @@ const UserManagement = () => {
                       icon: <ExportOutlined />,
                       label: 'ส่งออกข้อมูล',
                       disabled: true
-                }
-              ]
-            }}
-            trigger={['click']}
-            placement="bottomRight"
-          >
-            <Button
+                    }
+                  ]
+                }}
+                trigger={['click']}
+                placement="bottomRight"
+              >
+                <Button
                   icon={<SettingOutlined />}
                   size="large"
                   type="text"
-                style={{ 
-                  borderRadius: 8,
-                    height: 40,
-                    width: 40,
-                    display: 'flex',
-                    alignItems: 'center',
-                    justifyContent: 'center'
-                  }}
+                  className="umx-settings-btn"
                 />
               </Dropdown>
-            </Space>
+            </div>
           </div>
           
-          {/* Metrics Cards Grid - Compact Horizontal Layout */}
-          <div className="umx-hero-metrics-compact" style={{ 
-            display: 'grid',
-            gridTemplateColumns: 'repeat(auto-fit, minmax(140px, 1fr))',
-            gap: 12
-          }}>
-            {heroMetrics.map((metric) => (
-              <div 
-                key={metric.key} 
-                className="umx-metric-card-compact"
-                onClick={metric.onClick}
-                style={{
-                  padding: '12px 16px',
-                  cursor: 'pointer'
-                }}
-              >
-                <div className="umx-metric-label-compact" style={{ fontSize: 11, marginBottom: 4 }}>
-                  {metric.label}
+          {/* Title Section */}
+          <div className="umx-title-section">
+            <h1 className="umx-page-title">User Management</h1>
+            <p className="umx-page-subtitle">Manage and organize user accounts in your Active Directory</p>
+          </div>
+          
+          {/* Statistics Cards - Match Image */}
+          <div className="umx-stats-grid">
+            {heroMetrics.map((metric, index) => {
+              const icons = [
+                <UserOutlined key="users" />,
+                <CheckCircleOutlined key="enabled" />,
+                <CloseCircleOutlined key="disabled" />,
+                <BarChartOutlined key="current" />
+              ];
+              
+              return (
+                <div 
+                  key={metric.key} 
+                  className="umx-stat-card-new"
+                  onClick={metric.onClick}
+                  style={{ '--card-color': metric.accent }}
+                >
+                  <div className="umx-stat-icon-new" style={{ color: metric.accent }}>
+                    {icons[index]}
+                  </div>
+                  <div className="umx-stat-text">
+                    <div className="umx-stat-label-new">{metric.label}</div>
+                    <div className="umx-stat-value-new" style={{ color: metric.accent }}>
+                      {metric.value}
+                    </div>
+                  </div>
                 </div>
-                <div className="umx-metric-value-compact" style={{ 
-                  color: metric.accent,
-                  fontSize: 22,
-                  fontWeight: 700
-                }}>
-                  {metric.value}
-                </div>
-              </div>
-            ))}
+              );
+            })}
           </div>
         </div>
       </header>
@@ -2239,7 +2122,7 @@ const UserManagement = () => {
         <Tabs defaultActiveKey="1" items={manageGroupsTabsItems} />
       </Modal>
       
-      {/* OU Selection Modal */}
+      {/* OU Selection Modal - Enhanced Version */}
       <Modal
         title={
           <div style={{
@@ -2248,17 +2131,18 @@ const UserManagement = () => {
           }}>
             <Space size="middle" align="center">
               <div style={{
-                background: '#eff6ff',
-                borderRadius: 8,
-                padding: 10,
+                background: 'linear-gradient(135deg, #3b82f6 0%, #2563eb 100%)',
+                borderRadius: 10,
+                padding: 12,
                 display: 'flex',
                 alignItems: 'center',
-                justifyContent: 'center'
+                justifyContent: 'center',
+                boxShadow: '0 4px 12px rgba(59, 130, 246, 0.3)'
               }}>
-                <BankOutlined style={{ fontSize: 22, color: '#3b82f6' }} />
+                <BankOutlined style={{ fontSize: 24, color: '#ffffff' }} />
               </div>
               <div>
-                <div style={{ fontSize: 17, fontWeight: 700, color: '#1f2937', marginBottom: 2 }}>
+                <div style={{ fontSize: 18, fontWeight: 700, color: '#1f2937', marginBottom: 4 }}>
                   เลือก OU (Organizational Unit)
                 </div>
                 <Text style={{ fontSize: 12, color: '#6b7280', textTransform: 'uppercase', letterSpacing: '0.5px' }}>
@@ -2270,119 +2154,253 @@ const UserManagement = () => {
         }
         open={isOuModalVisible}
         onCancel={() => setIsOuModalVisible(false)}
-        footer={null}
+        footer={[
+          <Button
+            key="clear"
+            onClick={() => {
+              handleWifiOuFilterChange('');
+              handleRegularOuFilterChange('');
+            }}
+            disabled={!wifiOuFilter && !regularOuFilter}
+          >
+            <ClearOutlined /> ล้างการเลือก
+          </Button>,
+          <Button
+            key="cancel"
+            onClick={() => setIsOuModalVisible(false)}
+          >
+            ยกเลิก
+          </Button>,
+          <Button
+            key="apply"
+            type="primary"
+            onClick={() => setIsOuModalVisible(false)}
+            style={{
+              background: 'linear-gradient(135deg, #3b82f6 0%, #2563eb 100%)',
+              border: 'none'
+            }}
+          >
+            <CheckCircleOutlined /> ยืนยัน
+          </Button>
+        ]}
         width={(() => {
-          if (screens.xl || screens.lg) return 700;
-          if (screens.md || screens.sm) return 600;
+          if (screens.xl || screens.lg) return 800;
+          if (screens.md || screens.sm) return 700;
           return '95%';
         })()}
         destroyOnHidden
       >
         <div style={{ padding: '20px 0' }}>
-          <Row gutter={[16, 16]}>
-            <Col xs={24} md={12}>
-              <div style={{ marginBottom: 8 }}>
-                <Text strong style={{ fontSize: 14, color: '#374151' }}>
-                  WiFi OUs
-                </Text>
-          </div>
-              <TreeSelect
-                placeholder="เลือก WiFi OU"
-                allowClear
-                showSearch
-                value={wifiOuFilter || undefined}
-                onChange={handleWifiOuFilterChange}
-                treeData={wifiTreeData}
-                treeDefaultExpandAll={false}
-                style={{ width: '100%' }}
-                listHeight={300}
-                loading={loadingOUs}
-                filterTreeNode={(input, node) => {
-                  const title = typeof node.title === 'string' ? node.title : (node.fullPath || '');
-                  return title.toLowerCase().includes(input.toLowerCase());
-                }}
-                notFoundContent={
-                  loadingOUs ? (
-                    <div style={{ padding: '40px 20px', textAlign: 'center' }}>
-                      <Spin size="large" />
-                      <div style={{ marginTop: 16, color: '#6b7280' }}>
-                        กำลังโหลด...
-                      </div>
-                    </div>
-                  ) : (
-                    <Empty
-                      image={Empty.PRESENTED_IMAGE_SIMPLE}
-                      description="ไม่พบ WiFi OU"
-                      style={{ padding: '40px 20px' }}
-                    />
-                  )
-                }
-              />
-            </Col>
-            <Col xs={24} md={12}>
-              <div style={{ marginBottom: 8 }}>
-                <Text strong style={{ fontSize: 14, color: '#374151' }}>
-                  Regular OUs
-                      </Text>
-                    </div>
-              <TreeSelect
-                placeholder="เลือก Regular OU"
-                allowClear
-                showSearch
-                value={regularOuFilter || undefined}
-                onChange={handleRegularOuFilterChange}
-                treeData={regularTreeData}
-                treeDefaultExpandAll={false}
-                style={{ width: '100%' }}
-                listHeight={300}
-                loading={loadingOUs}
-                filterTreeNode={(input, node) => {
-                  const title = typeof node.title === 'string' ? node.title : (node.fullPath || '');
-                  return title.toLowerCase().includes(input.toLowerCase());
-                }}
-                notFoundContent={
-                  loadingOUs ? (
-                    <div style={{ padding: '40px 20px', textAlign: 'center' }}>
-                      <Spin size="large" />
-                      <div style={{ marginTop: 16, color: '#6b7280' }}>
-                        กำลังโหลด...
-                      </div>
-                    </div>
-                  ) : (
-                    <Empty
-                      image={Empty.PRESENTED_IMAGE_SIMPLE}
-                      description="ไม่พบ Regular OU"
-                      style={{ padding: '40px 20px' }}
-                    />
-                  )
-                }
-              />
-            </Col>
-          </Row>
-          
-          {ouFilter && (
-            <div style={{ marginTop: 20, padding: '12px', background: '#f0f9ff', borderRadius: 8, border: '1px solid #bae6fd' }}>
-              <Space>
-                <Text strong style={{ fontSize: 13, color: '#0369a1' }}>
-                  OU ที่เลือก:
-                </Text>
-                <Tag color="blue" style={{ fontSize: 13, padding: '4px 12px' }}>
-                  {resolveOuLabel(ouFilter, availableOUs)}
-                </Tag>
-                <Button
-                  type="link"
-                  size="small"
-                  danger
-                  onClick={() => {
-                    handleWifiOuFilterChange('');
-                    handleRegularOuFilterChange('');
-                  }}
-                >
-                  ล้าง
-                </Button>
+          {/* Selected OU Preview */}
+          {(wifiOuFilter || regularOuFilter) && (
+            <div style={{
+              marginBottom: 20,
+              padding: '16px',
+              background: 'linear-gradient(135deg, #eff6ff 0%, #dbeafe 100%)',
+              borderRadius: 12,
+              border: '2px solid #3b82f6',
+              boxShadow: '0 4px 12px rgba(59, 130, 246, 0.15)'
+            }}>
+              <Space direction="vertical" size={8} style={{ width: '100%' }}>
+                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                  <Space>
+                    <CheckCircleOutlined style={{ fontSize: 18, color: '#3b82f6' }} />
+                    <Text strong style={{ fontSize: 14, color: '#1e40af' }}>
+                      OU ที่เลือก:
+                    </Text>
+                  </Space>
+                  <Button
+                    type="link"
+                    size="small"
+                    danger
+                    icon={<ClearOutlined />}
+                    onClick={() => {
+                      handleWifiOuFilterChange('');
+                      handleRegularOuFilterChange('');
+                    }}
+                  >
+                    ล้าง
+                  </Button>
+                </div>
+                <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8 }}>
+                  {wifiOuFilter && (
+                    <Tag
+                      color="blue"
+                      style={{
+                        fontSize: 13,
+                        padding: '6px 14px',
+                        borderRadius: 6,
+                        fontWeight: 500,
+                        border: '1px solid #3b82f6'
+                      }}
+                    >
+                      <ThunderboltOutlined style={{ marginRight: 6 }} />
+                      WiFi: {resolveOuLabel(wifiOuFilter, availableOUs)}
+                    </Tag>
+                  )}
+                  {regularOuFilter && (
+                    <Tag
+                      color="green"
+                      style={{
+                        fontSize: 13,
+                        padding: '6px 14px',
+                        borderRadius: 6,
+                        fontWeight: 500,
+                        border: '1px solid #10b981'
+                      }}
+                    >
+                      <BankOutlined style={{ marginRight: 6 }} />
+                      Regular: {resolveOuLabel(regularOuFilter, availableOUs)}
+                    </Tag>
+                  )}
+                </div>
               </Space>
             </div>
           )}
+
+          {/* Tabs for WiFi and Regular OUs */}
+          <Tabs
+            defaultActiveKey="wifi"
+            items={[
+              {
+                key: 'wifi',
+                label: (
+                  <Space>
+                    <ThunderboltOutlined style={{ color: '#3b82f6' }} />
+                    <span>WiFi OUs</span>
+                    {wifiOUs.length > 0 && (
+                      <Badge count={wifiOUs.length} style={{ backgroundColor: '#3b82f6' }} />
+                    )}
+                  </Space>
+                ),
+                children: (
+                  <div>
+                    <TreeSelect
+                      placeholder="ค้นหาหรือเลือก WiFi OU"
+                      allowClear
+                      showSearch
+                      value={wifiOuFilter || undefined}
+                      onChange={handleWifiOuFilterChange}
+                      treeData={wifiTreeData}
+                      treeDefaultExpandAll={false}
+                      style={{ width: '100%' }}
+                      listHeight={400}
+                      loading={loadingOUs}
+                      size="large"
+                      filterTreeNode={(input, node) => {
+                        const title = typeof node.title === 'string' ? node.title : (node.fullPath || '');
+                        return title.toLowerCase().includes(input.toLowerCase());
+                      }}
+                      notFoundContent={
+                        loadingOUs ? (
+                          <div style={{ padding: '60px 20px', textAlign: 'center' }}>
+                            <Spin size="large" />
+                            <div style={{ marginTop: 16, color: '#6b7280', fontSize: 14 }}>
+                              กำลังโหลดข้อมูล WiFi OU...
+                            </div>
+                          </div>
+                        ) : (
+                          <Empty
+                            image={Empty.PRESENTED_IMAGE_SIMPLE}
+                            description={
+                              <div>
+                                <div style={{ marginBottom: 8, fontSize: 14, color: '#6b7280' }}>
+                                  ไม่พบ WiFi OU
+                                </div>
+                                <Text type="secondary" style={{ fontSize: 12 }}>
+                                  ลองค้นหาด้วยคำอื่นหรือตรวจสอบการเชื่อมต่อ
+                                </Text>
+                              </div>
+                            }
+                            style={{ padding: '60px 20px' }}
+                          />
+                        )
+                      }
+                    />
+                    {wifiOUs.length > 0 && (
+                      <div style={{ marginTop: 12, padding: '8px 12px', background: '#f0f9ff', borderRadius: 6 }}>
+                        <Text type="secondary" style={{ fontSize: 12 }}>
+                          <InfoCircleOutlined style={{ marginRight: 6 }} />
+                          พบ {wifiOUs.length} WiFi OU
+                        </Text>
+                      </div>
+                    )}
+                  </div>
+                ),
+                icon: <ThunderboltOutlined />
+              },
+              {
+                key: 'regular',
+                label: (
+                  <Space>
+                    <BankOutlined style={{ color: '#10b981' }} />
+                    <span>Regular OUs</span>
+                    {regularOUs.length > 0 && (
+                      <Badge count={regularOUs.length} style={{ backgroundColor: '#10b981' }} />
+                    )}
+                  </Space>
+                ),
+                children: (
+                  <div>
+                    <TreeSelect
+                      placeholder="ค้นหาหรือเลือก Regular OU"
+                      allowClear
+                      showSearch
+                      value={regularOuFilter || undefined}
+                      onChange={handleRegularOuFilterChange}
+                      treeData={regularTreeData}
+                      treeDefaultExpandAll={false}
+                      style={{ width: '100%' }}
+                      listHeight={400}
+                      loading={loadingOUs}
+                      size="large"
+                      filterTreeNode={(input, node) => {
+                        const title = typeof node.title === 'string' ? node.title : (node.fullPath || '');
+                        return title.toLowerCase().includes(input.toLowerCase());
+                      }}
+                      notFoundContent={
+                        loadingOUs ? (
+                          <div style={{ padding: '60px 20px', textAlign: 'center' }}>
+                            <Spin size="large" />
+                            <div style={{ marginTop: 16, color: '#6b7280', fontSize: 14 }}>
+                              กำลังโหลดข้อมูล Regular OU...
+                            </div>
+                          </div>
+                        ) : (
+                          <Empty
+                            image={Empty.PRESENTED_IMAGE_SIMPLE}
+                            description={
+                              <div>
+                                <div style={{ marginBottom: 8, fontSize: 14, color: '#6b7280' }}>
+                                  ไม่พบ Regular OU
+                                </div>
+                                <Text type="secondary" style={{ fontSize: 12 }}>
+                                  ลองค้นหาด้วยคำอื่นหรือตรวจสอบการเชื่อมต่อ
+                                </Text>
+                              </div>
+                            }
+                            style={{ padding: '60px 20px' }}
+                          />
+                        )
+                      }
+                    />
+                    {regularOUs.length > 0 && (
+                      <div style={{ marginTop: 12, padding: '8px 12px', background: '#f0fdf4', borderRadius: 6 }}>
+                        <Text type="secondary" style={{ fontSize: 12 }}>
+                          <InfoCircleOutlined style={{ marginRight: 6 }} />
+                          พบ {regularOUs.length} Regular OU
+                        </Text>
+                      </div>
+                    )}
+                  </div>
+                ),
+                icon: <BankOutlined />
+              }
+            ]}
+            style={{
+              marginTop: 8
+            }}
+          />
         </div>
       </Modal>
 
@@ -2648,6 +2666,39 @@ const UserManagement = () => {
         onRemoveFromGroup={handleRemoveFromGroup}
         notifyError={notifyError}
       />
+      
+      {/* Hidden Forms to suppress useForm warnings - used programmatically */}
+      <Form form={filterForm} style={{ display: 'none' }}>
+        <Form.Item name="department">
+          <Input style={{ display: 'none' }} />
+        </Form.Item>
+        <Form.Item name="ou">
+          <Input style={{ display: 'none' }} />
+        </Form.Item>
+        <Form.Item name="status">
+          <Input style={{ display: 'none' }} />
+        </Form.Item>
+        <Form.Item name="dateRange">
+          <DatePicker.RangePicker style={{ display: 'none' }} />
+        </Form.Item>
+      </Form>
+      
+      {/* Hidden Form for editForm - connected when EditUserModal is visible */}
+      <Form form={editForm} style={{ display: 'none' }}>
+        <Form.Item name="cn">
+          <Input style={{ display: 'none' }} />
+        </Form.Item>
+      </Form>
+      
+      {/* Hidden Form for passwordForm - connected when PasswordModal is visible */}
+      <Form form={passwordForm} style={{ display: 'none' }}>
+        <Form.Item name="password">
+          <Input.Password style={{ display: 'none' }} />
+        </Form.Item>
+        <Form.Item name="confirmPassword">
+          <Input.Password style={{ display: 'none' }} />
+        </Form.Item>
+      </Form>
     </div>
   );
 };

@@ -48,7 +48,7 @@ export const PAGINATION = {
  */
 export const TABLE_CONFIG = {
   // Default scroll height
-  SCROLL_Y: 520,
+  SCROLL_Y: 700,
   
   // Header height for scroll calculation
   HEADER_HEIGHT: {

@@ -69,22 +69,22 @@ const FilterBar = ({
   return (
     <div className={`umx-filter-wrapper ${isFilterSticky ? 'umx-filter-sticky' : ''}`}>
       <div className="umx-filter-bar-compact">
-        <Row gutter={24} align="top">
+        <Row gutter={16} align="top">
           {/* Search Section */}
           <Col flex="auto">
             <div style={{ position: 'relative' }}>
-              <div style={{ marginBottom: 8 }}>
-                <Text style={{ fontSize: 13, fontWeight: 500, color: '#374151' }}>ค้นหา</Text>
+              <div style={{ marginBottom: 6 }}>
+                <Text style={{ fontSize: 12, fontWeight: 500, color: '#374151' }}>ค้นหา</Text>
               </div>
               <Input
                 placeholder={searchPlaceholder}
-                prefix={<SearchOutlined style={{ fontSize: 16, color: '#9ca3af' }} />}
+                prefix={<SearchOutlined style={{ fontSize: 14, color: '#9ca3af' }} />}
                 allowClear
                 value={searchText || ''}
                 onChange={(e) => handleSearchChange(e.target.value)}
                 onFocus={handleSearchFocus}
                 onBlur={handleSearchBlur}
-                size="large"
+                size="middle"
                 className="umx-search-input-modern"
               />
               {/* Search Suggestions */}
@@ -113,18 +113,18 @@ const FilterBar = ({
           {/* Quick Filters Section */}
           <Col flex="none">
             <div>
-              <div style={{ marginBottom: 8 }}>
-                <Text style={{ fontSize: 13, fontWeight: 500, color: '#374151' }}>ตัวกรองด่วน</Text>
+              <div style={{ marginBottom: 6 }}>
+                <Text style={{ fontSize: 12, fontWeight: 500, color: '#374151' }}>ตัวกรองด่วน</Text>
               </div>
-              <Space size={12} align="center">
+              <Space size={8} align="center">
                 <Select
                   placeholder="แผนก"
                   allowClear
                   value={departmentFilter || undefined}
                   onChange={onDepartmentFilterChange}
-                  size="large"
-                  style={{ width: 180 }}
-                  suffixIcon={<FilterOutlined style={{ fontSize: 14, color: '#9ca3af' }} />}
+                  size="middle"
+                  style={{ width: 160 }}
+                  suffixIcon={<FilterOutlined style={{ fontSize: 12, color: '#9ca3af' }} />}
                   className="umx-filter-select-modern"
                 >
                   {departments.map((dept) => (
@@ -134,8 +134,8 @@ const FilterBar = ({
                 <Select
                   value={statusFilter}
                   onChange={onStatusFilterChange}
-                  size="large"
-                  style={{ width: 150 }}
+                  size="middle"
+                  style={{ width: 130 }}
                   className="umx-filter-select-modern"
                 >
                   <Option value="all">ทั้งหมด</Option>
@@ -149,12 +149,12 @@ const FilterBar = ({
           {/* OU Filters Section */}
           <Col flex="none">
             <div>
-              <div style={{ marginBottom: 8 }}>
-                <Text style={{ fontSize: 13, fontWeight: 500, color: '#374151' }}>OU</Text>
+              <div style={{ marginBottom: 6 }}>
+                <Text style={{ fontSize: 12, fontWeight: 500, color: '#374151' }}>OU</Text>
               </div>
               <Button
                 type="default"
-                size="large"
+                size="middle"
                 icon={<BankOutlined />}
                 onClick={handleOpenOuModal}
                 className="umx-ou-button-modern"

@@ -51,7 +51,7 @@ const UserTable = ({
   visibleColumns = {},
   sortedInfo = { order: null, columnKey: null },
   setSortedInfo,
-  tableScrollY = 'calc(100vh - 400px)',
+  tableScrollY = 'calc(100vh - 200px)',
   openDropdownKey = null,
   setOpenDropdownKey,
   
@@ -77,7 +77,7 @@ const UserTable = ({
   
   const renderCopyableValue = useCallback((value, tooltips = ['คัดลอก', 'คัดลอกแล้ว']) => {
     if (!value) {
-      return <Text type="secondary" style={{ fontSize: 12 }}>-</Text>;
+      return <Text type="secondary" style={{ fontSize: 13, color: '#94a3b8' }}>-</Text>;
     }
 
     return (
@@ -90,7 +90,9 @@ const UserTable = ({
             fontSize: 13,
             wordBreak: 'break-word',
             lineHeight: '1.5',
-            display: 'block'
+            display: 'block',
+            color: '#1f2937',
+            fontWeight: 400
           }}
         >
           {value}
@@ -105,12 +107,12 @@ const UserTable = ({
         maxWidth: '100%',
         wordBreak: 'break-word',
         whiteSpace: 'normal',
-        lineHeight: '1.4'
+        lineHeight: '1.5'
       }}>
         {renderCopyableValue(value, ['คัดลอกชื่อผู้ใช้', 'คัดลอกแล้ว'])}
       </div>
     ) : (
-      <Text type="secondary" style={{ fontSize: 12 }}>-</Text>
+      <Text type="secondary" style={{ fontSize: 13, color: '#94a3b8' }}>-</Text>
     )
   ), [renderCopyableValue]);
 
@@ -125,14 +127,15 @@ const UserTable = ({
             color: '#1f2937',
             wordBreak: 'break-word',
             lineHeight: '1.5',
-            display: 'block'
+            display: 'block',
+            fontWeight: 400
           }}
         >
           {value}
         </Text>
       </Tooltip>
     ) : (
-      <Text type="secondary" style={{ fontSize: 12 }}>-</Text>
+      <Text type="secondary" style={{ fontSize: 13, color: '#94a3b8' }}>-</Text>
     )
   ), []);
 
@@ -149,25 +152,26 @@ const UserTable = ({
   const renderDescriptionCell = useCallback((value) => (
     value ? (
       <Tooltip title={value} placement="topLeft">
-        <Text className="table-cell-text" ellipsis style={{ fontSize: 13, color: '#4b5563' }}>
+        <Text className="table-cell-text" ellipsis style={{ fontSize: 13, color: '#4b5563', lineHeight: '1.5' }}>
           {value}
         </Text>
       </Tooltip>
     ) : (
-      <Text type="secondary" style={{ fontSize: 12 }}>-</Text>
+      <Text type="secondary" style={{ fontSize: 13, color: '#94a3b8' }}>-</Text>
     )
   ), []);
 
   const renderDisplayName = useCallback((_, record) => (
-    <div className="display-name-cell" style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+    <div className="display-name-cell" style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
       <Avatar
-        size={36}
+        size={24}
         icon={!record.cn && <UserOutlined />}
         style={{
           background: record.isEnabled ? '#2563eb' : '#d1d5db',
           color: '#ffffff',
           fontWeight: 600,
-          flexShrink: 0
+          flexShrink: 0,
+          boxShadow: '0 2px 8px rgba(37, 99, 235, 0.2)'
         }}
       >
         {(record.cn || record.displayName || 'U').charAt(0).toUpperCase()}
@@ -176,7 +180,10 @@ const UserTable = ({
         <Tooltip title={record.cn || record.displayName || '-'} placement="topLeft">
           <div className="display-name-text table-cell-text" style={{ 
             wordBreak: 'break-word',
-            lineHeight: '1.4'
+            lineHeight: '1.5',
+            fontSize: 13,
+            fontWeight: 500,
+            color: '#111827'
           }}>
             {record.cn || record.displayName || '-'}
           </div>
@@ -186,7 +193,32 @@ const UserTable = ({
   ), []);
 
   const renderEmailCell = useCallback((value) => renderCopyableValue(value, ['คัดลอกอีเมล', 'คัดลอกแล้ว']), [renderCopyableValue]);
-  const renderEmployeeIdCell = useCallback((value) => renderCopyableValue(value, ['คัดลอก Employee ID', 'คัดลอกแล้ว']), [renderCopyableValue]);
+  const renderEmployeeIdCell = useCallback((value, record) => {
+    // Debug: Log employeeID value (only in development)
+    if (process.env.NODE_ENV === 'development' && record) {
+      console.debug('[UserTable] renderEmployeeIdCell', {
+        value,
+        valueType: typeof value,
+        hasValue: !!value,
+        isEmpty: value === '' || value === null || value === undefined,
+        username: record.sAMAccountName,
+        allKeys: Object.keys(record).filter(k => k.toLowerCase().includes('employee'))
+      });
+    }
+    
+    // Handle empty/null/undefined values
+    if (!value || value === '' || value === null || value === undefined) {
+      return <Text type="secondary" style={{ fontSize: 13, color: '#94a3b8', fontStyle: 'italic' }}>-</Text>;
+    }
+    
+    // Trim whitespace
+    const trimmedValue = String(value).trim();
+    if (trimmedValue === '') {
+      return <Text type="secondary" style={{ fontSize: 13, color: '#94a3b8', fontStyle: 'italic' }}>-</Text>;
+    }
+    
+    return renderCopyableValue(trimmedValue, ['คัดลอก Employee ID', 'คัดลอกแล้ว']);
+  }, [renderCopyableValue]);
   
   const renderStatusCell = useCallback((isEnabled) => (
     <Tag
@@ -204,19 +236,19 @@ const UserTable = ({
           ellipsis
           copyable={{ text: value, tooltips: ['คัดลอก UPN', 'คัดลอกแล้ว'] }}
           className="copyable-text table-cell-text"
-          style={{ fontSize: 13, maxWidth: 200 }}
+          style={{ fontSize: 13, maxWidth: 200, lineHeight: '1.5', color: '#1f2937' }}
         >
           {value}
         </Text>
       </Tooltip>
     ) : (
-      <Text type="secondary" style={{ fontSize: 12 }}>-</Text>
+      <Text type="secondary" style={{ fontSize: 13, color: '#94a3b8' }}>-</Text>
     )
   ), []);
 
   const renderManagerCell = useCallback((value) => {
     if (!value) {
-      return <Text type="secondary" style={{ fontSize: 12 }}>-</Text>;
+      return <Text type="secondary" style={{ fontSize: 13, color: '#94a3b8' }}>-</Text>;
     }
     
     // Try to find manager in users list
@@ -228,7 +260,7 @@ const UserTable = ({
         <Text
           ellipsis
           className="table-cell-text"
-          style={{ fontSize: 13, maxWidth: 200 }}
+          style={{ fontSize: 13, maxWidth: 200, lineHeight: '1.5', color: '#1f2937' }}
         >
           {managerName}
         </Text>
@@ -238,21 +270,21 @@ const UserTable = ({
 
   const renderLastLogonCell = useCallback((value) => {
     if (!value || value === '0' || value === '') {
-      return (
-        <Tooltip title="ไม่เคยเข้าสู่ระบบ">
-          <Tag color="default" style={{ fontSize: 12 }}>
-            <HistoryOutlined style={{ marginRight: 4 }} />
-            ไม่เคยเข้าสู่ระบบ
-          </Tag>
-        </Tooltip>
-      );
+        return (
+          <Tooltip title="ไม่เคยเข้าสู่ระบบ">
+            <Tag color="default" style={{ fontSize: 12, padding: '4px 10px', borderRadius: 6 }}>
+              <HistoryOutlined style={{ marginRight: 4 }} />
+              ไม่เคยเข้าสู่ระบบ
+            </Tag>
+          </Tooltip>
+        );
     }
     
     try {
       // Handle ISO string format
       const logonDate = dayjs(value);
       if (!logonDate.isValid()) {
-        return <Text type="secondary" style={{ fontSize: 12 }}>-</Text>;
+        return <Text type="secondary" style={{ fontSize: 13, color: '#94a3b8' }}>-</Text>;
       }
       
       const now = dayjs();
@@ -281,10 +313,10 @@ const UserTable = ({
       return (
         <Tooltip title={`เข้าสู่ระบบล่าสุด: ${logonDate.format('DD/MM/YYYY HH:mm')} (${timeAgoText})`}>
           <div>
-            <Text style={{ fontSize: 13, display: 'block', marginBottom: 4 }}>
+            <Text style={{ fontSize: 13, display: 'block', marginBottom: 6, fontWeight: 500, color: '#1f2937' }}>
               {logonDate.format('DD/MM/YYYY')}
             </Text>
-            <Tag color={tagColor} style={{ fontSize: 11 }}>
+            <Tag color={tagColor} style={{ fontSize: 12, padding: '4px 10px', borderRadius: 6 }}>
               {timeAgoText}
             </Tag>
           </div>
@@ -297,27 +329,27 @@ const UserTable = ({
         value,
         valueType: typeof value
       });
-      return <Text type="secondary" style={{ fontSize: 12 }}>-</Text>;
+      return <Text type="secondary" style={{ fontSize: 13, color: '#94a3b8' }}>-</Text>;
     }
   }, []);
 
   const renderPasswordLastSetCell = useCallback((value) => {
     if (!value || value === '0' || value === '') {
-      return (
-        <Tooltip title="ยังไม่เคยตั้งรหัสผ่าน">
-          <Tag color="default" style={{ fontSize: 12 }}>
-            <KeyOutlined style={{ marginRight: 4 }} />
-            ยังไม่เคยตั้ง
-          </Tag>
-        </Tooltip>
-      );
+        return (
+          <Tooltip title="ยังไม่เคยตั้งรหัสผ่าน">
+            <Tag color="default" style={{ fontSize: 12, padding: '4px 10px', borderRadius: 6 }}>
+              <KeyOutlined style={{ marginRight: 4 }} />
+              ยังไม่เคยตั้ง
+            </Tag>
+          </Tooltip>
+        );
     }
     
     try {
       // Handle ISO string format
       const pwdDate = dayjs(value);
       if (!pwdDate.isValid()) {
-        return <Text type="secondary" style={{ fontSize: 12 }}>-</Text>;
+        return <Text type="secondary" style={{ fontSize: 13, color: '#94a3b8' }}>-</Text>;
       }
       
       const now = dayjs();
@@ -333,10 +365,10 @@ const UserTable = ({
       return (
         <Tooltip title={`ตั้งรหัสผ่านเมื่อ: ${pwdDate.format('DD/MM/YYYY HH:mm')} (${daysAgo} วันที่แล้ว)`}>
           <div>
-            <Text style={{ fontSize: 13, display: 'block', marginBottom: 4 }}>
+            <Text style={{ fontSize: 13, display: 'block', marginBottom: 6, fontWeight: 500, color: '#1f2937' }}>
               {pwdDate.format('DD/MM/YYYY')}
             </Text>
-            <Tag color={tagColor} style={{ fontSize: 11 }}>
+            <Tag color={tagColor} style={{ fontSize: 12, padding: '4px 10px', borderRadius: 6 }}>
               {daysAgo} วันที่แล้ว
             </Tag>
           </div>
@@ -349,7 +381,7 @@ const UserTable = ({
         value,
         valueType: typeof value
       });
-      return <Text type="secondary" style={{ fontSize: 12 }}>-</Text>;
+      return <Text type="secondary" style={{ fontSize: 13, color: '#94a3b8' }}>-</Text>;
     }
   }, []);
 
@@ -366,14 +398,14 @@ const UserTable = ({
     
     // Check for null, undefined, empty string, '0', or falsy values
     if (!value || value === '0' || value === '' || value === null || value === undefined) {
-      return (
-        <Tooltip title="บัญชีไม่มีวันหมดอายุ">
-          <Tag color="default" style={{ fontSize: 12 }}>
-            <CheckCircleOutlined style={{ marginRight: 4 }} />
-            ไม่หมดอายุ
-          </Tag>
-        </Tooltip>
-      );
+        return (
+          <Tooltip title="บัญชีไม่มีวันหมดอายุ">
+            <Tag color="default" style={{ fontSize: 12, padding: '4px 10px', borderRadius: 6 }}>
+              <CheckCircleOutlined style={{ marginRight: 4 }} />
+              ไม่หมดอายุ
+            </Tag>
+          </Tooltip>
+        );
     }
     
     try {
@@ -387,7 +419,7 @@ const UserTable = ({
         });
         return (
           <Tooltip title={`Invalid date format: ${value}`}>
-            <Text type="secondary" style={{ fontSize: 12 }}>-</Text>
+            <Text type="secondary" style={{ fontSize: 13, color: '#94a3b8' }}>-</Text>
           </Tooltip>
         );
       }
@@ -401,10 +433,10 @@ const UserTable = ({
         return (
           <Tooltip title={`หมดอายุเมื่อ: ${expiryDate.format('DD/MM/YYYY HH:mm')} (${daysExpired} วันที่แล้ว)`}>
             <div>
-              <Text style={{ fontSize: 13, display: 'block', marginBottom: 4, color: '#ef4444' }}>
+              <Text style={{ fontSize: 13, display: 'block', marginBottom: 6, fontWeight: 500, color: '#ef4444' }}>
                 {expiryDate.format('DD/MM/YYYY')}
               </Text>
-              <Tag color="error" style={{ fontSize: 11 }}>
+              <Tag color="error" style={{ fontSize: 12, padding: '4px 10px', borderRadius: 6 }}>
                 <CloseCircleOutlined style={{ marginRight: 4 }} />
                 หมดอายุแล้ว ({daysExpired} วัน)
               </Tag>
@@ -418,10 +450,10 @@ const UserTable = ({
         return (
           <Tooltip title={`จะหมดอายุ: ${expiryDate.format('DD/MM/YYYY HH:mm')} (เหลือ ${daysRemaining} วัน)`}>
             <div>
-              <Text style={{ fontSize: 13, display: 'block', marginBottom: 4, color: '#f59e0b' }}>
+              <Text style={{ fontSize: 13, display: 'block', marginBottom: 6, fontWeight: 500, color: '#f59e0b' }}>
                 {expiryDate.format('DD/MM/YYYY')}
               </Text>
-              <Tag color="error" style={{ fontSize: 11 }}>
+              <Tag color="error" style={{ fontSize: 12, padding: '4px 10px', borderRadius: 6 }}>
                 <ClockCircleOutlined style={{ marginRight: 4 }} />
                 ใกล้หมดอายุ ({daysRemaining} วัน)
               </Tag>
@@ -432,10 +464,10 @@ const UserTable = ({
         return (
           <Tooltip title={`จะหมดอายุ: ${expiryDate.format('DD/MM/YYYY HH:mm')} (เหลือ ${daysRemaining} วัน)`}>
             <div>
-              <Text style={{ fontSize: 13, display: 'block', marginBottom: 4 }}>
+              <Text style={{ fontSize: 13, display: 'block', marginBottom: 6, fontWeight: 500, color: '#1f2937' }}>
                 {expiryDate.format('DD/MM/YYYY')}
               </Text>
-              <Tag color="warning" style={{ fontSize: 11 }}>
+              <Tag color="warning" style={{ fontSize: 12, padding: '4px 10px', borderRadius: 6 }}>
                 <ClockCircleOutlined style={{ marginRight: 4 }} />
                 เหลือ {daysRemaining} วัน
               </Tag>
@@ -447,10 +479,10 @@ const UserTable = ({
         return (
           <Tooltip title={`จะหมดอายุ: ${expiryDate.format('DD/MM/YYYY HH:mm')} (เหลือ ${daysRemaining} วัน)`}>
             <div>
-              <Text style={{ fontSize: 13, display: 'block', marginBottom: 4 }}>
+              <Text style={{ fontSize: 13, display: 'block', marginBottom: 6, fontWeight: 500, color: '#1f2937' }}>
                 {expiryDate.format('DD/MM/YYYY')}
               </Text>
-              <Tag color="success" style={{ fontSize: 11 }}>
+              <Tag color="success" style={{ fontSize: 12, padding: '4px 10px', borderRadius: 6 }}>
                 <CheckCircleOutlined style={{ marginRight: 4 }} />
                 เหลือ {daysRemaining} วัน
               </Tag>
@@ -466,7 +498,7 @@ const UserTable = ({
         valueType: typeof value,
         userDn: record?.dn
       });
-      return <Text type="secondary" style={{ fontSize: 12 }}>-</Text>;
+      return <Text type="secondary" style={{ fontSize: 13, color: '#94a3b8' }}>-</Text>;
     }
   }, []);
 
@@ -476,15 +508,23 @@ const UserTable = ({
 
     return (
       <div className="actions-cell">
-        <Space>
+        <Space size={4}>
           {/* Primary Action - View Details */}
           <Tooltip title="ดูรายละเอียด">
             <Button
               type="text"
-              icon={<EyeOutlined />}
+              icon={<EyeOutlined style={{ fontSize: '14px' }} />}
               onClick={() => handleViewDetails(record)}
               size="small"
               aria-label="ดูรายละเอียด"
+              style={{
+                width: '28px',
+                height: '28px',
+                padding: 0,
+                display: 'inline-flex',
+                alignItems: 'center',
+                justifyContent: 'center'
+              }}
             />
           </Tooltip>
           
@@ -567,9 +607,17 @@ const UserTable = ({
           >
             <Button
               type="text"
-              icon={<MoreOutlined />}
+              icon={<MoreOutlined style={{ fontSize: '14px' }} />}
               size="small"
               aria-label="เมนูเพิ่มเติม"
+              style={{
+                width: '28px',
+                height: '28px',
+                padding: 0,
+                display: 'inline-flex',
+                alignItems: 'center',
+                justifyContent: 'center'
+              }}
             />
           </Dropdown>
         </Space>
@@ -584,14 +632,12 @@ const UserTable = ({
       title: (
         <Tooltip title="ชื่อที่แสดงในระบบ">
           <Space size={4}>
-            <UserOutlined style={{ fontSize: 14, color: '#6b7280' }} />
+            <UserOutlined style={{ fontSize: 13, color: '#6b7280' }} />
             <span>Display Name</span>
           </Space>
         </Tooltip>
       ),
       key: 'user',
-      fixed: (screens.md || screens.lg || screens.xl) ? 'left' : undefined,
-      width: 190,
       className: 'col-display-name',
       sorter: (a, b) => (a.cn || a.displayName || '').localeCompare(b.cn || b.displayName || ''),
       sortOrder: sortedInfo.columnKey === 'user' ? sortedInfo.order : null,
@@ -602,15 +648,13 @@ const UserTable = ({
       title: (
         <Tooltip title="ชื่อผู้ใช้สำหรับเข้าสู่ระบบ">
           <Space size={4}>
-            <IdcardOutlined style={{ fontSize: 14, color: '#6b7280' }} />
+            <IdcardOutlined style={{ fontSize: 13, color: '#6b7280' }} />
             <span>Username</span>
           </Space>
         </Tooltip>
       ),
       dataIndex: 'sAMAccountName',
       key: 'sAMAccountName',
-      fixed: (screens.md || screens.lg || screens.xl) ? 'left' : undefined,
-      width: 160,
       className: 'col-username',
       sorter: (a, b) => (a.sAMAccountName || '').localeCompare(b.sAMAccountName || ''),
       sortOrder: sortedInfo.columnKey === 'sAMAccountName' ? sortedInfo.order : null,
@@ -621,14 +665,13 @@ const UserTable = ({
       title: (
         <Tooltip title="อีเมลที่ใช้ติดต่อ">
           <Space size={4}>
-            <MailOutlined style={{ fontSize: 14, color: '#6b7280' }} />
+            <MailOutlined style={{ fontSize: 13, color: '#6b7280' }} />
             <span>Email</span>
           </Space>
         </Tooltip>
       ),
       dataIndex: 'mail',
       key: 'mail',
-      width: 230,
       className: 'col-email',
       sorter: (a, b) => (a.mail || '').localeCompare(b.mail || ''),
       sortOrder: sortedInfo.columnKey === 'mail' ? sortedInfo.order : null,
@@ -637,7 +680,7 @@ const UserTable = ({
       },
       render: (value) => {
         if (!value) {
-          return <Text type="secondary" style={{ fontSize: 12 }}>-</Text>;
+          return <Text type="secondary" style={{ fontSize: 13, color: '#94a3b8' }}>-</Text>;
         }
         return (
           <Tooltip title={value} placement="topLeft">
@@ -649,7 +692,9 @@ const UserTable = ({
                 fontSize: 13, 
                 wordBreak: 'break-word',
                 lineHeight: '1.5',
-                display: 'block'
+                display: 'block',
+                color: '#1f2937',
+                fontWeight: 400
               }}
             >
               {value}
@@ -662,7 +707,6 @@ const UserTable = ({
       title: 'Job Title',
       dataIndex: 'title',
       key: 'title',
-      width: 200,
       className: 'col-job-title',
       responsive: ['sm'],
       ellipsis: true,
@@ -672,14 +716,13 @@ const UserTable = ({
       title: (
         <Tooltip title="แผนก/หน่วยงาน">
           <Space size={4}>
-            <TeamOutlined style={{ fontSize: 14, color: '#6b7280' }} />
+            <TeamOutlined style={{ fontSize: 13, color: '#6b7280' }} />
             <span>Department</span>
           </Space>
         </Tooltip>
       ),
       dataIndex: 'department',
       key: 'department',
-      width: 170,
       className: 'col-department',
       responsive: ['md'],
       ellipsis: true,
@@ -689,7 +732,6 @@ const UserTable = ({
       title: 'Company',
       dataIndex: 'company',
       key: 'company',
-      width: 200,
       className: 'col-company',
       responsive: ['lg'],
       ellipsis: true,
@@ -699,7 +741,6 @@ const UserTable = ({
       title: 'Work Location',
       dataIndex: 'physicalDeliveryOfficeName',
       key: 'location',
-      width: 170,
       className: 'col-location',
       responsive: ['lg'],
       ellipsis: true,
@@ -709,7 +750,6 @@ const UserTable = ({
       title: 'Description',
       dataIndex: 'description',
       key: 'description',
-      width: 190,
       className: 'col-description',
       responsive: ['lg'],
       ellipsis: {
@@ -717,19 +757,23 @@ const UserTable = ({
       },
       render: (value) => {
         if (!value) {
-          return <Text type="secondary" style={{ fontSize: 12 }}>-</Text>;
+          return <Text type="secondary" style={{ fontSize: 13, color: '#94a3b8' }}>-</Text>;
         }
         return (
           <Tooltip title={value} placement="topLeft">
             <Text 
               className="table-cell-text" 
-              ellipsis={{ tooltip: value, rows: 2 }}
+              ellipsis={{ tooltip: value }}
               style={{ 
                 fontSize: 13, 
                 color: '#4b5563',
                 wordBreak: 'break-word',
-                lineHeight: '1.5',
-                display: 'block'
+                lineHeight: '1.6',
+                display: 'block',
+                fontWeight: 400,
+                maxHeight: '3.2em', // Approximately 2 lines with line-height 1.6
+                overflow: 'hidden',
+                textOverflow: 'ellipsis'
               }}
             >
               {value}
@@ -742,29 +786,26 @@ const UserTable = ({
       title: 'Employee ID',
       dataIndex: 'employeeID',
       key: 'employeeID',
-      width: 160,
       className: 'col-employee-id',
-      responsive: ['xl'],
+      responsive: ['lg'],
       ellipsis: true,
-      render: renderEmployeeIdCell
+      render: (value, record) => renderEmployeeIdCell(value, record)
     },
     {
-      title: 'Department Number',
-      dataIndex: 'departmentNumber',
-      key: 'departmentNumber',
-      width: 180,
-      className: 'col-department-number',
+      title: 'Extension Name',
+      dataIndex: 'extensionName',
+      key: 'extensionName',
+      className: 'col-extension-name',
       responsive: ['md'],
       ellipsis: true,
-      sorter: (a, b) => (a.departmentNumber || '').localeCompare(b.departmentNumber || ''),
-      sortOrder: sortedInfo.columnKey === 'departmentNumber' ? sortedInfo.order : null,
+      sorter: (a, b) => (a.extensionName || '').localeCompare(b.extensionName || ''),
+      sortOrder: sortedInfo.columnKey === 'extensionName' ? sortedInfo.order : null,
       render: renderTextCell
     },
     {
       title: 'Phone',
       dataIndex: 'telephoneNumber',
       key: 'phone',
-      width: 160,
       className: 'col-phone',
       responsive: ['lg'],
       ellipsis: true,
@@ -774,7 +815,6 @@ const UserTable = ({
       title: 'Mobile',
       dataIndex: 'mobile',
       key: 'mobile',
-      width: 160,
       className: 'col-mobile',
       responsive: ['lg'],
       ellipsis: true,
@@ -784,14 +824,13 @@ const UserTable = ({
       title: (
         <Tooltip title="สถานะการใช้งาน (Active/Disabled)">
           <Space size={4}>
-            <CheckCircleOutlined style={{ fontSize: 14, color: '#6b7280' }} />
+            <CheckCircleOutlined style={{ fontSize: 13, color: '#6b7280' }} />
             <span>Status</span>
           </Space>
         </Tooltip>
       ),
       dataIndex: 'isEnabled',
       key: 'status',
-      width: 140,
       className: 'col-status',
       filters: [
         { text: 'Active', value: true },
@@ -804,14 +843,13 @@ const UserTable = ({
       title: (
         <Tooltip title="User Principal Name (UPN)">
           <Space size={4}>
-            <GlobalOutlined style={{ fontSize: 14, color: '#6b7280' }} />
+            <GlobalOutlined style={{ fontSize: 13, color: '#6b7280' }} />
             <span>UPN</span>
           </Space>
         </Tooltip>
       ),
       dataIndex: 'userPrincipalName',
       key: 'userPrincipalName',
-      width: 220,
       className: 'col-upn',
       responsive: ['lg'],
       ellipsis: true,
@@ -823,14 +861,13 @@ const UserTable = ({
       title: (
         <Tooltip title="Manager (หัวหน้า)">
           <Space size={4}>
-            <UserSwitchOutlined style={{ fontSize: 14, color: '#6b7280' }} />
+            <UserSwitchOutlined style={{ fontSize: 13, color: '#6b7280' }} />
             <span>Manager</span>
           </Space>
         </Tooltip>
       ),
       dataIndex: 'manager',
       key: 'manager',
-      width: 200,
       className: 'col-manager',
       responsive: ['lg'],
       ellipsis: true,
@@ -840,14 +877,13 @@ const UserTable = ({
       title: (
         <Tooltip title="เข้าสู่ระบบล่าสุด">
           <Space size={4}>
-            <HistoryOutlined style={{ fontSize: 14, color: '#6b7280' }} />
+            <HistoryOutlined style={{ fontSize: 13, color: '#6b7280' }} />
             <span>เข้าสู่ระบบล่าสุด</span>
           </Space>
         </Tooltip>
       ),
       dataIndex: 'lastLogon',
       key: 'lastLogon',
-      width: 200,
       className: 'col-last-logon',
       responsive: ['lg'],
       sorter: (a, b) => {
@@ -863,14 +899,13 @@ const UserTable = ({
       title: (
         <Tooltip title="รหัสผ่านล่าสุด">
           <Space size={4}>
-            <KeyOutlined style={{ fontSize: 14, color: '#6b7280' }} />
+            <KeyOutlined style={{ fontSize: 13, color: '#6b7280' }} />
             <span>รหัสผ่านล่าสุด</span>
           </Space>
         </Tooltip>
       ),
       dataIndex: 'pwdLastSet',
       key: 'pwdLastSet',
-      width: 200,
       className: 'col-pwd-last-set',
       responsive: ['lg'],
       sorter: (a, b) => {
@@ -886,14 +921,13 @@ const UserTable = ({
       title: (
         <Tooltip title="วันหมดอายุบัญชี">
           <Space size={4}>
-            <ClockCircleOutlined style={{ fontSize: 14, color: '#6b7280' }} />
+            <ClockCircleOutlined style={{ fontSize: 13, color: '#6b7280' }} />
             <span>หมดอายุ</span>
           </Space>
         </Tooltip>
       ),
       dataIndex: 'accountExpires',
       key: 'accountExpires',
-      width: 200,
       className: 'col-account-expires',
       responsive: ['lg'],
       sorter: (a, b) => {
@@ -908,8 +942,6 @@ const UserTable = ({
     {
       title: 'Actions',
       key: 'actions',
-      fixed: (screens.md || screens.lg || screens.xl) ? 'right' : undefined,
-      width: 140,
       className: 'col-actions',
       render: renderActionsCell
     }
@@ -954,7 +986,6 @@ const UserTable = ({
         }
       },
       columnWidth: 48,
-      fixed: (screens.md || screens.lg || screens.xl) ? 'left' : undefined,
       preserveSelectedRowKeys: true,
       getCheckboxProps: (record) => ({
         indeterminate: someSelected && selectedRowKeys.includes(record.dn)
@@ -985,7 +1016,7 @@ const UserTable = ({
       <div className="umx-table-head">
         <div>
           <div className="umx-table-title">รายชื่อผู้ใช้</div>
-          <Text type="secondary" style={{ fontSize: 14, fontWeight: 400 }}>
+          <Text type="secondary" style={{ fontSize: 13, fontWeight: 400 }}>
             แสดง <Text strong style={{ color: 'var(--color-text-primary)' }}>{paginatedUsers.length}</Text> จาก <Text strong style={{ color: 'var(--color-text-primary)' }}>{formatCount(filteredUsers.length)}</Text> รายการในมุมมองนี้
           </Text>
         </div>
@@ -1027,11 +1058,10 @@ const UserTable = ({
         bordered={false}
         size="middle"
         scroll={{ 
-          x: 'max-content', 
-          y: tableScrollY,
-          scrollToFirstRowOnChange: false
+          x: 'max-content',
+          y: 'calc(100vh - 200px)'
         }}
-        tableLayout="fixed"
+        tableLayout="auto"
         rowClassName={(record, index) => {
           const baseClass = index % 2 === 0 ? 'table-row-light' : 'table-row-dark';
           return selectedRowKeys.includes(record.dn) ? `${baseClass} row-selected` : baseClass;
@@ -1048,7 +1078,7 @@ const UserTable = ({
                   <div style={{ marginBottom: 12, fontSize: 16, fontWeight: 600, color: '#111827' }}>
                     ไม่พบผู้ใช้ตามเงื่อนไขที่เลือก
                   </div>
-                  <Text type="secondary" style={{ fontSize: 14, display: 'block', marginBottom: 16 }}>
+                  <Text type="secondary" style={{ fontSize: 13, display: 'block', marginBottom: 16 }}>
                     ลองปรับเปลี่ยนตัวกรองหรือล้างตัวกรองทั้งหมดเพื่อดูผลลัพธ์
                   </Text>
                   {activeFilterTags.length > 0 && (
@@ -1080,7 +1110,7 @@ const UserTable = ({
       />
       <div className="umx-table-footer">
         <div>
-          <Text type="secondary" style={{ fontSize: 14 }}>
+          <Text type="secondary" style={{ fontSize: 13 }}>
             แสดง <Text strong>{paginatedUsers.length}</Text> จาก <Text strong>{formatCount(filteredUsers.length)}</Text> รายการ
           </Text>
         </div>

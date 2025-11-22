@@ -524,10 +524,12 @@ const EditUserModal = ({
       destroyOnHidden
       width={getResponsiveWidthHelper(1100, 900, '95%')}
       style={{ top: 20 }}
-      bodyStyle={{
-        maxHeight: 'calc(100vh - 180px)',
-        overflowY: 'auto',
-        padding: '24px 28px'
+      styles={{
+        body: {
+          maxHeight: 'calc(100vh - 180px)',
+          overflowY: 'auto',
+          padding: '24px 28px'
+        }
       }}
       okText="บันทึกการเปลี่ยนแปลง"
       cancelText="ยกเลิก"

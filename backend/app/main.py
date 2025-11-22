@@ -76,9 +76,18 @@ app = FastAPI(
 @app.exception_handler(APIException)
 async def api_exception_handler(request: Request, exc: APIException):
     """Handle custom API exceptions with standardized error response"""
-    logger.error(f"❌ API Exception: {exc.error_code} - {exc.detail}")
-    logger.error(f"   URL: {request.url}")
-    logger.error(f"   Method: {request.method}")
+    # Log 401 errors on verify endpoint as warning (expected behavior for expired/invalid tokens)
+    is_verify_endpoint = str(request.url.path) == "/api/auth/verify"
+    is_unauthorized = exc.status_code == status.HTTP_401_UNAUTHORIZED
+    
+    if is_verify_endpoint and is_unauthorized:
+        logger.warning(f"⚠️ Token verification failed: {exc.detail}")
+        logger.debug(f"   URL: {request.url}")
+        logger.debug(f"   Method: {request.method}")
+    else:
+        logger.error(f"❌ API Exception: {exc.error_code} - {exc.detail}")
+        logger.error(f"   URL: {request.url}")
+        logger.error(f"   Method: {request.method}")
     
     return JSONResponse(
         status_code=exc.status_code,

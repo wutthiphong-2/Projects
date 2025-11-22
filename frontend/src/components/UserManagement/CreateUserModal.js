@@ -34,7 +34,9 @@ import {
   LockOutlined,
   UnlockOutlined,
   ClockCircleOutlined,
-  SafetyCertificateOutlined
+  SafetyCertificateOutlined,
+  PhoneOutlined,
+  IdcardOutlined
 } from '@ant-design/icons';
 import { userService } from '../../services/userService';
 import { ouService } from '../../services/ouService';
@@ -211,65 +213,115 @@ const CreateUserModal = ({
   return (
     <Modal
       title={
-        <Space>
-          <UserAddOutlined />
-          <span>Create New User</span>
-          <Text type="secondary" style={{ fontSize: 12 }}>
-            (Step {currentStep + 1} of 3)
-          </Text>
-        </Space>
+        <div style={{ paddingBottom: 8 }}>
+          <Space size={12} align="center">
+            <div style={{
+              background: 'linear-gradient(135deg, #2563eb, #3b82f6)',
+              borderRadius: 8,
+              padding: 8,
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center'
+            }}>
+              <UserAddOutlined style={{ fontSize: 20, color: '#ffffff' }} />
+            </div>
+            <div>
+              <div style={{ fontSize: 18, fontWeight: 700, color: '#1f2937', marginBottom: 2 }}>
+                Create New User
+              </div>
+              <Text type="secondary" style={{ fontSize: 12 }}>
+                Step {currentStep + 1} of 3
+              </Text>
+            </div>
+          </Space>
+        </div>
       }
       open={visible}
       onCancel={handleCancel}
       destroyOnHidden
-      width={getResponsiveWidth(720, 560, '95%')}
+      width={getResponsiveWidth(900, 700, '95%')}
+      style={{ top: 20 }}
+      styles={{
+        body: {
+          maxHeight: 'calc(100vh - 200px)',
+          overflowY: 'auto',
+          padding: '20px 24px'
+        }
+      }}
       footer={
-        <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+        <div style={{ 
+          display: 'flex', 
+          justifyContent: 'space-between',
+          alignItems: 'center',
+          padding: '12px 0',
+          borderTop: '1px solid #e5e7eb'
+        }}>
           <Button
             onClick={handleBackStep}
             disabled={currentStep === 0}
+            size="large"
+            style={{ borderRadius: 8 }}
           >
-            Back
+            ย้อนกลับ
           </Button>
           <div>
             {currentStep < 2 ? (
               <Button
                 type="primary"
                 onClick={handleNextStep}
+                size="large"
+                style={{ 
+                  borderRadius: 8,
+                  fontWeight: 600,
+                  minWidth: 120
+                }}
               >
-                Next Step
+                ถัดไป
               </Button>
             ) : (
               <Button
                 type="primary"
                 onClick={handleCreate}
                 icon={<CheckCircleOutlined />}
+                size="large"
+                style={{ 
+                  borderRadius: 8,
+                  fontWeight: 600,
+                  minWidth: 140,
+                  background: 'linear-gradient(135deg, #059669, #10b981)',
+                  border: 'none'
+                }}
               >
-                Create User
+                สร้างผู้ใช้
               </Button>
             )}
           </div>
         </div>
       }
     >
-      <div style={{ padding: '20px 0' }}>
-        <Steps current={currentStep} style={{ marginBottom: 24 }}>
-          <Step 
-            title="Account" 
-            icon={<UserOutlined />}
-            description="Basic Information"
-          />
-          <Step 
-            title="Groups" 
-            icon={<TeamOutlined />}
-            description="Group Membership"
-          />
-          <Step 
-            title="Review" 
-            icon={<CheckCircleOutlined />}
-            description="Confirm"
-          />
-        </Steps>
+      <div style={{ padding: '0' }}>
+        <Steps 
+          current={currentStep} 
+          style={{ marginBottom: 20 }}
+          size="small"
+          items={[
+            {
+              title: 'Account',
+              icon: <UserOutlined />,
+              description: 'Basic Information'
+            },
+            {
+              title: 'Groups',
+              icon: <TeamOutlined />,
+              description: 'Group Membership'
+            },
+            {
+              title: 'Review',
+              icon: <CheckCircleOutlined />,
+              description: 'Confirm'
+            }
+          ]}
+        />
 
         <Form
           form={form}
@@ -278,13 +330,19 @@ const CreateUserModal = ({
         >
           {/* Step 1: Essential Information */}
           <div style={{ display: currentStep === 0 ? 'block' : 'none' }}>
-            <div className="umx-step-wrapper">
-              <div className="umx-step-columns">
-                <Card
-                  title="Account Information"
-                  extra={<Tag color="blue">Required</Tag>}
-                  style={{ marginBottom: 16 }}
-                >
+            {/* Account Information - Required Fields */}
+            <Card
+              title={
+                <Space>
+                  <UserOutlined style={{ color: '#3b82f6' }} />
+                  <span style={{ fontSize: 16, fontWeight: 600 }}>ข้อมูลบัญชีผู้ใช้ (จำเป็น)</span>
+                  <Tag color="red" style={{ fontSize: 11, padding: '2px 8px' }}>Required</Tag>
+                </Space>
+              }
+              style={{ marginBottom: 16, border: '1px solid #e5e7eb' }}
+              headStyle={{ background: '#f9fafb', borderBottom: '2px solid #3b82f6', padding: '12px 16px' }}
+              bodyStyle={{ padding: '16px' }}
+            >
                   <Row gutter={16}>
                     <Col xs={24} md={12}>
                       <Form.Item
@@ -395,45 +453,90 @@ const CreateUserModal = ({
                     </Col>
                   </Row>
 
-                  <div style={{ marginTop: 16 }}>
+                  <div style={{ 
+                    marginTop: 16, 
+                    padding: '12px', 
+                    background: '#f9fafb', 
+                    borderRadius: 8,
+                    border: '1px solid #e5e7eb'
+                  }}>
                     <Form.Item
                       name="accountOption"
                       label={
                         <Space>
-                          <SettingOutlined />
-                          <span>Account Options</span>
+                          <SettingOutlined style={{ color: '#6b7280' }} />
+                          <span style={{ fontSize: 14, fontWeight: 500 }}>การตั้งค่ารหัสผ่าน</span>
+                          <Tooltip title="เลือกนโยบายรหัสผ่านสำหรับผู้ใช้คนนี้">
+                            <QuestionCircleOutlined style={{ color: '#9ca3af', fontSize: 12 }} />
+                          </Tooltip>
                         </Space>
                       }
                       rules={[{ required: false }]}
+                      style={{ marginBottom: 0 }}
                     >
                       <Radio.Group>
-                        <Space direction="vertical" style={{ width: '100%' }}>
-                          <Radio value="passwordMustChange">
+                        <Space direction="vertical" style={{ width: '100%' }} size={8}>
+                          <Radio value="passwordMustChange" style={{ 
+                            padding: '8px 10px',
+                            borderRadius: 6,
+                            border: '1px solid #e5e7eb',
+                            background: '#ffffff',
+                            width: '100%',
+                            margin: 0
+                          }}>
                             <Space>
-                              <LockOutlined />
-                              <span>User must change password at next logon</span>
+                              <LockOutlined style={{ color: '#f59e0b' }} />
+                              <span style={{ fontSize: 13 }}>ผู้ใช้ต้องเปลี่ยนรหัสผ่านเมื่อเข้าสู่ระบบครั้งแรก</span>
                             </Space>
                           </Radio>
-                          <Radio value="userCannotChangePassword">
+                          <Radio value="userCannotChangePassword" style={{ 
+                            padding: '8px 10px',
+                            borderRadius: 6,
+                            border: '1px solid #e5e7eb',
+                            background: '#ffffff',
+                            width: '100%',
+                            margin: 0
+                          }}>
                             <Space>
-                              <UnlockOutlined />
-                              <span>User cannot change password</span>
+                              <UnlockOutlined style={{ color: '#6b7280' }} />
+                              <span style={{ fontSize: 13 }}>ผู้ใช้ไม่สามารถเปลี่ยนรหัสผ่านได้</span>
                             </Space>
                           </Radio>
-                          <Radio value="passwordNeverExpires">
+                          <Radio value="passwordNeverExpires" style={{ 
+                            padding: '8px 10px',
+                            borderRadius: 6,
+                            border: '1px solid #e5e7eb',
+                            background: '#ffffff',
+                            width: '100%',
+                            margin: 0
+                          }}>
                             <Space>
-                              <ClockCircleOutlined />
-                              <span>Password never expires</span>
+                              <ClockCircleOutlined style={{ color: '#10b981' }} />
+                              <span style={{ fontSize: 13 }}>รหัสผ่านไม่หมดอายุ</span>
                             </Space>
                           </Radio>
-                          <Radio value="storePasswordReversible">
+                          <Radio value="storePasswordReversible" style={{ 
+                            padding: '8px 10px',
+                            borderRadius: 6,
+                            border: '1px solid #e5e7eb',
+                            background: '#ffffff',
+                            width: '100%',
+                            margin: 0
+                          }}>
                             <Space>
-                              <SafetyCertificateOutlined />
-                              <span>Store password using reversible encryption</span>
+                              <SafetyCertificateOutlined style={{ color: '#8b5cf6' }} />
+                              <span style={{ fontSize: 13 }}>เก็บรหัสผ่านแบบเข้ารหัสแบบย้อนกลับได้</span>
                             </Space>
                           </Radio>
-                          <Radio value="none">
-                            <Text type="secondary">None (default settings)</Text>
+                          <Radio value="none" style={{ 
+                            padding: '8px 10px',
+                            borderRadius: 6,
+                            border: '1px solid #e5e7eb',
+                            background: '#ffffff',
+                            width: '100%',
+                            margin: 0
+                          }}>
+                            <Text type="secondary" style={{ fontSize: 13 }}>ไม่ระบุ (ใช้การตั้งค่าเริ่มต้น)</Text>
                           </Radio>
                         </Space>
                       </Radio.Group>
@@ -441,12 +544,34 @@ const CreateUserModal = ({
                   </div>
                 </Card>
 
-                <Card
-                  title="Profile & Contact Information"
-                  style={{ marginBottom: 16 }}
+            {/* Profile Information - Optional Fields */}
+            <Card
+              title={
+                <Space>
+                  <IdcardOutlined style={{ color: '#10b981' }} />
+                  <span style={{ fontSize: 16, fontWeight: 600 }}>ข้อมูลส่วนตัว (ไม่บังคับ)</span>
+                  <Tag color="default" style={{ fontSize: 11, padding: '2px 8px' }}>Optional</Tag>
+                </Space>
+              }
+              style={{ marginBottom: 16, border: '1px solid #e5e7eb' }}
+              headStyle={{ background: '#f9fafb', borderBottom: '2px solid #10b981', padding: '12px 16px' }}
+              bodyStyle={{ padding: '16px' }}
+            >
+              <Collapse 
+                defaultActiveKey={[]}
+                ghost
+                style={{ background: 'transparent' }}
+              >
+                <Panel 
+                  header={
+                    <span style={{ fontSize: 14, fontWeight: 500 }}>
+                      <UserOutlined style={{ marginRight: 8, color: '#6b7280' }} />
+                      ข้อมูลส่วนตัว
+                    </span>
+                  } 
+                  key="personal"
+                  style={{ marginBottom: 12 }}
                 >
-                  <Collapse defaultActiveKey={['personal', 'contact']}>
-                    <Panel header="Personal Details" key="personal">
                       <Row gutter={16}>
                         <Col xs={24} md={12}>
                           <Form.Item
@@ -504,8 +629,8 @@ const CreateUserModal = ({
                       <Row gutter={16}>
                         <Col xs={24} md={12}>
                           <Form.Item
-                            name="departmentNumber"
-                            label="Department Number"
+                            name="extensionName"
+                            label="Extension Name"
                           >
                             <Input placeholder="e.g., K1IT00" />
                           </Form.Item>
@@ -513,7 +638,16 @@ const CreateUserModal = ({
                       </Row>
                     </Panel>
 
-                    <Panel header="Contact & Office" key="contact">
+                    <Panel 
+                      header={
+                        <span style={{ fontSize: 14, fontWeight: 500 }}>
+                          <PhoneOutlined style={{ marginRight: 8, color: '#6b7280' }} />
+                          ข้อมูลติดต่อและที่ทำงาน
+                        </span>
+                      } 
+                      key="contact"
+                      style={{ marginBottom: 12 }}
+                    >
                       <Row gutter={16}>
                         <Col xs={24} md={12}>
                           <Form.Item
@@ -532,33 +666,35 @@ const CreateUserModal = ({
                           </Form.Item>
                         </Col>
                       </Row>
-                      <Row gutter={16}>
-                        <Col xs={24} md={12}>
-                          <Form.Item
-                            name="physicalDeliveryOfficeName"
-                            label="Office Location"
-                          >
-                            <Input placeholder="Enter office location" />
-                          </Form.Item>
-                        </Col>
-                        <Col xs={24} md={12}>
-                          <Form.Item
-                            name="description"
-                            label="Description"
-                          >
-                            <Input.TextArea rows={3} placeholder="Enter description or notes" />
-                          </Form.Item>
-                        </Col>
-                      </Row>
+                      <Form.Item
+                        name="physicalDeliveryOfficeName"
+                        label="Office Location"
+                      >
+                        <Input placeholder="Enter office location" />
+                      </Form.Item>
+                      <Form.Item
+                        name="description"
+                        label="Description"
+                      >
+                        <Input.TextArea rows={3} placeholder="Enter description or notes" />
+                      </Form.Item>
                     </Panel>
                   </Collapse>
-                </Card>
-              </div>
+            </Card>
 
-              <Card
-                title="Organizational Placement"
-                style={{ marginBottom: 16 }}
-              >
+            {/* Organizational Placement */}
+            <Card
+              title={
+                <Space>
+                  <BankOutlined style={{ color: '#8b5cf6' }} />
+                  <span style={{ fontSize: 16, fontWeight: 600 }}>ตำแหน่งในองค์กร</span>
+                  <Tag color="default" style={{ fontSize: 11, padding: '2px 8px' }}>Optional</Tag>
+                </Space>
+              }
+              style={{ marginBottom: 16, border: '1px solid #e5e7eb' }}
+              headStyle={{ background: '#f9fafb', borderBottom: '2px solid #8b5cf6', padding: '12px 16px' }}
+              bodyStyle={{ padding: '16px' }}
+            >
                 <Form.Item
                   label={
                     <Space>
@@ -621,7 +757,6 @@ const CreateUserModal = ({
                   )}
                 </Form.Item>
               </Card>
-            </div>
           </div>
 
           {/* Step 2: Groups & Permissions */}
