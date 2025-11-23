@@ -339,8 +339,10 @@ const CreateUserModal = ({
                 </Space>
               }
               style={{ marginBottom: 16, border: '1px solid #e5e7eb' }}
-              headStyle={{ background: '#f9fafb', borderBottom: '2px solid #3b82f6', padding: '12px 16px' }}
-              bodyStyle={{ padding: '16px' }}
+              styles={{
+                header: { background: '#f9fafb', borderBottom: '2px solid #3b82f6', padding: '12px 16px' },
+                body: { padding: '16px' }
+              }}
             >
                   <Row gutter={16}>
                     <Col xs={24} md={12}>
@@ -553,8 +555,10 @@ const CreateUserModal = ({
                 </Space>
               }
               style={{ marginBottom: 16, border: '1px solid #e5e7eb' }}
-              headStyle={{ background: '#f9fafb', borderBottom: '2px solid #10b981', padding: '12px 16px' }}
-              bodyStyle={{ padding: '16px' }}
+              styles={{
+                header: { background: '#f9fafb', borderBottom: '2px solid #10b981', padding: '12px 16px' },
+                body: { padding: '16px' }
+              }}
             >
               <Collapse 
                 defaultActiveKey={[]}
@@ -695,8 +699,10 @@ const CreateUserModal = ({
                 </Space>
               }
               style={{ marginBottom: 16, border: '1px solid #e5e7eb' }}
-              headStyle={{ background: '#f9fafb', borderBottom: '2px solid #8b5cf6', padding: '12px 16px' }}
-              bodyStyle={{ padding: '16px' }}
+              styles={{
+                header: { background: '#f9fafb', borderBottom: '2px solid #8b5cf6', padding: '12px 16px' },
+                body: { padding: '16px' }
+              }}
             >
                 <Form.Item
                   label={

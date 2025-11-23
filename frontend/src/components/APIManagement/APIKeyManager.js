@@ -783,7 +783,7 @@ const APIKeyManager = () => {
               borderRadius: '12px',
               overflow: 'hidden'
             }}
-            bodyStyle={{ padding: '20px' }}
+            styles={{ body: { padding: '20px' } }}
           >
             <Statistic
               title={<span style={{ color: 'rgba(255, 255, 255, 0.9)', fontSize: '13px' }}>API Keys ทั้งหมด</span>}
@@ -801,7 +801,7 @@ const APIKeyManager = () => {
               borderRadius: '12px',
               overflow: 'hidden'
             }}
-            bodyStyle={{ padding: '20px' }}
+            styles={{ body: { padding: '20px' } }}
           >
             <Statistic
               title={<span style={{ color: 'rgba(255, 255, 255, 0.9)', fontSize: '13px' }}>ใช้งานอยู่</span>}
@@ -819,7 +819,7 @@ const APIKeyManager = () => {
               borderRadius: '12px',
               overflow: 'hidden'
             }}
-            bodyStyle={{ padding: '20px' }}
+            styles={{ body: { padding: '20px' } }}
           >
             <Statistic
               title={<span style={{ color: 'rgba(255, 255, 255, 0.9)', fontSize: '13px' }}>หมดอายุ</span>}
@@ -837,7 +837,7 @@ const APIKeyManager = () => {
               borderRadius: '12px',
               overflow: 'hidden'
             }}
-            bodyStyle={{ padding: '20px' }}
+            styles={{ body: { padding: '20px' } }}
           >
             <Statistic
               title={<span style={{ color: 'rgba(255, 255, 255, 0.9)', fontSize: '13px' }}>การใช้งานทั้งหมด</span>}

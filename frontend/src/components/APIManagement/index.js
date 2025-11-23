@@ -134,7 +134,7 @@ const APIManagement = () => {
           border: 'none',
           overflow: 'hidden'
         }}
-        bodyStyle={{ padding: 0 }}
+        styles={{ body: { padding: 0 } }}
       >
       <Tabs
         activeKey={activeTab}

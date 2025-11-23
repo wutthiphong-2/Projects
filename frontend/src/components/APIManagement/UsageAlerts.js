@@ -366,7 +366,7 @@ const UsageAlerts = () => {
               borderRadius: '12px',
               overflow: 'hidden'
             }}
-            bodyStyle={{ padding: '20px' }}
+            styles={{ body: { padding: '20px' } }}
           >
             <Statistic
               title={<span style={{ color: 'rgba(255, 255, 255, 0.9)', fontSize: '13px' }}>Alerts ทั้งหมด</span>}
@@ -384,7 +384,7 @@ const UsageAlerts = () => {
               borderRadius: '12px',
               overflow: 'hidden'
             }}
-            bodyStyle={{ padding: '20px' }}
+            styles={{ body: { padding: '20px' } }}
           >
             <Statistic
               title={<span style={{ color: 'rgba(255, 255, 255, 0.9)', fontSize: '13px' }}>เปิดใช้งาน</span>}
@@ -402,7 +402,7 @@ const UsageAlerts = () => {
               borderRadius: '12px',
               overflow: 'hidden'
             }}
-            bodyStyle={{ padding: '20px' }}
+            styles={{ body: { padding: '20px' } }}
           >
             <Statistic
               title={<span style={{ color: 'rgba(255, 255, 255, 0.9)', fontSize: '13px' }}>Triggered</span>}
