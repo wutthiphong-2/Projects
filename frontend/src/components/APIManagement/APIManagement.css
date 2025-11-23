@@ -1,0 +1,1014 @@
+/* API Management Styles */
+
+.api-management {
+  padding: 24px;
+  background: linear-gradient(135deg, #1e40af 0%, #2563eb 100%);
+  min-height: calc(100vh - 64px);
+  position: relative;
+  overflow: hidden;
+}
+
+.api-management::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: 
+    radial-gradient(circle at 20% 50%, rgba(30, 64, 175, 0.3) 0%, transparent 50%),
+    radial-gradient(circle at 80% 80%, rgba(255, 255, 255, 0.1) 0%, transparent 50%);
+  pointer-events: none;
+  z-index: 0;
+}
+
+.api-management > * {
+  position: relative;
+  z-index: 1;
+}
+
+.api-key-manager {
+  padding: 0;
+}
+
+.api-key-manager .ant-card {
+  border-radius: 16px;
+  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.12);
+  border: none;
+  background: #ffffff;
+  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+  overflow: hidden;
+}
+
+.api-key-manager .ant-card:hover {
+  transform: translateY(-4px);
+  box-shadow: 0 12px 40px rgba(0, 0, 0, 0.16);
+}
+
+.api-key-manager .ant-statistic-title {
+  font-size: 14px;
+  color: #666;
+}
+
+.api-key-manager .ant-statistic-content {
+  font-size: 24px;
+  font-weight: 600;
+}
+
+.api-documentation {
+  padding: 0;
+}
+
+.api-documentation .ant-card {
+  border-radius: 16px;
+  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.12);
+  border: none;
+  margin-bottom: 24px;
+  background: #ffffff;
+  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.api-documentation .ant-card:hover {
+  transform: translateY(-4px);
+  box-shadow: 0 12px 40px rgba(0, 0, 0, 0.16);
+}
+
+.api-documentation pre {
+  margin: 0;
+  padding: 20px;
+  background: #1e1e1e;
+  color: #d4d4d4;
+  border-radius: 8px;
+  overflow-x: auto;
+  font-size: 13px;
+  font-family: 'Consolas', 'Monaco', 'Courier New', monospace;
+  line-height: 1.6;
+  border: 1px solid #2d2d2d;
+  transition: all 0.3s ease;
+}
+
+.api-documentation code {
+  font-family: 'Consolas', 'Monaco', 'Courier New', monospace;
+  font-size: 13px;
+}
+
+.api-documentation .ant-collapse {
+  background: transparent;
+  border: none;
+}
+
+.api-documentation .ant-collapse-item {
+  border: 1px solid #e2e8f0;
+  border-radius: 12px;
+  margin-bottom: 12px;
+  overflow: hidden;
+  transition: all 0.3s ease;
+}
+
+.api-documentation .ant-collapse-item:hover {
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.08);
+}
+
+.api-documentation .ant-collapse-header {
+  padding: 16px 20px;
+  background: linear-gradient(135deg, #f8f9fa 0%, #ffffff 100%);
+  font-weight: 600;
+  transition: all 0.3s ease;
+}
+
+.api-documentation .ant-collapse-header:hover {
+  background: linear-gradient(135deg, #f0f0f0 0%, #f8f9fa 100%);
+}
+
+.api-documentation .ant-collapse-content {
+  border-top: 1px solid #e8e8e8;
+}
+
+/* Table Styles */
+.api-key-manager .ant-table {
+  background: #fff;
+  border-radius: 12px;
+  overflow: hidden;
+}
+
+.api-key-manager .ant-table-thead > tr > th {
+  background: linear-gradient(135deg, #f5f7fa 0%, #c3cfe2 100%);
+  font-weight: 600;
+  font-size: 13px;
+  color: #2d3748;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  padding: 16px;
+  border-bottom: 2px solid #e2e8f0;
+}
+
+.api-key-manager .ant-table-tbody > tr > td {
+  font-size: 13px;
+  padding: 16px;
+  border-bottom: 1px solid #f1f5f9;
+  transition: all 0.2s ease;
+}
+
+.api-key-manager .ant-table-tbody > tr {
+  transition: all 0.2s ease;
+}
+
+.api-key-manager .ant-table-tbody > tr:hover > td {
+  background: linear-gradient(90deg, rgba(30, 64, 175, 0.05) 0%, rgba(37, 99, 235, 0.05) 100%);
+  transform: scale(1.01);
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.04);
+}
+
+/* Modal Styles */
+.api-key-manager .ant-modal {
+  border-radius: 16px;
+  overflow: hidden;
+}
+
+.api-key-manager .ant-modal-content {
+  border-radius: 16px;
+  box-shadow: 0 20px 60px rgba(0, 0, 0, 0.3);
+}
+
+.api-key-manager .ant-modal-header {
+  background: linear-gradient(135deg, #1e40af 0%, #2563eb 100%);
+  border-bottom: none;
+  padding: 24px;
+  border-radius: 16px 16px 0 0;
+}
+
+.api-key-manager .ant-modal-title {
+  color: white;
+  font-weight: 600;
+  font-size: 20px;
+}
+
+.api-key-manager .ant-modal-close {
+  color: white;
+  top: 24px;
+  right: 24px;
+}
+
+.api-key-manager .ant-modal-close:hover {
+  color: rgba(255, 255, 255, 0.8);
+}
+
+.api-key-manager .ant-modal-body {
+  padding: 32px;
+  background: #fafbfc;
+}
+
+.api-key-manager .ant-modal-footer {
+  border-top: 1px solid #e8e8e8;
+  padding: 20px 32px;
+  background: #ffffff;
+  border-radius: 0 0 16px 16px;
+}
+
+/* Form Styles */
+.api-key-manager .ant-form-item-label > label {
+  font-weight: 600;
+  font-size: 14px;
+  color: #2d3748;
+}
+
+.api-key-manager .ant-input,
+.api-key-manager .ant-input-number,
+.api-key-manager .ant-picker,
+.api-key-manager .ant-select-selector {
+  border-radius: 8px;
+  border: 2px solid #e2e8f0;
+  transition: all 0.3s ease;
+}
+
+.api-key-manager .ant-input:hover,
+.api-key-manager .ant-input-number:hover,
+.api-key-manager .ant-picker:hover,
+.api-key-manager .ant-select:hover .ant-select-selector {
+  border-color: #667eea;
+}
+
+.api-key-manager .ant-input:focus,
+.api-key-manager .ant-input-number:focus,
+.api-key-manager .ant-picker:focus,
+.api-key-manager .ant-select-focused .ant-select-selector {
+  border-color: #667eea;
+  box-shadow: 0 0 0 3px rgba(30, 64, 175, 0.1);
+}
+
+/* Tag Styles */
+.api-key-manager .ant-tag {
+  border-radius: 6px;
+  padding: 4px 12px;
+  font-size: 12px;
+  font-weight: 600;
+  border: none;
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+  transition: all 0.2s ease;
+}
+
+.api-key-manager .ant-tag:hover {
+  transform: scale(1.05);
+  box-shadow: 0 4px 8px rgba(0, 0, 0, 0.15);
+}
+
+/* Button Styles */
+.api-key-manager .ant-btn {
+  border-radius: 8px;
+  font-weight: 500;
+  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.08);
+}
+
+.api-key-manager .ant-btn:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+}
+
+.api-key-manager .ant-btn-primary {
+  background: linear-gradient(135deg, #1e40af 0%, #2563eb 100%);
+  border: none;
+  color: white;
+  font-weight: 600;
+}
+
+.api-key-manager .ant-btn-primary:hover {
+  background: linear-gradient(135deg, #2563eb 0%, #1e40af 100%);
+  box-shadow: 0 6px 20px rgba(30, 64, 175, 0.4);
+  transform: translateY(-2px);
+}
+
+.api-key-manager .ant-btn[type="text"] {
+  box-shadow: none;
+  border-radius: 6px;
+  padding: 4px 8px;
+}
+
+.api-key-manager .ant-btn[type="text"]:hover {
+  background: rgba(30, 64, 175, 0.1);
+  transform: scale(1.1);
+}
+
+/* Alert Styles */
+.api-key-manager .ant-alert {
+  border-radius: 12px;
+  border: 2px solid #e8e8e8;
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.08);
+  transition: all 0.3s ease;
+}
+
+.api-key-manager .ant-alert:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 6px 20px rgba(0, 0, 0, 0.12);
+}
+
+.api-key-manager .ant-alert-success {
+  background: linear-gradient(135deg, #f6ffed 0%, #d9f7be 100%);
+  border-color: #b7eb8f;
+}
+
+.api-key-manager .ant-alert-success .ant-alert-message {
+  color: #52c41a;
+  font-weight: 600;
+  font-size: 16px;
+}
+
+/* Stats Cards */
+.api-key-manager .ant-statistic {
+  text-align: center;
+  padding: 20px;
+  background: linear-gradient(135deg, #1e40af 0%, #2563eb 100%);
+  border-radius: 12px;
+  color: white;
+  transition: all 0.3s ease;
+  position: relative;
+  overflow: hidden;
+}
+
+.api-key-manager .ant-statistic::before {
+  content: '';
+  position: absolute;
+  top: -50%;
+  right: -50%;
+  width: 200%;
+  height: 200%;
+  background: radial-gradient(circle, rgba(255, 255, 255, 0.1) 0%, transparent 70%);
+  animation: shimmer 3s infinite;
+}
+
+@keyframes shimmer {
+  0% { transform: rotate(0deg); }
+  100% { transform: rotate(360deg); }
+}
+
+.api-key-manager .ant-statistic:hover {
+  transform: scale(1.05);
+  box-shadow: 0 8px 24px rgba(30, 64, 175, 0.4);
+}
+
+.api-key-manager .ant-statistic-title {
+  margin-bottom: 8px;
+  color: rgba(255, 255, 255, 0.9);
+  font-size: 13px;
+  font-weight: 500;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+.api-key-manager .ant-statistic-content {
+  color: #ffffff;
+  font-size: 28px;
+  font-weight: 700;
+  text-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+}
+
+/* API Tester Styles */
+.api-tester {
+  padding: 0;
+}
+
+.api-tester .ant-card {
+  border-radius: 16px;
+  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.12);
+  border: none;
+  background: #ffffff;
+  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.api-tester .ant-card:hover {
+  transform: translateY(-4px);
+  box-shadow: 0 12px 40px rgba(0, 0, 0, 0.16);
+}
+
+.api-tester pre {
+  margin: 0;
+  padding: 20px;
+  background: #1e1e1e;
+  color: #d4d4d4;
+  border-radius: 8px;
+  overflow-x: auto;
+  font-size: 13px;
+  font-family: 'Consolas', 'Monaco', 'Courier New', monospace;
+  line-height: 1.6;
+  border: 1px solid #2d2d2d;
+  transition: all 0.3s ease;
+}
+
+.api-tester pre:hover {
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.3);
+}
+
+.api-tester code {
+  font-family: 'Consolas', 'Monaco', 'Courier New', monospace;
+  font-size: 13px;
+}
+
+.api-tester .ant-form-item-label > label {
+  font-weight: 500;
+  font-size: 14px;
+}
+
+.api-tester .ant-input,
+.api-tester .ant-select,
+.api-tester .ant-input-number,
+.api-tester .ant-select-selector {
+  border-radius: 8px;
+  border: 2px solid #e2e8f0;
+  transition: all 0.3s ease;
+}
+
+.api-tester .ant-input:hover,
+.api-tester .ant-select:hover .ant-select-selector,
+.api-tester .ant-input-number:hover {
+  border-color: #667eea;
+}
+
+.api-tester .ant-input:focus,
+.api-tester .ant-select-focused .ant-select-selector,
+.api-tester .ant-input-number:focus {
+  border-color: #667eea;
+  box-shadow: 0 0 0 3px rgba(30, 64, 175, 0.1);
+}
+
+.api-tester .ant-btn-primary {
+  background: linear-gradient(135deg, #1e40af 0%, #2563eb 100%);
+  border: none;
+  height: 40px;
+  font-size: 14px;
+  font-weight: 600;
+  border-radius: 8px;
+  box-shadow: 0 4px 12px rgba(30, 64, 175, 0.3);
+  transition: all 0.3s ease;
+}
+
+.api-tester .ant-btn-primary:hover {
+  background: linear-gradient(135deg, #2563eb 0%, #1e40af 100%);
+  box-shadow: 0 6px 20px rgba(30, 64, 175, 0.4);
+  transform: translateY(-2px);
+}
+
+/* Analytics Dashboard Styles */
+.analytics-dashboard {
+  padding: 0;
+}
+
+.analytics-dashboard .ant-card {
+  border-radius: 16px;
+  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.12);
+  border: none;
+  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.analytics-dashboard .ant-card:hover {
+  transform: translateY(-4px);
+  box-shadow: 0 12px 40px rgba(0, 0, 0, 0.16);
+}
+
+.analytics-dashboard .ant-statistic-title {
+  font-size: 14px;
+  color: #666;
+  margin-bottom: 8px;
+}
+
+.analytics-dashboard .ant-statistic-content {
+  font-size: 24px;
+  font-weight: 600;
+}
+
+.analytics-dashboard .ant-progress {
+  margin-top: 8px;
+}
+
+.analytics-dashboard .ant-table {
+  background: #fff;
+  border-radius: 12px;
+  overflow: hidden;
+}
+
+.analytics-dashboard .ant-table-thead > tr > th {
+  background: linear-gradient(135deg, #f5f7fa 0%, #c3cfe2 100%);
+  font-weight: 600;
+  font-size: 13px;
+  color: #2d3748;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  padding: 16px;
+  border-bottom: 2px solid #e2e8f0;
+}
+
+.analytics-dashboard .ant-table-tbody > tr > td {
+  font-size: 13px;
+  padding: 16px;
+  border-bottom: 1px solid #f1f5f9;
+  transition: all 0.2s ease;
+}
+
+.analytics-dashboard .ant-table-tbody > tr:hover > td {
+  background: linear-gradient(90deg, rgba(30, 64, 175, 0.05) 0%, rgba(37, 99, 235, 0.05) 100%);
+}
+
+/* Animations */
+@keyframes fadeIn {
+  from {
+    opacity: 0;
+    transform: translateY(20px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@keyframes slideIn {
+  from {
+    opacity: 0;
+    transform: translateX(-20px);
+  }
+  to {
+    opacity: 1;
+    transform: translateX(0);
+  }
+}
+
+.api-key-manager .ant-card,
+.api-tester .ant-card,
+.analytics-dashboard .ant-card {
+  animation: fadeIn 0.5s ease-out;
+}
+
+.api-key-manager .ant-table-tbody > tr {
+  animation: slideIn 0.3s ease-out;
+  animation-fill-mode: both;
+}
+
+.api-key-manager .ant-table-tbody > tr:nth-child(1) { animation-delay: 0.05s; }
+.api-key-manager .ant-table-tbody > tr:nth-child(2) { animation-delay: 0.1s; }
+.api-key-manager .ant-table-tbody > tr:nth-child(3) { animation-delay: 0.15s; }
+.api-key-manager .ant-table-tbody > tr:nth-child(4) { animation-delay: 0.2s; }
+.api-key-manager .ant-table-tbody > tr:nth-child(5) { animation-delay: 0.25s; }
+
+/* Loading Spinner */
+.api-key-manager .ant-spin-nested-loading > div > .ant-spin {
+  max-height: none;
+}
+
+.api-key-manager .ant-spin-container {
+  min-height: 200px;
+}
+
+/* Scrollbar Styling */
+.api-key-manager ::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+
+.api-key-manager ::-webkit-scrollbar-track {
+  background: #f1f1f1;
+  border-radius: 10px;
+}
+
+.api-key-manager ::-webkit-scrollbar-thumb {
+  background: linear-gradient(135deg, #1e40af 0%, #2563eb 100%);
+  border-radius: 10px;
+}
+
+.api-key-manager ::-webkit-scrollbar-thumb:hover {
+  background: linear-gradient(135deg, #2563eb 0%, #1e40af 100%);
+}
+
+/* Responsive */
+@media (max-width: 768px) {
+  .api-management {
+    padding: 16px;
+  }
+
+  .api-management::before {
+    display: none;
+  }
+
+  .api-key-manager .ant-table {
+    font-size: 12px;
+  }
+
+  .api-key-manager .ant-table-thead > tr > th,
+  .api-key-manager .ant-table-tbody > tr > td {
+    padding: 8px;
+  }
+
+  .api-tester .ant-row {
+    flex-direction: column;
+  }
+
+  .api-tester .ant-col {
+    margin-bottom: 24px;
+  }
+
+  .analytics-dashboard .ant-row {
+    flex-direction: column;
+  }
+
+  .analytics-dashboard .ant-col {
+    margin-bottom: 16px;
+  }
+
+  .api-key-manager .ant-statistic-content {
+    font-size: 24px;
+  }
+}
+
+/* Code Block Styles */
+.api-documentation pre code {
+  color: #d4d4d4;
+  background: transparent;
+  padding: 0;
+}
+
+.api-documentation .ant-card-body {
+  padding: 24px;
+}
+
+.api-documentation pre {
+  position: relative;
+  transition: all 0.3s ease;
+}
+
+.api-documentation pre:hover {
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.3);
+}
+
+/* Copy Button */
+.api-documentation .ant-btn[class*="copy"] {
+  background: rgba(255, 255, 255, 0.1);
+  border: 1px solid rgba(255, 255, 255, 0.2);
+  color: #fff;
+}
+
+.api-documentation .ant-btn[class*="copy"]:hover {
+  background: rgba(255, 255, 255, 0.2);
+  border-color: rgba(255, 255, 255, 0.3);
+}
+
+/* Tabs */
+.api-management .ant-tabs {
+  background: #ffffff;
+  padding: 0;
+  border-radius: 16px;
+  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.12);
+  overflow: hidden;
+}
+
+.api-management .ant-tabs-nav {
+  padding: 0 24px;
+  margin: 0;
+  background: linear-gradient(135deg, #f5f7fa 0%, #ffffff 100%);
+  border-bottom: 2px solid #e2e8f0;
+}
+
+.api-management .ant-tabs-tab {
+  padding: 16px 24px;
+  font-weight: 600;
+  font-size: 14px;
+  color: #64748b;
+  transition: all 0.3s ease;
+  border-radius: 8px 8px 0 0;
+  margin-right: 4px;
+}
+
+.api-management .ant-tabs-tab:hover {
+  color: #667eea;
+  background: rgba(30, 64, 175, 0.05);
+}
+
+.api-management .ant-tabs-content-holder {
+  padding: 24px;
+  background: #ffffff;
+}
+
+.api-management .ant-tabs-tab-active {
+  color: #667eea;
+  background: rgba(30, 64, 175, 0.1);
+}
+
+.api-management .ant-tabs-ink-bar {
+  background: linear-gradient(90deg, #667eea 0%, #764ba2 100%);
+  height: 3px;
+  border-radius: 2px;
+}
+
+/* Empty State */
+.api-documentation .ant-empty {
+  padding: 40px 0;
+}
+
+.api-key-manager .ant-empty {
+  padding: 60px 0;
+}
+
+.api-key-manager .ant-empty-description {
+  color: #8c8c8c;
+  font-size: 14px;
+}
+
+/* Search Input */
+.api-documentation .ant-input-search {
+  border-radius: 8px;
+  overflow: hidden;
+}
+
+.api-documentation .ant-input-search .ant-input {
+  border-radius: 8px 0 0 8px;
+  border: 2px solid #e2e8f0;
+  transition: all 0.3s ease;
+}
+
+.api-documentation .ant-input-search .ant-input:focus {
+  border-color: #667eea;
+  box-shadow: 0 0 0 3px rgba(30, 64, 175, 0.1);
+}
+
+.api-documentation .ant-input-search .ant-input-search-button {
+  border-radius: 0 8px 8px 0;
+  background: linear-gradient(135deg, #1e40af 0%, #2563eb 100%);
+  border: none;
+}
+
+.api-documentation .ant-input-search .ant-input-search-button:hover {
+  background: linear-gradient(135deg, #2563eb 0%, #1e40af 100%);
+}
+
+/* Collapse Styles */
+.api-key-manager .ant-collapse {
+  background: #ffffff;
+  border: 1px solid #e2e8f0;
+  border-radius: 12px;
+  overflow: hidden;
+}
+
+.api-key-manager .ant-collapse-item {
+  border-bottom: 1px solid #e2e8f0;
+  transition: all 0.3s ease;
+}
+
+.api-key-manager .ant-collapse-item:last-child {
+  border-bottom: none;
+}
+
+.api-key-manager .ant-collapse-header {
+  padding: 16px 20px;
+  background: linear-gradient(135deg, #f8f9fa 0%, #ffffff 100%);
+  font-weight: 600;
+  transition: all 0.3s ease;
+}
+
+.api-key-manager .ant-collapse-header:hover {
+  background: linear-gradient(135deg, #f0f0f0 0%, #f8f9fa 100%);
+}
+
+.api-key-manager .ant-collapse-item-active .ant-collapse-header {
+  background: linear-gradient(135deg, #1e40af 0%, #2563eb 100%);
+  color: white;
+}
+
+.api-key-manager .ant-collapse-content {
+  background: #ffffff;
+  border-top: 1px solid #e2e8f0;
+}
+
+/* Checkbox Styles */
+.api-key-manager .ant-checkbox-wrapper {
+  padding: 8px 12px;
+  border-radius: 8px;
+  transition: all 0.2s ease;
+  margin: 4px 0;
+}
+
+.api-key-manager .ant-checkbox-wrapper:hover {
+  background: rgba(30, 64, 175, 0.05);
+  transform: translateX(4px);
+}
+
+.api-key-manager .ant-checkbox-checked .ant-checkbox-inner {
+  background: linear-gradient(135deg, #1e40af 0%, #2563eb 100%);
+  border-color: #667eea;
+}
+
+/* Usage Alerts Styles */
+.usage-alerts {
+  padding: 0;
+}
+
+.usage-alerts .ant-card {
+  border-radius: 16px;
+  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.12);
+  border: none;
+  background: #ffffff;
+  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+  overflow: hidden;
+}
+
+.usage-alerts .ant-card:hover {
+  transform: translateY(-4px);
+  box-shadow: 0 12px 40px rgba(0, 0, 0, 0.16);
+}
+
+.usage-alerts .ant-alert {
+  border-radius: 12px;
+  border: 2px solid #e2e8f0;
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.08);
+}
+
+.usage-alerts .ant-table {
+  background: #fff;
+  border-radius: 12px;
+  overflow: hidden;
+}
+
+.usage-alerts .ant-table-thead > tr > th {
+  background: linear-gradient(135deg, #f5f7fa 0%, #c3cfe2 100%);
+  font-weight: 600;
+  font-size: 13px;
+  color: #2d3748;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  padding: 16px;
+  border-bottom: 2px solid #e2e8f0;
+}
+
+.usage-alerts .ant-table-tbody > tr > td {
+  font-size: 13px;
+  padding: 16px;
+  border-bottom: 1px solid #f1f5f9;
+  transition: all 0.2s ease;
+}
+
+.usage-alerts .ant-table-tbody > tr:hover > td {
+  background: linear-gradient(90deg, rgba(30, 64, 175, 0.05) 0%, rgba(37, 99, 235, 0.05) 100%);
+}
+
+.usage-alerts .ant-statistic {
+  text-align: center;
+}
+
+.usage-alerts .ant-statistic-title {
+  font-size: 14px;
+  color: #666;
+  margin-bottom: 8px;
+}
+
+.usage-alerts .ant-statistic-content {
+  font-size: 24px;
+  font-weight: 600;
+}
+
+/* Rate Limit Manager Styles */
+.rate-limit-manager {
+  padding: 0;
+}
+
+.rate-limit-manager .ant-card {
+  border-radius: 16px;
+  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.12);
+  border: none;
+  background: #ffffff;
+  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.rate-limit-manager .ant-card:hover {
+  transform: translateY(-4px);
+  box-shadow: 0 12px 40px rgba(0, 0, 0, 0.16);
+}
+
+/* API Logs Viewer Styles */
+.api-logs-viewer {
+  padding: 0;
+}
+
+.api-logs-viewer .ant-card {
+  border-radius: 16px;
+  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.12);
+  border: none;
+  background: #ffffff;
+  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.api-logs-viewer .ant-card:hover {
+  transform: translateY(-4px);
+  box-shadow: 0 12px 40px rgba(0, 0, 0, 0.16);
+}
+
+.api-logs-viewer .ant-table {
+  background: #fff;
+  border-radius: 12px;
+  overflow: hidden;
+}
+
+.api-logs-viewer .ant-table-thead > tr > th {
+  background: linear-gradient(135deg, #f5f7fa 0%, #c3cfe2 100%);
+  font-weight: 600;
+  font-size: 13px;
+  color: #2d3748;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  padding: 16px;
+  border-bottom: 2px solid #e2e8f0;
+}
+
+.api-logs-viewer .ant-table-tbody > tr > td {
+  font-size: 13px;
+  padding: 16px;
+  border-bottom: 1px solid #f1f5f9;
+  transition: all 0.2s ease;
+}
+
+.api-logs-viewer .ant-table-tbody > tr:hover > td {
+  background: linear-gradient(90deg, rgba(30, 64, 175, 0.05) 0%, rgba(37, 99, 235, 0.05) 100%);
+}
+
+/* Permissions Manager Styles */
+.permissions-manager {
+  padding: 0;
+}
+
+.permissions-manager .ant-card {
+  border-radius: 16px;
+  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.12);
+  border: none;
+  background: #ffffff;
+  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.permissions-manager .ant-card:hover {
+  transform: translateY(-4px);
+  box-shadow: 0 12px 40px rgba(0, 0, 0, 0.16);
+}
+
+/* Common Styles for All Components */
+.api-key-manager,
+.api-tester,
+.analytics-dashboard,
+.api-documentation,
+.usage-alerts,
+.rate-limit-manager,
+.api-logs-viewer,
+.permissions-manager {
+  padding: 0;
+}
+
+.api-key-manager .ant-card,
+.api-tester .ant-card,
+.analytics-dashboard .ant-card,
+.api-documentation .ant-card,
+.usage-alerts .ant-card,
+.rate-limit-manager .ant-card,
+.api-logs-viewer .ant-card,
+.permissions-manager .ant-card {
+  border-radius: 16px;
+  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.12);
+  border: none;
+  background: #ffffff;
+  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.api-key-manager .ant-card:hover,
+.api-tester .ant-card:hover,
+.analytics-dashboard .ant-card:hover,
+.api-documentation .ant-card:hover,
+.usage-alerts .ant-card:hover,
+.rate-limit-manager .ant-card:hover,
+.api-logs-viewer .ant-card:hover,
+.permissions-manager .ant-card:hover {
+  transform: translateY(-4px);
+  box-shadow: 0 12px 40px rgba(0, 0, 0, 0.16);
+}
+
+/* Consistent Button Styles */
+.api-key-manager .ant-btn-primary,
+.api-tester .ant-btn-primary,
+.analytics-dashboard .ant-btn-primary,
+.api-documentation .ant-btn-primary,
+.usage-alerts .ant-btn-primary,
+.rate-limit-manager .ant-btn-primary,
+.api-logs-viewer .ant-btn-primary,
+.permissions-manager .ant-btn-primary {
+  background: linear-gradient(135deg, #1e40af 0%, #2563eb 100%);
+  border: none;
+  color: white;
+  font-weight: 600;
+  border-radius: 8px;
+  box-shadow: 0 4px 12px rgba(30, 64, 175, 0.3);
+  transition: all 0.3s ease;
+}
+
+.api-key-manager .ant-btn-primary:hover,
+.api-tester .ant-btn-primary:hover,
+.analytics-dashboard .ant-btn-primary:hover,
+.api-documentation .ant-btn-primary:hover,
+.usage-alerts .ant-btn-primary:hover,
+.rate-limit-manager .ant-btn-primary:hover,
+.api-logs-viewer .ant-btn-primary:hover,
+.permissions-manager .ant-btn-primary:hover {
+  background: linear-gradient(135deg, #2563eb 0%, #1e40af 100%);
+  box-shadow: 0 6px 20px rgba(30, 64, 175, 0.4);
+  transform: translateY(-2px);
+}
+

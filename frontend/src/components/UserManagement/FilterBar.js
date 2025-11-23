@@ -73,7 +73,7 @@ const FilterBar = ({
           {/* Search Section */}
           <Col flex="auto">
             <div style={{ position: 'relative' }}>
-              <div style={{ marginBottom: 6 }}>
+              <div style={{ marginBottom: 4 }}>
                 <Text style={{ fontSize: 12, fontWeight: 500, color: '#374151' }}>ค้นหา</Text>
               </div>
               <Input
@@ -113,7 +113,7 @@ const FilterBar = ({
           {/* Quick Filters Section */}
           <Col flex="none">
             <div>
-              <div style={{ marginBottom: 6 }}>
+              <div style={{ marginBottom: 4 }}>
                 <Text style={{ fontSize: 12, fontWeight: 500, color: '#374151' }}>ตัวกรองด่วน</Text>
               </div>
               <Space size={8} align="center">
@@ -149,7 +149,7 @@ const FilterBar = ({
           {/* OU Filters Section */}
           <Col flex="none">
             <div>
-              <div style={{ marginBottom: 6 }}>
+              <div style={{ marginBottom: 4 }}>
                 <Text style={{ fontSize: 12, fontWeight: 500, color: '#374151' }}>OU</Text>
               </div>
               <Button

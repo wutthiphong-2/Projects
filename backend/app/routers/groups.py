@@ -9,7 +9,7 @@ from pathlib import Path
 from app.core.config import settings
 from app.core.database import get_ldap_connection
 from app.core.exceptions import NotFoundError, InternalServerError, ValidationError
-from app.routers.auth import verify_token, verify_token_or_api_key, get_client_ip
+from app.routers.auth import verify_token, verify_token_or_api_key, get_client_ip, check_api_key_permission
 from app.core.activity_log import activity_log_manager
 from app.core.cache import cached_response, invalidate_cache
 from app.core.responses import create_paginated_response
@@ -155,7 +155,7 @@ def format_user_data(entry: tuple) -> Dict[str, Any]:
 
 # Routes
 @router.get(
-    "/",
+    "",
     response_model=Union[PaginatedResponse[GroupResponse], List[GroupResponse]],
     summary="Get all groups",
     description="Retrieve a paginated list of groups from Active Directory with search capabilities",
@@ -164,6 +164,7 @@ def format_user_data(entry: tuple) -> Dict[str, Any]:
 @cached_response(ttl_seconds=600)  # ⚡ Cache for 10 minutes
 async def get_groups(
     token_data = Depends(verify_token_or_api_key),
+    _ = Depends(check_api_key_permission),
     q: str | None = Query(default=None, description="Search text for cn/description"),
     page: int = Query(default=1, ge=1),
     page_size: int = Query(default=50, ge=1, le=50000),  # Increased to 50000
@@ -324,7 +325,11 @@ async def get_categorized_groups(token_data = Depends(verify_token)):
         raise InternalServerError("Failed to retrieve categorized groups")
 
 @router.get("/{dn}", response_model=GroupResponse)
-async def get_group(dn: str, token_data = Depends(verify_token)):
+async def get_group(
+    dn: str, 
+    token_data = Depends(verify_token_or_api_key),
+    _ = Depends(check_api_key_permission)
+):
     """Get specific group by DN"""
     ldap_conn = get_ldap_connection()
     
@@ -344,8 +349,12 @@ async def get_group(dn: str, token_data = Depends(verify_token)):
         logger.error(f"Error getting group {dn}: {e}")
         raise InternalServerError("Failed to retrieve group")
 
-@router.post("/", response_model=GroupCreateResponse, status_code=status.HTTP_201_CREATED)
-async def create_group(group_data: GroupCreate, token_data = Depends(verify_token)):
+@router.post("", response_model=GroupCreateResponse, status_code=status.HTTP_201_CREATED)
+async def create_group(
+    group_data: GroupCreate, 
+    token_data = Depends(verify_token_or_api_key),
+    _ = Depends(check_api_key_permission)
+):
     """Create new group in Active Directory with full AD support"""
     ldap_conn = get_ldap_connection()
     
@@ -442,7 +451,12 @@ async def create_group(group_data: GroupCreate, token_data = Depends(verify_toke
         raise InternalServerError(str(e))
 
 @router.put("/{dn}", response_model=GroupUpdateResponse)
-async def update_group(dn: str, group_data: GroupUpdate, token_data = Depends(verify_token)):
+async def update_group(
+    dn: str, 
+    group_data: GroupUpdate, 
+    token_data = Depends(verify_token_or_api_key),
+    _ = Depends(check_api_key_permission)
+):
     """Update group in Active Directory"""
     ldap_conn = get_ldap_connection()
     
@@ -473,7 +487,11 @@ async def update_group(dn: str, group_data: GroupUpdate, token_data = Depends(ve
         raise InternalServerError("Failed to update group")
 
 @router.delete("/{dn}", response_model=GroupDeleteResponse)
-async def delete_group(dn: str, token_data = Depends(verify_token)):
+async def delete_group(
+    dn: str, 
+    token_data = Depends(verify_token_or_api_key),
+    _ = Depends(check_api_key_permission)
+):
     """Delete group from Active Directory"""
     ldap_conn = get_ldap_connection()
     
@@ -497,7 +515,11 @@ async def delete_group(dn: str, token_data = Depends(verify_token)):
 
 # Group Member Management Endpoints
 @router.get("/{group_dn}/members", response_model=List[GroupMemberResponse])
-async def get_group_members(group_dn: str, token_data = Depends(verify_token)):
+async def get_group_members(
+    group_dn: str, 
+    token_data = Depends(verify_token_or_api_key),
+    _ = Depends(check_api_key_permission)
+):
     """Get all members of a specific group"""
     ldap_conn = get_ldap_connection()
     
@@ -549,7 +571,13 @@ async def get_group_members(group_dn: str, token_data = Depends(verify_token)):
         raise InternalServerError("Failed to retrieve group members")
 
 @router.post("/{group_dn}/members", response_model=GroupMemberAddResponse, status_code=status.HTTP_201_CREATED)
-async def add_group_member(group_dn: str, member_data: GroupMemberAdd, request: Request, token_data = Depends(verify_token)):
+async def add_group_member(
+    group_dn: str, 
+    member_data: GroupMemberAdd, 
+    request: Request, 
+    token_data = Depends(verify_token_or_api_key),
+    _ = Depends(check_api_key_permission)
+):
     """Add a user to a group and verify memberOf is updated in AD"""
     ldap_conn = get_ldap_connection()
     
@@ -717,7 +745,13 @@ async def add_group_member(group_dn: str, member_data: GroupMemberAdd, request: 
         raise InternalServerError("Failed to add member to group")
 
 @router.delete("/{group_dn}/members", response_model=GroupMemberRemoveResponse)
-async def remove_group_member(group_dn: str, member_data: GroupMemberRemove, request: Request, token_data = Depends(verify_token)):
+async def remove_group_member(
+    group_dn: str, 
+    member_data: GroupMemberRemove, 
+    request: Request, 
+    token_data = Depends(verify_token_or_api_key),
+    _ = Depends(check_api_key_permission)
+):
     """Remove a user from a group and verify memberOf is updated in AD"""
     ldap_conn = get_ldap_connection()
     
@@ -811,7 +845,11 @@ async def remove_group_member(group_dn: str, member_data: GroupMemberRemove, req
         raise InternalServerError("Failed to remove member from group")
 
 @router.get("/{group_dn}/available-users", response_model=List[GroupMemberResponse])
-async def get_available_users_for_group(group_dn: str, token_data = Depends(verify_token)):
+async def get_available_users_for_group(
+    group_dn: str, 
+    token_data = Depends(verify_token_or_api_key),
+    _ = Depends(check_api_key_permission)
+):
     """Get users that can be added to the group (not already members)"""
     ldap_conn = get_ldap_connection()
     

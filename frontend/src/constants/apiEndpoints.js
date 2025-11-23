@@ -31,7 +31,7 @@ export const API_ENDPOINTS = {
   
   // Groups
   GROUPS: {
-    BASE: '/api/groups/',
+    BASE: '/api/groups',
     CATEGORIZED: '/api/groups/categorized',
     BY_DN: (dn) => `/api/groups/${encodeURIComponent(dn)}`,
     MEMBERS_BY_DN: (dn) => `/api/groups/${encodeURIComponent(dn)}/members`,
@@ -42,7 +42,7 @@ export const API_ENDPOINTS = {
   
   // OUs
   OUS: {
-    BASE: '/api/ous/',
+    BASE: '/api/ous',
     BY_DN: (dn) => `/api/ous/${encodeURIComponent(dn)}`,
     SUGGESTED_GROUPS: (dn) => `/api/ous/${encodeURIComponent(dn)}/suggested-groups`,
   },

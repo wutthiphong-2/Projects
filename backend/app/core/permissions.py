@@ -4,6 +4,9 @@ Permission system for API keys using scope-based access control.
 Scopes follow the format: resource:action
 - resource: users, groups, ous, activity, api_keys
 - action: read, write
+
+Also supports endpoint-based format: METHOD:/api/resource
+- e.g., GET:/api/users, POST:/api/users
 """
 from typing import List, Dict, Optional, Tuple
 import re
@@ -160,12 +163,89 @@ def validate_scopes(scopes: List[str]) -> Tuple[bool, Optional[str]]:
     return True, None
 
 
+def convert_endpoint_to_scope(endpoint_permission: str) -> Optional[str]:
+    """
+    Convert endpoint-based permission (e.g., "GET:/api/users") to scope (e.g., "users:read")
+    
+    Args:
+        endpoint_permission: Permission in format "METHOD:/api/resource"
+    
+    Returns:
+        Scope string (e.g., "users:read") or None if cannot convert
+    """
+    if not endpoint_permission or ':' not in endpoint_permission:
+        return None
+    
+    try:
+        method, path = endpoint_permission.split(':', 1)
+        method = method.upper()
+        
+        # Map path to resource
+        if path.startswith('/api/users'):
+            resource = 'users'
+        elif path.startswith('/api/groups'):
+            resource = 'groups'
+        elif path.startswith('/api/ous'):
+            resource = 'ous'
+        elif path.startswith('/api/activity-logs'):
+            resource = 'activity'
+        elif path.startswith('/api/api-keys'):
+            resource = 'api_keys'
+        else:
+            return None
+        
+        # Map method to action
+        if method in ['GET', 'HEAD', 'OPTIONS']:
+            action = 'read'
+        elif method in ['POST', 'PUT', 'PATCH', 'DELETE']:
+            action = 'write'
+        else:
+            return None
+        
+        return f"{resource}:{action}"
+    except Exception:
+        return None
+
+
+def normalize_permissions(permissions: List[str]) -> List[str]:
+    """
+    Normalize permissions to scope-based format
+    Converts endpoint-based permissions (GET:/api/users) to scope-based (users:read)
+    
+    Args:
+        permissions: List of permissions (can be mixed format)
+    
+    Returns:
+        List of normalized scope-based permissions
+    """
+    normalized = []
+    seen_scopes = set()
+    
+    for perm in permissions:
+        if not perm or not isinstance(perm, str):
+            continue
+        
+        # If already in scope format (contains : but not /api/)
+        if ':' in perm and '/api/' not in perm:
+            if perm not in seen_scopes:
+                normalized.append(perm)
+                seen_scopes.add(perm)
+        # If in endpoint format, convert it
+        elif ':' in perm and '/api/' in perm:
+            scope = convert_endpoint_to_scope(perm)
+            if scope and scope not in seen_scopes:
+                normalized.append(scope)
+                seen_scopes.add(scope)
+    
+    return normalized
+
+
 def check_permission(api_key_permissions: List[str], required_scope: str) -> bool:
     """
     Check if API key has the required permission
     
     Args:
-        api_key_permissions: List of scopes the API key has
+        api_key_permissions: List of scopes the API key has (can be mixed format)
         required_scope: The scope required to access the resource
     
     Returns:
@@ -174,15 +254,21 @@ def check_permission(api_key_permissions: List[str], required_scope: str) -> boo
     if not api_key_permissions:
         return False
     
+    # Normalize permissions to scope-based format
+    normalized_perms = normalize_permissions(api_key_permissions)
+    
+    if not normalized_perms:
+        return False
+    
     # Direct match
-    if required_scope in api_key_permissions:
+    if required_scope in normalized_perms:
         return True
     
     # Special case: write permission implies read permission
     # e.g., users:write implies users:read
     if required_scope.endswith(":read"):
         write_scope = required_scope.replace(":read", ":write")
-        if write_scope in api_key_permissions:
+        if write_scope in normalized_perms:
             return True
     
     return False
@@ -217,7 +303,7 @@ def has_permission(api_key_permissions: List[str], path: str, method: str) -> Tu
     Check if API key has permission to access the endpoint
     
     Args:
-        api_key_permissions: List of scopes the API key has
+        api_key_permissions: List of scopes the API key has (can be mixed format)
         path: The request path
         method: The HTTP method
     
@@ -231,6 +317,11 @@ def has_permission(api_key_permissions: List[str], path: str, method: str) -> Tu
     # If no scope required, allow access (public endpoint)
     if required_scope is None:
         return True, None
+    
+    # Empty permissions array = Full Access (allow all)
+    # This matches the frontend behavior where "Empty = Full Access"
+    if not api_key_permissions or len(api_key_permissions) == 0:
+        return True, required_scope
     
     # Check if API key has the required permission
     has_access = check_permission(api_key_permissions, required_scope)

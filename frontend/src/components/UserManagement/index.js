@@ -1840,7 +1840,22 @@ const UserManagement = () => {
         </div>
       </header>
 
-      {/* Filter Bar */}
+      {/* Main Content Area */}
+      <main className="umx-main-content">
+        {/* Bulk Action Bar */}
+        {selectedRowKeys.length > 0 && (
+          <BulkActionBar
+            selectedCount={selectedRowKeys.length}
+            onClearSelection={() => setSelectedRowKeys([])}
+            onBulkAction={handleBulkAction}
+            loading={bulkActionLoading}
+          />
+        )}
+        
+        {/* UserTable component with FilterBar inside */}
+        <Card className="umx-table-card" styles={{ body: { padding: 0 } }}>
+          {/* Filter Bar inside Card */}
+          <div className="umx-filter-bar-inside-card">
       <FilterBar
         searchText={searchText}
         onSearchChange={(value) => {
@@ -1887,23 +1902,10 @@ const UserManagement = () => {
           setShowSearchSuggestions(false);
         }}
         compact={true}
-        isFilterSticky={isFilterSticky}
-      />
-      
-      {/* Main Content Area */}
-      <main className="umx-main-content">
-        {/* Bulk Action Bar */}
-        {selectedRowKeys.length > 0 && (
-          <BulkActionBar
-            selectedCount={selectedRowKeys.length}
-            onClearSelection={() => setSelectedRowKeys([])}
-            onBulkAction={handleBulkAction}
-            loading={bulkActionLoading}
+              isFilterSticky={false}
           />
-        )}
-        
-        {/* UserTable component */}
-        <Card className="umx-table-card" styles={{ body: { padding: 0 } }}>
+          </div>
+          
           <UserTable
             users={users}
             paginatedUsers={paginatedUsers}
@@ -2683,14 +2685,23 @@ const UserManagement = () => {
         </Form.Item>
       </Form>
       
-      {/* Hidden Form for editForm - connected when EditUserModal is visible */}
+      {/* Hidden Form for editForm - always connected to suppress warning */}
       <Form form={editForm} style={{ display: 'none' }}>
         <Form.Item name="cn">
           <Input style={{ display: 'none' }} />
         </Form.Item>
+        <Form.Item name="sAMAccountName">
+          <Input style={{ display: 'none' }} />
+        </Form.Item>
+        <Form.Item name="mail">
+          <Input style={{ display: 'none' }} />
+        </Form.Item>
+        <Form.Item name="accountOption">
+          <Input style={{ display: 'none' }} />
+        </Form.Item>
       </Form>
       
-      {/* Hidden Form for passwordForm - connected when PasswordModal is visible */}
+      {/* Hidden Form for passwordForm - always connected to suppress warning */}
       <Form form={passwordForm} style={{ display: 'none' }}>
         <Form.Item name="password">
           <Input.Password style={{ display: 'none' }} />

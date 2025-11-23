@@ -9,6 +9,7 @@ import UserManagement from './components/UserManagement/index';
 import GroupManagement from './components/GroupManagement';
 import OUManagement from './components/OUManagement';
 import ActivityLog from './components/ActivityLog';
+import APIManagement from './components/APIManagement';
 import Sidebar from './components/Sidebar';
 import { AuthProvider, useAuth } from './contexts/AuthContext';
 import { NotificationProvider } from './contexts/NotificationContext';
@@ -27,6 +28,7 @@ function AppContent() {
     '/groups': 'จัดการกลุ่ม',
     '/ous': 'จัดการ OU',
     '/activity-log': 'Activity Log',
+    '/api-management': 'API Management',
   };
 
   const getBreadcrumbItems = () => {
@@ -83,6 +85,7 @@ function AppContent() {
                 <Route path="/groups" element={<GroupManagement />} />
                 <Route path="/ous" element={<OUManagement />} />
                 <Route path="/activity-log" element={<ActivityLog />} />
+                <Route path="/api-management" element={<APIManagement />} />
                 {/* Catch-all route for unknown paths */}
                 <Route path="*" element={<Navigate to="/dashboard" replace />} />
               </Routes>

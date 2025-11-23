@@ -48,7 +48,6 @@ import { TIMING } from '../../constants/userManagement';
 
 const { Text } = Typography;
 const { Step } = Steps;
-const { Panel } = Collapse;
 
 const CreateUserModal = ({
   visible,
@@ -561,17 +560,17 @@ const CreateUserModal = ({
                 defaultActiveKey={[]}
                 ghost
                 style={{ background: 'transparent' }}
-              >
-                <Panel 
-                  header={
+                items={[
+                  {
+                    key: 'personal',
+                    label: (
                     <span style={{ fontSize: 14, fontWeight: 500 }}>
                       <UserOutlined style={{ marginRight: 8, color: '#6b7280' }} />
                       ข้อมูลส่วนตัว
                     </span>
-                  } 
-                  key="personal"
-                  style={{ marginBottom: 12 }}
-                >
+                    ),
+                    children: (
+                      <>
                       <Row gutter={16}>
                         <Col xs={24} md={12}>
                           <Form.Item
@@ -636,18 +635,19 @@ const CreateUserModal = ({
                           </Form.Item>
                         </Col>
                       </Row>
-                    </Panel>
-
-                    <Panel 
-                      header={
+                      </>
+                    )
+                  },
+                  {
+                    key: 'contact',
+                    label: (
                         <span style={{ fontSize: 14, fontWeight: 500 }}>
                           <PhoneOutlined style={{ marginRight: 8, color: '#6b7280' }} />
                           ข้อมูลติดต่อและที่ทำงาน
                         </span>
-                      } 
-                      key="contact"
-                      style={{ marginBottom: 12 }}
-                    >
+                    ),
+                    children: (
+                      <>
                       <Row gutter={16}>
                         <Col xs={24} md={12}>
                           <Form.Item
@@ -678,8 +678,11 @@ const CreateUserModal = ({
                       >
                         <Input.TextArea rows={3} placeholder="Enter description or notes" />
                       </Form.Item>
-                    </Panel>
-                  </Collapse>
+                      </>
+                    )
+                  }
+                ]}
+              />
             </Card>
 
             {/* Organizational Placement */}

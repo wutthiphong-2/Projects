@@ -12,7 +12,7 @@ import base64
 from app.core.config import settings
 from app.core.database import get_ldap_connection
 from app.core.exceptions import NotFoundError, InternalServerError, ValidationError
-from app.routers.auth import verify_token, verify_token_or_api_key, get_client_ip
+from app.routers.auth import verify_token, verify_token_or_api_key, get_client_ip, check_api_key_permission
 from app.core.cache import cached_response, invalidate_cache
 from app.core.activity_log import activity_log_manager
 from app.core.responses import create_paginated_response
@@ -455,7 +455,7 @@ def format_user_data(entry: tuple, full_details: bool = True) -> Dict[str, Any]:
     "/",
     response_model=Union[PaginatedResponse[UserResponse], List[UserResponse]],
     summary="Get all users",
-    description="Retrieve a paginated list of users from Active Directory with advanced search and filtering capabilities. Use 'fields' parameter to select specific attributes for better performance.",
+    description="Retrieve a paginated list of users from Active Directory with advanced search and filtering capabilities. Use 'fields' parameter to select specific attributes for better performance. If page and page_size are not provided, returns all users.",
     tags=["users"]
 )
 @cached_response(ttl_seconds=600)  # ⚡ Cache for 10 minutes (เพิ่มความเร็ว)
@@ -463,8 +463,8 @@ async def get_users(
     q: Optional[str] = None,
     department: Optional[str] = None,
     ou: Optional[str] = None,  # Filter by Organizational Unit DN
-    page: int = Query(1, ge=1),
-    page_size: int = Query(500, ge=1, le=50000),  # Default 500 for better UX (was 10)
+    page: Optional[int] = Query(None, ge=1),
+    page_size: Optional[int] = Query(None, ge=1, le=50000),
     format: Optional[str] = Query("paginated", regex="^(paginated|simple)$"),  # Backward compatibility
     fields: Optional[str] = Query(None, description="Comma-separated list of fields to return (e.g., 'cn,mail,displayName'). If not specified, returns all fields."),
     # Advanced search parameters
@@ -476,7 +476,8 @@ async def get_users(
     search_title: Optional[str] = None,
     search_department: Optional[str] = None,
     search_office: Optional[str] = None,
-    token_data = Depends(verify_token_or_api_key)
+    token_data = Depends(verify_token_or_api_key),
+    _ = Depends(check_api_key_permission)
 ):
     """Get all users from Active Directory with advanced search support
     
@@ -484,9 +485,13 @@ async def get_users(
     - q: General search across name, username, and email
     - department: Filter by department (legacy parameter)
     - ou: Filter by Organizational Unit DN (e.g., "OU=IT-K1IT00,OU=Phase10,OU=TBKK-Users,DC=tbkk,DC=co,DC=th")
-    - page: Page number (default: 1)
-    - page_size: Number of results per page (default: 500, max: 50000)
+    - page: Page number (optional, if not provided returns all users)
+    - page_size: Number of results per page (optional, if not provided returns all users, max: 50000)
     - fields: Comma-separated list of fields to return (e.g., 'cn,mail,displayName'). Improves performance by fetching only needed attributes.
+    
+    Pagination:
+    - If page and page_size are not provided, returns all users (no pagination)
+    - If page_size >= 1000 or format=simple, returns all users in simple array format
     
     Search Modes:
     - contains: *text* (default)
@@ -769,6 +774,11 @@ async def get_users(
         
         total_users = len(users_all)
         
+        # If page or page_size is not provided, return all users
+        if page is None or page_size is None:
+            logger.info(f"🚀 Returning ALL {total_users} users (no pagination specified)")
+            return users_all
+        
         # Backward compatibility: Return simple array if format=simple or page_size >= 1000
         if format == "simple" or page_size >= 1000:
             logger.info(f"🚀 Returning ALL {total_users} users to frontend (simple format)")
@@ -1046,7 +1056,11 @@ async def get_group_members(group_dn: str, token: str = Depends(verify_token)):
     description="Retrieve detailed information about a specific user by Distinguished Name (DN)",
     tags=["users"]
 )
-async def get_user(dn: str, token_data = Depends(verify_token)):
+async def get_user(
+    dn: str, 
+    token_data = Depends(verify_token_or_api_key),
+    _ = Depends(check_api_key_permission)
+):
     """Get specific user by DN with full details"""
     # Sanitize DN to prevent injection
     try:
@@ -1087,7 +1101,12 @@ async def get_user(dn: str, token_data = Depends(verify_token)):
     description="Create a new user account in Active Directory with optional group assignments and password settings",
     tags=["users"]
 )
-async def create_user(user_data: UserCreate, request: Request, token_data = Depends(verify_token)):
+async def create_user(
+    user_data: UserCreate, 
+    request: Request, 
+    token_data = Depends(verify_token_or_api_key),
+    _ = Depends(check_api_key_permission)
+):
     """Create new user in Active Directory"""
     # 🔍 DEBUG: Log incoming data (without password for security)
     logger.info(f"📥 Received user creation request")
@@ -1336,7 +1355,13 @@ async def create_user(user_data: UserCreate, request: Request, token_data = Depe
     description="Update user attributes in Active Directory. Supports password reset and account options modification.",
     tags=["users"]
 )
-async def update_user(dn: str, user_data: UserUpdate, request: Request, token_data = Depends(verify_token)):
+async def update_user(
+    dn: str, 
+    user_data: UserUpdate, 
+    request: Request, 
+    token_data = Depends(verify_token_or_api_key),
+    _ = Depends(check_api_key_permission)
+):
     """Update user in Active Directory"""
     ldap_conn = get_ldap_connection()
     
@@ -1610,7 +1635,12 @@ async def update_user(dn: str, user_data: UserUpdate, request: Request, token_da
     description="Enable or disable a user account in Active Directory",
     tags=["users"]
 )
-async def toggle_user_status(dn: str, request: Request, token_data = Depends(verify_token)):
+async def toggle_user_status(
+    dn: str, 
+    request: Request, 
+    token_data = Depends(verify_token_or_api_key),
+    _ = Depends(check_api_key_permission)
+):
     """Enable/Disable user account"""
     ldap_conn = get_ldap_connection()
     
@@ -1670,7 +1700,12 @@ async def toggle_user_status(dn: str, request: Request, token_data = Depends(ver
     description="Permanently delete a user account from Active Directory",
     tags=["users"]
 )
-async def delete_user(dn: str, request: Request, token_data = Depends(verify_token)):
+async def delete_user(
+    dn: str, 
+    request: Request, 
+    token_data = Depends(verify_token_or_api_key),
+    _ = Depends(check_api_key_permission)
+):
     """Delete user from Active Directory"""
     ldap_conn = get_ldap_connection()
     

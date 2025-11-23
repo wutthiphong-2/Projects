@@ -398,101 +398,141 @@ const ActivityLog = () => {
 
   return (
     <div className="activity-log-container">
-      {/* Single Combined Card: Header + Filters + Table */}
-      <Card
-        style={{
-          borderRadius: 16,
-          boxShadow: '0 4px 16px rgba(0,0,0,0.1)',
-          overflow: 'hidden'
-        }}
-        styles={{ body: { padding: 0 } }}
-      >
-        {/* Header Section with Gradient */}
-        <div style={{
-          background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
-          padding: '20px 24px'
-        }}>
-          <Row gutter={[24, 16]} align="middle">
+      {/* Header Section */}
+      <header style={{ padding: '0', marginBottom: '24px' }}>
+        <Row gutter={[24, 16]} align="middle" style={{ marginBottom: '24px' }}>
             <Col xs={24} md={12}>
               <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
                 <div style={{
-                  background: 'rgba(255, 255, 255, 0.2)',
-                  borderRadius: 8,
-                  padding: 10,
+                background: 'rgba(255, 255, 255, 0.15)',
+                borderRadius: '12px',
+                padding: '16px',
                   backdropFilter: 'blur(10px)'
                 }}>
-                  <BarChartOutlined style={{ fontSize: 22, color: '#ffffff' }} />
+                <BarChartOutlined style={{ fontSize: 44, color: '#ffffff' }} />
+              </div>
+              <div>
+                <div style={{ 
+                  color: '#ffffff',
+                  margin: 0, 
+                  marginBottom: 4, 
+                  fontWeight: 700, 
+                  fontSize: 32,
+                  letterSpacing: '-0.8px'
+                }}>
+                  Activity Log
                 </div>
-                <div>
-                  <Title level={3} style={{ margin: 0, color: '#ffffff', fontSize: 20, fontWeight: 700 }}>
-                    Activity Log
-                  </Title>
-                  <Text style={{ color: 'rgba(255, 255, 255, 0.85)', fontSize: 13, fontWeight: 400 }}>
+                <Text style={{ color: 'rgba(255, 255, 255, 0.9)', fontSize: 15, fontWeight: 500 }}>
                     ติดตามและตรวจสอบกิจกรรมทั้งหมดในระบบ
                   </Text>
                 </div>
               </div>
             </Col>
+        </Row>
+
+        {/* Statistics Cards */}
             {stats && (
-              <Col xs={24} md={12}>
-                <Row gutter={[12, 12]}>
-                  <Col xs={12}>
+          <Row gutter={[16, 16]}>
+            <Col xs={12} sm={6} md={6}>
+              <div style={{
+                background: '#ffffff',
+                borderRadius: 16,
+                padding: '24px',
+                textAlign: 'center',
+                border: 'none',
+                borderLeft: '4px solid #2563eb',
+                boxShadow: '0 8px 32px rgba(0, 0, 0, 0.12)',
+                transition: 'all 0.3s cubic-bezier(0.4, 0, 0.2, 1)'
+              }}
+              onMouseEnter={(e) => {
+                e.currentTarget.style.transform = 'translateY(-6px) scale(1.02)';
+                e.currentTarget.style.boxShadow = '0 16px 48px rgba(0, 0, 0, 0.18)';
+              }}
+              onMouseLeave={(e) => {
+                e.currentTarget.style.transform = 'translateY(0) scale(1)';
+                e.currentTarget.style.boxShadow = '0 8px 32px rgba(0, 0, 0, 0.12)';
+              }}
+              >
                     <div style={{
-                      background: 'rgba(255, 255, 255, 0.15)',
-                      borderRadius: 8,
-                      padding: 12,
-                      backdropFilter: 'blur(10px)',
-                      border: '1px solid rgba(255, 255, 255, 0.2)',
-                      textAlign: 'center'
+                  fontSize: 13,
+                  color: '#6b7280',
+                  textTransform: 'uppercase',
+                  letterSpacing: '0.8px',
+                  marginBottom: 12,
+                  fontWeight: 600
                     }}>
-                      <ClockCircleOutlined style={{ fontSize: 20, color: '#ffffff', marginBottom: 6 }} />
-                      <div style={{ color: 'rgba(255, 255, 255, 0.8)', fontSize: 10, marginBottom: 4, textTransform: 'uppercase', letterSpacing: 0.5 }}>
-                        กิจกรรมทั้งหมด
+                  <ClockCircleOutlined style={{ marginRight: 6, color: '#2563eb' }} /> กิจกรรมทั้งหมด
                       </div>
-                      <div style={{ color: '#ffffff', fontSize: 24, fontWeight: 700 }}>
+                <div style={{ 
+                  fontSize: 32, 
+                  fontWeight: 700, 
+                  color: '#2563eb'
+                }}>
                         {stats.total_actions}
                       </div>
                     </div>
                   </Col>
-                  <Col xs={12}>
+            <Col xs={12} sm={6} md={6}>
+              <div style={{
+                background: '#ffffff',
+                borderRadius: 16,
+                padding: '24px',
+                textAlign: 'center',
+                border: 'none',
+                borderLeft: '4px solid #10b981',
+                boxShadow: '0 8px 32px rgba(0, 0, 0, 0.12)',
+                transition: 'all 0.3s cubic-bezier(0.4, 0, 0.2, 1)'
+              }}
+              onMouseEnter={(e) => {
+                e.currentTarget.style.transform = 'translateY(-6px) scale(1.02)';
+                e.currentTarget.style.boxShadow = '0 16px 48px rgba(0, 0, 0, 0.18)';
+              }}
+              onMouseLeave={(e) => {
+                e.currentTarget.style.transform = 'translateY(0) scale(1)';
+                e.currentTarget.style.boxShadow = '0 8px 32px rgba(0, 0, 0, 0.12)';
+              }}
+              >
                     <div style={{
-                      background: 'rgba(255, 255, 255, 0.15)',
-                      borderRadius: 8,
-                      padding: 12,
-                      backdropFilter: 'blur(10px)',
-                      border: '1px solid rgba(255, 255, 255, 0.2)',
-                      textAlign: 'center'
+                  fontSize: 13,
+                  color: '#6b7280',
+                  textTransform: 'uppercase',
+                  letterSpacing: '0.8px',
+                  marginBottom: 12,
+                  fontWeight: 600
                     }}>
-                      <CheckCircleOutlined style={{ fontSize: 20, color: '#ffffff', marginBottom: 6 }} />
-                      <div style={{ color: 'rgba(255, 255, 255, 0.8)', fontSize: 10, marginBottom: 4, textTransform: 'uppercase', letterSpacing: 0.5 }}>
-                        ช่วง 30 วัน
+                  <CheckCircleOutlined style={{ marginRight: 6, color: '#10b981' }} /> ช่วง 30 วัน
                       </div>
-                      <div style={{ color: '#ffffff', fontSize: 24, fontWeight: 700 }}>
+                <div style={{ 
+                  fontSize: 32, 
+                  fontWeight: 700, 
+                  color: '#10b981'
+                }}>
                         {stats.period_days}
                       </div>
                     </div>
                   </Col>
                 </Row>
-              </Col>
             )}
-          </Row>
-        </div>
+      </header>
 
-        {/* White Content Section */}
-        <div style={{ padding: '20px', background: '#ffffff' }}>
+      {/* Main Content Area */}
+      <main style={{ padding: '0' }}>
         {/* Filters Section */}
-        <div style={{ marginBottom: 20 }}>
+        <Card
+          style={{
+            background: '#ffffff',
+            borderRadius: '16px',
+            padding: '16px 24px',
+            marginBottom: '24px',
+            boxShadow: '0 8px 32px rgba(0, 0, 0, 0.12)',
+            border: 'none'
+          }}
+        >
+
+          <div style={{ marginBottom: 16 }}>
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12 }}>
             <Space size={8}>
-              <div style={{
-                background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
-                borderRadius: 6,
-                padding: '6px 10px',
-                display: 'flex',
-                alignItems: 'center'
-              }}>
-                <FilterOutlined style={{ color: '#ffffff', fontSize: 16 }} />
-              </div>
+                <FilterOutlined style={{ color: '#2563eb', fontSize: 16 }} />
               <Text strong style={{ fontSize: 14 }}>กรองและค้นหาข้อมูล</Text>
             </Space>
             <Space size={8}>
@@ -504,7 +544,7 @@ const ActivityLog = () => {
                 }}
                 size="small"
                 style={{
-                  borderRadius: 6,
+                    borderRadius: 8,
                   fontWeight: 600
                 }}
               >
@@ -514,7 +554,7 @@ const ActivityLog = () => {
                 onClick={handleResetFilters}
                 size="small"
                 style={{
-                  borderRadius: 6,
+                    borderRadius: 8,
                   fontWeight: 600
                 }}
               >
@@ -557,33 +597,33 @@ const ActivityLog = () => {
                 icon={<SearchOutlined />}
                 onClick={handleFilterChange}
                 block
+                  style={{
+                    borderRadius: 8,
+                    fontWeight: 600
+                  }}
               >
                 ค้นหา
               </Button>
             </Col>
           </Row>
         </div>
-
-        {/* Divider */}
-        <div style={{ 
-          height: 1, 
-          background: 'linear-gradient(90deg, transparent, #e5e7eb, transparent)', 
-          marginBottom: 20 
-        }} />
+        </Card>
 
         {/* Table Section */}
-        <div>
-          <div style={{ marginBottom: 12 }}>
+        <Card
+          style={{
+            background: '#ffffff',
+            borderRadius: '16px',
+            padding: '24px',
+            boxShadow: '0 8px 32px rgba(0, 0, 0, 0.12)',
+            border: 'none'
+          }}
+          styles={{ body: { padding: 0 } }}
+        >
+          <div style={{ padding: '24px' }}>
+            <div style={{ marginBottom: 16 }}>
             <Space size={8}>
-              <div style={{
-                background: 'linear-gradient(135deg, #10b981 0%, #059669 100%)',
-                borderRadius: 6,
-                padding: '6px 10px',
-                display: 'flex',
-                alignItems: 'center'
-              }}>
-                <ClockCircleOutlined style={{ color: '#ffffff', fontSize: 16 }} />
-              </div>
+                <ClockCircleOutlined style={{ color: '#10b981', fontSize: 16 }} />
               <div>
                 <Text strong style={{ fontSize: 14 }}>รายการกิจกรรมล่าสุด</Text>
                 {activities.length > 0 && (
@@ -612,8 +652,8 @@ const ActivityLog = () => {
             style={{ borderRadius: 8 }}
           />
         </div>
-        </div>
       </Card>
+      </main>
     </div>
   );
 };

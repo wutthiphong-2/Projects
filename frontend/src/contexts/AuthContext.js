@@ -77,7 +77,10 @@ export const AuthProvider = ({ children }) => {
       return { success: true };
     } catch (error) {
       const errorMessage = getErrorMessage(error);
-      console.error('Login failed:', error);
+      // Don't log 401 errors as they're expected (invalid credentials)
+      if (error.response?.status !== 401) {
+        console.error('Login failed:', error);
+      }
       return { 
         success: false, 
         error: errorMessage

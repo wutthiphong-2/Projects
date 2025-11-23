@@ -6,22 +6,27 @@
 import axios from 'axios';
 import config from '../config';
 
+// Set axios defaults to ensure no timeout globally
+axios.defaults.timeout = 0;
+
 // Create axios instance
 const api = axios.create({
   baseURL: config.apiUrl || 'http://localhost:8000',
-  timeout: 10000,
+  timeout: 0, // No timeout - allow requests to take as long as needed
   headers: {
     'Content-Type': 'application/json',
   },
 });
 
-// Request interceptor - Add auth token
+// Request interceptor - Add auth token and ensure no timeout
 api.interceptors.request.use(
   (config) => {
     const token = localStorage.getItem('token');
     if (token) {
       config.headers.Authorization = `Bearer ${token}`;
     }
+    // Ensure timeout is always 0 (no timeout)
+    config.timeout = 0;
     return config;
   },
   (error) => {
@@ -68,7 +73,12 @@ api.interceptors.response.use(
     } else if (error.request) {
       // Request was made but no response received
       if (error.code === 'ECONNABORTED' || error.message?.includes('timeout')) {
-        console.error('Network error: timeout of', error.config?.timeout || 10000, 'ms exceeded');
+        const timeoutValue = error.config?.timeout || 0;
+        if (timeoutValue === 0) {
+          console.error('Network error: request was aborted (no timeout configured)');
+        } else {
+          console.error('Network error: timeout of', timeoutValue, 'ms exceeded');
+        }
       } else {
         console.error('Network error:', error.message);
       }

@@ -4,8 +4,8 @@
    ============================================ */
 
 .modern-tech-sidebar {
-  background: #1a1d24 !important;
-  border-right: 1px solid #292d35;
+  background: linear-gradient(135deg, #475569 0%, #64748b 100%) !important;
+  border-right: 1px solid rgba(255, 255, 255, 0.1);
   height: 100vh;
   position: fixed;
   left: 0;
@@ -13,6 +13,7 @@
   bottom: 0;
   z-index: 1000;
   transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+  box-shadow: 4px 0 24px rgba(0, 0, 0, 0.15);
 }
 
 .sidebar-container {
@@ -57,18 +58,67 @@
 .brand-name {
   font-size: 15px;
   font-weight: 700;
-  color: #e8eaed;
+  color: #ffffff;
   letter-spacing: -0.3px;
 }
 
 .brand-badge {
-  background: linear-gradient(135deg, #5b8def 0%, #8b7ff4 100%);
+  background: rgba(255, 255, 255, 0.2);
+  backdrop-filter: blur(10px);
   color: #ffffff;
   font-size: 9px;
   font-weight: 700;
   padding: 2px 6px;
   border-radius: 4px;
   letter-spacing: 0.5px;
+  border: 1px solid rgba(255, 255, 255, 0.3);
+}
+
+.sidebar-search {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 12px;
+  background: rgba(255, 255, 255, 0.1);
+  backdrop-filter: blur(10px);
+  border: 1px solid rgba(255, 255, 255, 0.2);
+  border-radius: 8px;
+  transition: all 0.2s ease;
+}
+
+.sidebar-search:hover {
+  background: rgba(255, 255, 255, 0.15);
+  border-color: rgba(255, 255, 255, 0.3);
+}
+
+.sidebar-search input {
+  flex: 1;
+  background: transparent;
+  border: none;
+  outline: none;
+  color: #ffffff;
+  font-size: 13px;
+  font-weight: 500;
+}
+
+.sidebar-search input::placeholder {
+  color: rgba(255, 255, 255, 0.6);
+}
+
+.sidebar-search svg {
+  color: rgba(255, 255, 255, 0.7);
+  flex-shrink: 0;
+}
+
+.sidebar-search kbd {
+  background: rgba(255, 255, 255, 0.2);
+  border: 1px solid rgba(255, 255, 255, 0.3);
+  color: rgba(255, 255, 255, 0.9);
+  font-size: 10px;
+  font-weight: 600;
+  padding: 2px 6px;
+  border-radius: 4px;
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
 }
 
 /* ===== NAVIGATION ===== */
@@ -81,7 +131,7 @@
 .nav-section-title {
   font-size: 11px;
   font-weight: 600;
-  color: #80868b;
+  color: rgba(255, 255, 255, 0.7);
   text-transform: uppercase;
   letter-spacing: 0.8px;
   padding: 8px 12px;
@@ -102,19 +152,22 @@
   border-radius: 8px;
   cursor: pointer;
   transition: all 0.2s ease;
-  color: #bdc1c6;
+  color: rgba(255, 255, 255, 0.85);
   position: relative;
 }
 
 .nav-item:hover {
-  background: #23262e;
-  color: #e8eaed;
+  background: rgba(255, 255, 255, 0.1);
+  backdrop-filter: blur(10px);
+  color: #ffffff;
 }
 
 .nav-item.active {
-  background: rgba(91, 141, 239, 0.15);
-  color: #e8eaed;
-  box-shadow: inset 0 0 0 1px rgba(91, 141, 239, 0.3);
+  background: rgba(255, 255, 255, 0.2);
+  backdrop-filter: blur(10px);
+  color: #ffffff;
+  box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.3);
+  font-weight: 600;
 }
 
 .nav-item.active::before {
@@ -125,8 +178,9 @@
   transform: translateY(-50%);
   width: 3px;
   height: 20px;
-  background: linear-gradient(135deg, #5b8def 0%, #8b7ff4 100%);
+  background: #ffffff;
   border-radius: 0 2px 2px 0;
+  box-shadow: 0 0 8px rgba(255, 255, 255, 0.5);
 }
 
 .nav-item-icon {
@@ -144,7 +198,8 @@
 }
 
 .nav-item-badge {
-  background: #5b8def;
+  background: rgba(255, 255, 255, 0.25);
+  backdrop-filter: blur(10px);
   color: #ffffff;
   font-size: 11px;
   font-weight: 600;
@@ -152,6 +207,7 @@
   border-radius: 10px;
   min-width: 20px;
   text-align: center;
+  border: 1px solid rgba(255, 255, 255, 0.3);
 }
 
 /* Navigation Item Chevron */
@@ -202,15 +258,15 @@
 }
 
 .nav-submenu-item.active {
-  background: linear-gradient(135deg, rgba(59, 130, 246, 0.15), rgba(139, 92, 246, 0.15));
-  color: #60a5fa;
+  background: linear-gradient(135deg, rgba(71, 85, 105, 0.15), rgba(100, 116, 139, 0.15));
+  color: #94a3b8;
   font-weight: 600;
-  border-left: 3px solid #3b82f6;
+  border-left: 3px solid #64748b;
   padding-left: 13px;
 }
 
 .nav-submenu-item.active:hover {
-  background: linear-gradient(135deg, rgba(59, 130, 246, 0.2), rgba(139, 92, 246, 0.2));
+  background: linear-gradient(135deg, rgba(71, 85, 105, 0.2), rgba(100, 116, 139, 0.2));
 }
 
 .submenu-label {
@@ -228,8 +284,8 @@
 }
 
 .nav-submenu-item.active .submenu-count {
-  background: rgba(59, 130, 246, 0.2);
-  color: #60a5fa;
+  background: rgba(71, 85, 105, 0.2);
+  color: #94a3b8;
 }
 
 .nav-submenu-item.loading {
@@ -274,7 +330,7 @@
   flex-direction: column;
   gap: 12px;
   padding-top: 16px;
-  border-top: 1px solid #292d35;
+  border-top: 1px solid rgba(255, 255, 255, 0.1);
 }
 
 .footer-action {
@@ -286,17 +342,18 @@
   border-radius: 8px;
   cursor: pointer;
   transition: all 0.2s ease;
-  color: #9aa0a6;
+  color: rgba(255, 255, 255, 0.8);
 }
 
 .footer-action:hover {
-  background: #23262e;
-  color: #e8eaed;
+  background: rgba(255, 255, 255, 0.1);
+  backdrop-filter: blur(10px);
+  color: #ffffff;
 }
 
 .footer-divider {
   height: 1px;
-  background: #292d35;
+  background: rgba(255, 255, 255, 0.1);
   margin: 4px 0;
 }
 
@@ -312,12 +369,14 @@
 }
 
 .user-profile:hover {
-  background: #23262e;
+  background: rgba(255, 255, 255, 0.1);
+  backdrop-filter: blur(10px);
 }
 
 .user-avatar {
   flex-shrink: 0;
-  border: 2px solid #292d35;
+  border: 2px solid rgba(255, 255, 255, 0.3);
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.2);
 }
 
 .user-info {
@@ -331,7 +390,7 @@
 .user-name {
   font-size: 13px;
   font-weight: 600;
-  color: #e8eaed;
+  color: #ffffff;
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
@@ -341,7 +400,7 @@
 .user-role {
   font-size: 11px;
   font-weight: 500;
-  color: #80868b;
+  color: rgba(255, 255, 255, 0.7);
 }
 
 .logout-btn {
@@ -352,13 +411,14 @@
   height: 28px;
   border-radius: 6px;
   transition: all 0.2s ease;
-  color: #9aa0a6;
+  color: rgba(255, 255, 255, 0.8);
   flex-shrink: 0;
 }
 
 .logout-btn:hover {
-  background: #3c4149;
-  color: #f28b82;
+  background: rgba(239, 68, 68, 0.2);
+  backdrop-filter: blur(10px);
+  color: #fca5a5;
 }
 
 /* Collapse Toggle - Modern Style */
@@ -368,25 +428,27 @@
   justify-content: center;
   height: 40px;
   width: 40px;
-  background: linear-gradient(135deg, #3b82f6 0%, #2563eb 100%);
-  border: none;
+  background: rgba(255, 255, 255, 0.2);
+  backdrop-filter: blur(10px);
+  border: 1px solid rgba(255, 255, 255, 0.3);
   border-radius: 10px;
   cursor: pointer;
   transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
   color: #ffffff;
-  box-shadow: 0 2px 8px rgba(59, 130, 246, 0.3);
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.2);
   margin: 12px auto 0;
 }
 
 .collapse-toggle:hover {
-  background: linear-gradient(135deg, #2563eb 0%, #1e40af 100%);
-  box-shadow: 0 4px 12px rgba(59, 130, 246, 0.5);
+  background: rgba(255, 255, 255, 0.3);
+  backdrop-filter: blur(10px);
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
   transform: scale(1.05);
 }
 
 .collapse-toggle:active {
   transform: scale(0.95);
-  box-shadow: 0 1px 4px rgba(59, 130, 246, 0.3);
+  box-shadow: 0 1px 4px rgba(0, 0, 0, 0.2);
 }
 
 /* ===== COLLAPSED STATE ===== */
@@ -451,12 +513,12 @@
 }
 
 .sidebar-nav::-webkit-scrollbar-thumb {
-  background: #3c4149;
+  background: rgba(255, 255, 255, 0.2);
   border-radius: 2px;
 }
 
 .sidebar-nav::-webkit-scrollbar-thumb:hover {
-  background: #4a4f5a;
+  background: rgba(255, 255, 255, 0.3);
 }
 
 /* ===== RESPONSIVE ===== */
@@ -464,24 +526,28 @@
 
 /* ===== BADGE ===== */
 .ant-badge-count {
-  background: linear-gradient(135deg, #5b8def 0%, #8b7ff4 100%);
-  box-shadow: 0 2px 8px rgba(91, 141, 239, 0.3);
+  background: rgba(255, 255, 255, 0.9);
+  color: #64748b;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.2);
   font-weight: 600;
+  border: 1px solid rgba(255, 255, 255, 0.3);
 }
 
 /* ===== TOOLTIPS ===== */
 .ant-tooltip-inner {
-  background: #2d3039;
-  border: 1px solid #3c4149;
-  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.4);
+  background: rgba(71, 85, 105, 0.95);
+  backdrop-filter: blur(10px);
+  border: 1px solid rgba(255, 255, 255, 0.2);
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
   border-radius: 6px;
   font-size: 12px;
   font-weight: 500;
+  color: #ffffff;
 }
 
 .ant-tooltip-arrow-content {
-  background: #2d3039;
-  border: 1px solid #3c4149;
+  background: rgba(71, 85, 105, 0.95);
+  border: 1px solid rgba(255, 255, 255, 0.2);
 }
 
 /* ===== TYPOGRAPHY ===== */

@@ -4,12 +4,33 @@
    ============================================ */
 
 .group-management-container {
-  min-height: 100vh;
-  background: linear-gradient(to bottom, #fef3c7, #fed7aa);
+  min-height: calc(100vh - 64px);
+  background: linear-gradient(135deg, #1e40af 0%, #2563eb 100%);
   max-width: 100%;
   overflow-x: hidden;
   box-sizing: border-box;
   padding: 24px;
+  position: relative;
+  overflow: hidden;
+}
+
+.group-management-container::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: 
+    radial-gradient(circle at 20% 50%, rgba(30, 64, 175, 0.3) 0%, transparent 50%),
+    radial-gradient(circle at 80% 80%, rgba(255, 255, 255, 0.1) 0%, transparent 50%);
+  pointer-events: none;
+  z-index: 0;
+}
+
+.group-management-container > * {
+  position: relative;
+  z-index: 1;
 }
 
 /* Search Input White Theme */

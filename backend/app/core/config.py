@@ -19,7 +19,7 @@ class Settings(BaseSettings):
     # JWT Configuration
     JWT_SECRET_KEY: str = "your-secret-key"
     JWT_ALGORITHM: str = "HS256"
-    ACCESS_TOKEN_EXPIRE_MINUTES: int = 480  # 8 hours (was 30 minutes)
+    ACCESS_TOKEN_EXPIRE_MINUTES: int = 525600  # 1 year (8760 hours) - for long-term API access
     
     # CORS Configuration
     # For production, set specific origins in .env file

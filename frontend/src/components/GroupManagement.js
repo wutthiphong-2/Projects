@@ -1103,19 +1103,8 @@ const GroupManagement = () => {
   
   return (
     <div className="group-management-container" style={{ padding: '0', margin: '0', minHeight: '100vh', width: '100%' }}>
-      {/* Professional Header */}
-      <Card
-        style={{
-          borderRadius: 0,
-          background: 'linear-gradient(135deg, #f59e0b 0%, #d97706 50%, #ea580c 100%)',
-          border: 'none',
-          boxShadow: 'none',
-          minHeight: '100vh',
-          margin: 0,
-          width: '100%'
-        }}
-        styles={{ body: { padding: '36px 40px 40px 40px', margin: 0 } }}
-      >
+      {/* Header Section */}
+      <header style={{ padding: '24px', marginBottom: '24px' }}>
         <Row justify="space-between" align="middle" style={{ marginBottom: 24 }}>
           <Col>
             <Space size="large" align="center">
@@ -1132,10 +1121,9 @@ const GroupManagement = () => {
                   color: '#ffffff', 
                   margin: 0, 
                   marginBottom: 4, 
-                  fontWeight: 800, 
+                  fontWeight: 700, 
                   fontSize: 32,
-                  textShadow: '0 4px 12px rgba(0, 0, 0, 0.3), 0 2px 4px rgba(0, 0, 0, 0.2)',
-                  letterSpacing: '0.5px'
+                  letterSpacing: '-0.8px'
                 }}>
                   Group Management
                 </div>
@@ -1310,9 +1298,22 @@ const GroupManagement = () => {
             </Space>
           </Col>
         </Row>
+      </header>
 
+      {/* Main Content Area */}
+      <main style={{ padding: '0 24px 24px 24px' }}>
         {/* Search & Filter Section */}
-        <Row gutter={[16, 16]} align="middle" style={{ marginBottom: 24 }}>
+        <Card
+          style={{
+            background: '#ffffff',
+            borderRadius: '16px',
+            padding: '16px 24px',
+            marginBottom: '24px',
+            boxShadow: '0 8px 32px rgba(0, 0, 0, 0.12)',
+            border: 'none'
+          }}
+        >
+          <Row gutter={[16, 16]} align="middle">
           <Col xs={24} md={10}>
             <Search
               placeholder="Search groups (Name, Description...)"
@@ -1320,10 +1321,8 @@ const GroupManagement = () => {
               onSearch={handleSearch}
               size="large"
               style={{
-                borderRadius: 8,
-                border: '2px solid rgba(255, 255, 255, 0.3)'
+                  borderRadius: 8
               }}
-              className="search-input-white"
             />
           </Col>
           <Col xs={12} md={7}>
@@ -1333,9 +1332,8 @@ const GroupManagement = () => {
               size="large"
               value={typeFilter}
               onChange={handleTypeFilterChange}
-              suffixIcon={<FilterOutlined style={{ color: '#fff' }} />}
+                suffixIcon={<FilterOutlined />}
               style={{ width: '100%', borderRadius: 8 }}
-              className="select-white"
             >
               <Option value="all">All Types</Option>
               <Option value="Security">Security</Option>
@@ -1349,9 +1347,8 @@ const GroupManagement = () => {
               size="large"
               value={scopeFilter}
               onChange={handleScopeFilterChange}
-              suffixIcon={<GlobalOutlined style={{ color: '#fff' }} />}
+                suffixIcon={<GlobalOutlined />}
               style={{ width: '100%', borderRadius: 8 }}
-              className="select-white"
             >
               <Option value="all">All Scopes</Option>
               <Option value="Global">Global</Option>
@@ -1360,45 +1357,44 @@ const GroupManagement = () => {
             </Select>
           </Col>
         </Row>
+        </Card>
 
         {/* Statistics Cards */}
         <Row gutter={[16, 16]} style={{ marginBottom: 24 }}>
           <Col xs={12} sm={6} md={4}>
             <div style={{
-              background: 'linear-gradient(135deg, #f59e0b 0%, #d97706 100%)',
+              background: '#ffffff',
               borderRadius: 16,
               padding: '24px',
               textAlign: 'center',
-              border: '2px solid rgba(255, 255, 255, 0.3)',
-              backdropFilter: 'blur(16px)',
-              boxShadow: '0 8px 32px rgba(245, 158, 11, 0.4)',
-              transition: 'all 0.3s ease'
+              border: 'none',
+              borderLeft: '4px solid #f59e0b',
+              boxShadow: '0 8px 32px rgba(0, 0, 0, 0.12)',
+              transition: 'all 0.3s cubic-bezier(0.4, 0, 0.2, 1)'
             }}
             onMouseEnter={(e) => {
-              e.currentTarget.style.transform = 'translateY(-8px)';
-              e.currentTarget.style.boxShadow = '0 12px 40px rgba(245, 158, 11, 0.6)';
+              e.currentTarget.style.transform = 'translateY(-6px) scale(1.02)';
+              e.currentTarget.style.boxShadow = '0 16px 48px rgba(0, 0, 0, 0.18)';
             }}
             onMouseLeave={(e) => {
-              e.currentTarget.style.transform = 'translateY(0)';
-              e.currentTarget.style.boxShadow = '0 8px 32px rgba(245, 158, 11, 0.4)';
+              e.currentTarget.style.transform = 'translateY(0) scale(1)';
+              e.currentTarget.style.boxShadow = '0 8px 32px rgba(0, 0, 0, 0.12)';
             }}
             >
               <div style={{
                 fontSize: 13,
-                color: '#ffffff',
+                color: '#6b7280',
                 textTransform: 'uppercase',
-                letterSpacing: '1px',
-                marginBottom: 14,
-                fontWeight: 700,
-                textShadow: '0 2px 8px rgba(0, 0, 0, 0.3)'
+                letterSpacing: '0.8px',
+                marginBottom: 12,
+                fontWeight: 600
               }}>
-                <TeamOutlined style={{ marginRight: 6 }} /> Total Groups
+                <TeamOutlined style={{ marginRight: 6, color: '#f59e0b' }} /> Total Groups
               </div>
               <div style={{ 
-                fontSize: 42, 
-                fontWeight: 800, 
-                color: '#ffffff',
-                textShadow: '0 4px 16px rgba(0, 0, 0, 0.3)'
+                fontSize: 32, 
+                fontWeight: 700, 
+                color: '#f59e0b'
               }}>
                 {stats.total}
               </div>
@@ -1406,40 +1402,38 @@ const GroupManagement = () => {
           </Col>
           <Col xs={12} sm={6} md={4}>
             <div style={{
-              background: 'linear-gradient(135deg, #ef4444 0%, #dc2626 100%)',
+              background: '#ffffff',
               borderRadius: 16,
               padding: '24px',
               textAlign: 'center',
-              border: '2px solid rgba(255, 255, 255, 0.3)',
-              backdropFilter: 'blur(16px)',
-              boxShadow: '0 8px 32px rgba(239, 68, 68, 0.4)',
-              transition: 'all 0.3s ease'
+              border: 'none',
+              borderLeft: '4px solid #ef4444',
+              boxShadow: '0 8px 32px rgba(0, 0, 0, 0.12)',
+              transition: 'all 0.3s cubic-bezier(0.4, 0, 0.2, 1)'
             }}
             onMouseEnter={(e) => {
-              e.currentTarget.style.transform = 'translateY(-8px)';
-              e.currentTarget.style.boxShadow = '0 12px 40px rgba(239, 68, 68, 0.6)';
+              e.currentTarget.style.transform = 'translateY(-6px) scale(1.02)';
+              e.currentTarget.style.boxShadow = '0 16px 48px rgba(0, 0, 0, 0.18)';
             }}
             onMouseLeave={(e) => {
-              e.currentTarget.style.transform = 'translateY(0)';
-              e.currentTarget.style.boxShadow = '0 8px 32px rgba(239, 68, 68, 0.4)';
+              e.currentTarget.style.transform = 'translateY(0) scale(1)';
+              e.currentTarget.style.boxShadow = '0 8px 32px rgba(0, 0, 0, 0.12)';
             }}
             >
               <div style={{
                 fontSize: 13,
-                color: '#ffffff',
+                color: '#6b7280',
                 textTransform: 'uppercase',
-                letterSpacing: '1px',
-                marginBottom: 14,
-                fontWeight: 700,
-                textShadow: '0 2px 8px rgba(0, 0, 0, 0.3)'
+                letterSpacing: '0.8px',
+                marginBottom: 12,
+                fontWeight: 600
               }}>
-                <SafetyCertificateOutlined style={{ marginRight: 6 }} /> Security
+                <SafetyCertificateOutlined style={{ marginRight: 6, color: '#ef4444' }} /> Security
               </div>
               <div style={{ 
-                fontSize: 42, 
-                fontWeight: 800, 
-                color: '#ffffff',
-                textShadow: '0 4px 16px rgba(0, 0, 0, 0.3)'
+                fontSize: 32, 
+                fontWeight: 700, 
+                color: '#ef4444'
               }}>
                 {stats.security}
               </div>
@@ -1447,40 +1441,38 @@ const GroupManagement = () => {
           </Col>
           <Col xs={12} sm={6} md={4}>
             <div style={{
-              background: 'linear-gradient(135deg, #3b82f6 0%, #2563eb 100%)',
+              background: '#ffffff',
               borderRadius: 16,
               padding: '24px',
               textAlign: 'center',
-              border: '2px solid rgba(255, 255, 255, 0.3)',
-              backdropFilter: 'blur(16px)',
-              boxShadow: '0 8px 32px rgba(59, 130, 246, 0.4)',
-              transition: 'all 0.3s ease'
+              border: 'none',
+              borderLeft: '4px solid #3b82f6',
+              boxShadow: '0 8px 32px rgba(0, 0, 0, 0.12)',
+              transition: 'all 0.3s cubic-bezier(0.4, 0, 0.2, 1)'
             }}
             onMouseEnter={(e) => {
-              e.currentTarget.style.transform = 'translateY(-8px)';
-              e.currentTarget.style.boxShadow = '0 12px 40px rgba(59, 130, 246, 0.6)';
+              e.currentTarget.style.transform = 'translateY(-6px) scale(1.02)';
+              e.currentTarget.style.boxShadow = '0 16px 48px rgba(0, 0, 0, 0.18)';
             }}
             onMouseLeave={(e) => {
-              e.currentTarget.style.transform = 'translateY(0)';
-              e.currentTarget.style.boxShadow = '0 8px 32px rgba(59, 130, 246, 0.4)';
+              e.currentTarget.style.transform = 'translateY(0) scale(1)';
+              e.currentTarget.style.boxShadow = '0 8px 32px rgba(0, 0, 0, 0.12)';
             }}
             >
               <div style={{
                 fontSize: 13,
-                color: '#ffffff',
+                color: '#6b7280',
                 textTransform: 'uppercase',
-                letterSpacing: '1px',
-                marginBottom: 14,
-                fontWeight: 700,
-                textShadow: '0 2px 8px rgba(0, 0, 0, 0.3)'
+                letterSpacing: '0.8px',
+                marginBottom: 12,
+                fontWeight: 600
               }}>
-                <GlobalOutlined style={{ marginRight: 6 }} /> Distribution
+                <GlobalOutlined style={{ marginRight: 6, color: '#3b82f6' }} /> Distribution
               </div>
               <div style={{ 
-                fontSize: 42, 
-                fontWeight: 800, 
-                color: '#ffffff',
-                textShadow: '0 4px 16px rgba(0, 0, 0, 0.3)'
+                fontSize: 32, 
+                fontWeight: 700, 
+                color: '#3b82f6'
               }}>
                 {stats.distribution}
               </div>
@@ -1488,40 +1480,38 @@ const GroupManagement = () => {
           </Col>
           <Col xs={12} sm={6} md={4}>
             <div style={{
-              background: 'linear-gradient(135deg, #10b981 0%, #059669 100%)',
+              background: '#ffffff',
               borderRadius: 16,
               padding: '24px',
               textAlign: 'center',
-              border: '2px solid rgba(255, 255, 255, 0.3)',
-              backdropFilter: 'blur(16px)',
-              boxShadow: '0 8px 32px rgba(16, 185, 129, 0.4)',
-              transition: 'all 0.3s ease'
+              border: 'none',
+              borderLeft: '4px solid #10b981',
+              boxShadow: '0 8px 32px rgba(0, 0, 0, 0.12)',
+              transition: 'all 0.3s cubic-bezier(0.4, 0, 0.2, 1)'
             }}
             onMouseEnter={(e) => {
-              e.currentTarget.style.transform = 'translateY(-8px)';
-              e.currentTarget.style.boxShadow = '0 12px 40px rgba(16, 185, 129, 0.6)';
+              e.currentTarget.style.transform = 'translateY(-6px) scale(1.02)';
+              e.currentTarget.style.boxShadow = '0 16px 48px rgba(0, 0, 0, 0.18)';
             }}
             onMouseLeave={(e) => {
-              e.currentTarget.style.transform = 'translateY(0)';
-              e.currentTarget.style.boxShadow = '0 8px 32px rgba(16, 185, 129, 0.4)';
+              e.currentTarget.style.transform = 'translateY(0) scale(1)';
+              e.currentTarget.style.boxShadow = '0 8px 32px rgba(0, 0, 0, 0.12)';
             }}
             >
               <div style={{
                 fontSize: 13,
-                color: '#ffffff',
+                color: '#6b7280',
                 textTransform: 'uppercase',
-                letterSpacing: '1px',
-                marginBottom: 14,
-                fontWeight: 700,
-                textShadow: '0 2px 8px rgba(0, 0, 0, 0.3)'
+                letterSpacing: '0.8px',
+                marginBottom: 12,
+                fontWeight: 600
               }}>
-                <GlobalOutlined style={{ marginRight: 6 }} /> Global
+                <GlobalOutlined style={{ marginRight: 6, color: '#10b981' }} /> Global
               </div>
               <div style={{ 
-                fontSize: 42, 
-                fontWeight: 800, 
-                color: '#ffffff',
-                textShadow: '0 4px 16px rgba(0, 0, 0, 0.3)'
+                fontSize: 32, 
+                fontWeight: 700, 
+                color: '#10b981'
               }}>
                 {stats.global}
               </div>
@@ -1529,40 +1519,38 @@ const GroupManagement = () => {
           </Col>
           <Col xs={12} sm={6} md={4}>
             <div style={{
-              background: 'linear-gradient(135deg, #3b82f6 0%, #2563eb 100%)',
+              background: '#ffffff',
               borderRadius: 16,
               padding: '24px',
               textAlign: 'center',
-              border: '2px solid rgba(255, 255, 255, 0.3)',
-              backdropFilter: 'blur(16px)',
-              boxShadow: '0 8px 32px rgba(59, 130, 246, 0.4)',
-              transition: 'all 0.3s ease'
+              border: 'none',
+              borderLeft: '4px solid #3b82f6',
+              boxShadow: '0 8px 32px rgba(0, 0, 0, 0.12)',
+              transition: 'all 0.3s cubic-bezier(0.4, 0, 0.2, 1)'
             }}
             onMouseEnter={(e) => {
-              e.currentTarget.style.transform = 'translateY(-8px)';
-              e.currentTarget.style.boxShadow = '0 12px 40px rgba(59, 130, 246, 0.6)';
+              e.currentTarget.style.transform = 'translateY(-6px) scale(1.02)';
+              e.currentTarget.style.boxShadow = '0 16px 48px rgba(0, 0, 0, 0.18)';
             }}
             onMouseLeave={(e) => {
-              e.currentTarget.style.transform = 'translateY(0)';
-              e.currentTarget.style.boxShadow = '0 8px 32px rgba(59, 130, 246, 0.4)';
+              e.currentTarget.style.transform = 'translateY(0) scale(1)';
+              e.currentTarget.style.boxShadow = '0 8px 32px rgba(0, 0, 0, 0.12)';
             }}
             >
               <div style={{
                 fontSize: 13,
-                color: '#ffffff',
+                color: '#6b7280',
                 textTransform: 'uppercase',
-                letterSpacing: '1px',
-                marginBottom: 14,
-                fontWeight: 700,
-                textShadow: '0 2px 8px rgba(0, 0, 0, 0.3)'
+                letterSpacing: '0.8px',
+                marginBottom: 12,
+                fontWeight: 600
               }}>
-                <GlobalOutlined style={{ marginRight: 6 }} /> Domain Local
+                <GlobalOutlined style={{ marginRight: 6, color: '#3b82f6' }} /> Domain Local
               </div>
               <div style={{ 
-                fontSize: 42, 
-                fontWeight: 800, 
-                color: '#ffffff',
-                textShadow: '0 4px 16px rgba(0, 0, 0, 0.3)'
+                fontSize: 32, 
+                fontWeight: 700, 
+                color: '#3b82f6'
               }}>
                 {stats.domainLocal}
               </div>
@@ -1570,40 +1558,38 @@ const GroupManagement = () => {
           </Col>
           <Col xs={12} sm={6} md={4}>
             <div style={{
-              background: 'linear-gradient(135deg, #8b5cf6 0%, #7c3aed 100%)',
+              background: '#ffffff',
               borderRadius: 16,
               padding: '24px',
               textAlign: 'center',
-              border: '2px solid rgba(255, 255, 255, 0.3)',
-              backdropFilter: 'blur(16px)',
-              boxShadow: '0 8px 32px rgba(139, 92, 246, 0.4)',
-              transition: 'all 0.3s ease'
+              border: 'none',
+              borderLeft: '4px solid #8b5cf6',
+              boxShadow: '0 8px 32px rgba(0, 0, 0, 0.12)',
+              transition: 'all 0.3s cubic-bezier(0.4, 0, 0.2, 1)'
             }}
             onMouseEnter={(e) => {
-              e.currentTarget.style.transform = 'translateY(-8px)';
-              e.currentTarget.style.boxShadow = '0 12px 40px rgba(139, 92, 246, 0.6)';
+              e.currentTarget.style.transform = 'translateY(-6px) scale(1.02)';
+              e.currentTarget.style.boxShadow = '0 16px 48px rgba(0, 0, 0, 0.18)';
             }}
             onMouseLeave={(e) => {
-              e.currentTarget.style.transform = 'translateY(0)';
-              e.currentTarget.style.boxShadow = '0 8px 32px rgba(139, 92, 246, 0.4)';
+              e.currentTarget.style.transform = 'translateY(0) scale(1)';
+              e.currentTarget.style.boxShadow = '0 8px 32px rgba(0, 0, 0, 0.12)';
             }}
             >
               <div style={{
                 fontSize: 13,
-                color: '#ffffff',
+                color: '#6b7280',
                 textTransform: 'uppercase',
-                letterSpacing: '1px',
-                marginBottom: 14,
-                fontWeight: 700,
-                textShadow: '0 2px 8px rgba(0, 0, 0, 0.3)'
+                letterSpacing: '0.8px',
+                marginBottom: 12,
+                fontWeight: 600
               }}>
-                <UserOutlined style={{ marginRight: 6 }} /> Avg Members
+                <UserOutlined style={{ marginRight: 6, color: '#8b5cf6' }} /> Avg Members
               </div>
               <div style={{ 
-                fontSize: 42, 
-                fontWeight: 800, 
-                color: '#ffffff',
-                textShadow: '0 4px 16px rgba(0, 0, 0, 0.3)'
+                fontSize: 32, 
+                fontWeight: 700, 
+                color: '#8b5cf6'
               }}>
                 {stats.avgMembers}
               </div>
@@ -1611,14 +1597,19 @@ const GroupManagement = () => {
           </Col>
         </Row>
 
-        {/* Content Section with White Background */}
-        <div style={{
+        {/* Table Section */}
+        <Card
+          style={{
           background: '#ffffff',
-          borderRadius: '12px',
+            borderRadius: '16px',
           padding: '24px',
-          boxShadow: '0 4px 12px rgba(0, 0, 0, 0.1)'
-        }}>
+            boxShadow: '0 8px 32px rgba(0, 0, 0, 0.12)',
+            border: 'none'
+          }}
+          styles={{ body: { padding: 0 } }}
+        >
           {/* Professional Table */}
+          <div style={{ padding: '24px' }}>
           <Table
             columns={columns}
             dataSource={filteredGroups}
@@ -1640,6 +1631,7 @@ const GroupManagement = () => {
           />
         </div>
       </Card>
+      </main>
 
       {/* Create Group Modal */}
       <Modal
@@ -1788,7 +1780,7 @@ const GroupManagement = () => {
                 size="large"
                 optionFilterProp="label"
                 filterOption={(input, option) =>
-                  (option?.label ?? '').toLowerCase().includes(input.toLowerCase())
+                  String(option?.label ?? '').toLowerCase().includes(String(input || '').toLowerCase())
                 }
                 options={allUsers.map(user => ({
                   value: user.dn,

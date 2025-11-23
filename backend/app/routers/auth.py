@@ -9,7 +9,7 @@ import logging
 
 from app.core.config import settings
 from app.core.database import get_ldap_connection
-from app.core.exceptions import UnauthorizedError
+from app.core.exceptions import UnauthorizedError, ForbiddenError
 from app.schemas.auth import LoginRequest, LoginResponse, TokenData, TokenVerifyResponse
 
 router = APIRouter()
@@ -52,6 +52,8 @@ def verify_token_or_api_key(
     """
     Verify either JWT token or API key
     Tries JWT first, then falls back to API key
+    
+    Returns TokenData with username or api_key:id format
     """
     if not credentials:
         raise UnauthorizedError("Authentication required. Provide JWT token or API key in Authorization header")
@@ -74,6 +76,9 @@ def verify_token_or_api_key(
         from app.core.exceptions import UnauthorizedError as APIUnauthorizedError
         key_info = api_key_auth.verify_api_key(credentials, request)
         if key_info:
+            # Store key_info in request state for permission checking
+            if request:
+                request.state.api_key_info = key_info
             # Return TokenData with API key info
             return TokenData(username=f"api_key:{key_info['id']}")
     except APIUnauthorizedError as e:
@@ -83,6 +88,47 @@ def verify_token_or_api_key(
         logger.debug(f"API key verification failed: {e}")
     
     raise UnauthorizedError("Invalid authentication token or API key")
+
+
+def check_api_key_permission(
+    token_data: TokenData = Depends(verify_token_or_api_key),
+    request: FastAPIRequest = None
+):
+    """
+    Check API key permissions for the requested endpoint
+    Only checks permissions if using API key (not JWT token)
+    
+    This is a dependency that should be used alongside verify_token_or_api_key
+    """
+    # If using JWT token (not API key), skip permission check (JWT has full access)
+    if not token_data.username.startswith("api_key:"):
+        return None
+    
+    # Get API key info from request state (set by verify_token_or_api_key)
+    key_info = getattr(request.state, 'api_key_info', None) if request else None
+    if not key_info:
+        logger.warning("API key info not found in request state")
+        return None
+    
+    # Check permissions for this endpoint
+    path = request.url.path if request else ""
+    method = request.method if request else "GET"
+    
+    from app.core.permissions import has_permission
+    
+    api_key_permissions = key_info.get("permissions", [])
+    has_access, required_scope = has_permission(api_key_permissions, path, method)
+    
+    if not has_access:
+        if required_scope:
+            raise ForbiddenError(
+                f"API key does not have required permission: {required_scope}. "
+                f"Current permissions: {api_key_permissions}"
+            )
+        else:
+            raise ForbiddenError("Access denied for this endpoint")
+    
+    return key_info
 
 
 def get_client_ip(request: Request) -> Optional[str]:

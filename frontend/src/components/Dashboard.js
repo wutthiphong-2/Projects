@@ -116,7 +116,8 @@ const Dashboard = () => {
     while (keepFetching) {
       const response = await axios.get(`${config.apiUrl}/api/users/`, {
         headers: getAuthHeaders(),
-        params: { page: currentPage, page_size: PAGE_SIZE }
+        params: { page: currentPage, page_size: PAGE_SIZE },
+        timeout: 0 // No timeout
       });
 
       const pageData = response.data || [];
@@ -149,20 +150,25 @@ const Dashboard = () => {
     try {
       const [countsResponse, groupsResponse, ousResponse, departmentsResponse, activitiesResponse] = await Promise.all([
         axios.get(`${config.apiUrl}/api/users/stats`, {
-          headers: getAuthHeaders()
+          headers: getAuthHeaders(),
+          timeout: 0 // No timeout
         }),
-        axios.get(`${config.apiUrl}/api/groups/`, { 
+        axios.get(`${config.apiUrl}/api/groups`, { 
           headers: getAuthHeaders(), 
-          params: { page: 1, page_size: 1000 } 
+          params: { page: 1, page_size: 1000 },
+          timeout: 0 // No timeout
         }),
-        axios.get(`${config.apiUrl}/api/ous/`, { 
+        axios.get(`${config.apiUrl}/api/ous`, { 
           headers: getAuthHeaders(), 
-          params: { page: 1, page_size: 1000 } 
+          params: { page: 1, page_size: 1000 },
+          timeout: 0 // No timeout
         }),
         axios.get(`${config.apiUrl}/api/users/departments`, { 
-          headers: getAuthHeaders() 
+          headers: getAuthHeaders(),
+          timeout: 0 // No timeout
         }),
         axios.get(`${config.apiUrl}/api/activity-logs/recent`, {
+          timeout: 0, // No timeout
           headers: getAuthHeaders(),
           params: { limit: 10 }
         }).catch(() => ({ data: [] }))
@@ -193,7 +199,8 @@ const Dashboard = () => {
     try {
       const response = await axios.get(`${config.apiUrl}/api/users/login-insights/recent`, {
         headers: getAuthHeaders(),
-        params: { limit: 10 }
+        params: { limit: 10 },
+        timeout: 0 // No timeout
       });
       setRecentLogins(response.data || []);
     } catch (error) {
@@ -209,7 +216,8 @@ const Dashboard = () => {
     try {
       const response = await axios.get(`${config.apiUrl}/api/users/login-insights/never`, {
         headers: getAuthHeaders(),
-        params: { limit: 10 }
+        params: { limit: 10 },
+        timeout: 0 // No timeout
       });
       setSingleLoginUsers(response.data || []);
     } catch (error) {
@@ -225,7 +233,8 @@ const Dashboard = () => {
       const [usersResponse] = await Promise.all([
         axios.get(`${config.apiUrl}/api/users/`, { 
           headers: getAuthHeaders(), 
-          params: { page: 1, page_size: 1000 } 
+          params: { page: 1, page_size: 1000 },
+          timeout: 0 // No timeout
         })
       ]);
 
@@ -261,7 +270,8 @@ const Dashboard = () => {
     try {
       const response = await axios.get(`${config.apiUrl}/api/users/`, { 
         headers: getAuthHeaders(), 
-        params: { page: 1, page_size: 1000 } 
+        params: { page: 1, page_size: 1000 },
+        timeout: 0 // No timeout
       });
 
       const users = response.data;
@@ -336,11 +346,19 @@ const Dashboard = () => {
     <div className="dashboard-container">
       {/* Header */}
       <div className="dashboard-header">
-        <Title level={2} className="dashboard-title">
-          <BarChartOutlined style={{ marginRight: 12, color: '#3b82f6' }} />
+        <Title level={3} className="dashboard-title" style={{ 
+          marginBottom: 8,
+          background: 'linear-gradient(135deg, #ffffff 0%, #f0f0f0 100%)',
+          WebkitBackgroundClip: 'text',
+          backgroundClip: 'text',
+          WebkitTextFillColor: 'transparent',
+          fontWeight: 700,
+          fontSize: '32px'
+        }}>
+          <BarChartOutlined style={{ marginRight: 12, color: 'rgba(255, 255, 255, 0.9)' }} />
           Active Directory Dashboard
         </Title>
-        <Text className="dashboard-subtitle">
+        <Text className="dashboard-subtitle" style={{ fontSize: '15px', fontWeight: 500 }}>
           System Overview and Usage Statistics
         </Text>
       </div>
@@ -352,8 +370,8 @@ const Dashboard = () => {
             <Statistic
               title="Total Users"
               value={stats.totalUsers}
-              prefix={<UserOutlined />}
-              valueStyle={{ color: '#3b82f6', fontSize: '28px', fontWeight: '600' }}
+              prefix={<UserOutlined style={{ fontSize: '28px' }} />}
+              valueStyle={{ fontSize: '32px', fontWeight: 700 }}
             />
             <Progress 
               percent={stats.totalUsers > 0 ? Math.round((stats.enabledUsers / stats.totalUsers) * 100) : 0}
@@ -363,12 +381,12 @@ const Dashboard = () => {
               showInfo={false}
             />
             <div className="stat-description">
-              <Space split={<span>•</span>} size="small">
-                <Text type="success">
-                  <CheckCircleOutlined /> {stats.enabledUsers} Enabled
+              <Space split={<span style={{ color: '#9ca3af' }}>•</span>} size="small">
+                <Text style={{ color: '#374151', fontSize: '13px' }}>
+                  <CheckCircleOutlined style={{ color: '#10b981' }} /> {stats.enabledUsers} Enabled
                 </Text>
-                <Text type="danger">
-                  <StopOutlined /> {stats.disabledUsers} Disabled
+                <Text style={{ color: '#374151', fontSize: '13px' }}>
+                  <StopOutlined style={{ color: '#ef4444' }} /> {stats.disabledUsers} Disabled
                 </Text>
               </Space>
             </div>
@@ -380,12 +398,12 @@ const Dashboard = () => {
             <Statistic
               title="Total Groups"
               value={stats.totalGroups}
-              prefix={<TeamOutlined />}
-              valueStyle={{ color: '#10b981', fontSize: '28px', fontWeight: '600' }}
+              prefix={<TeamOutlined style={{ fontSize: '28px' }} />}
+              valueStyle={{ fontSize: '32px', fontWeight: 700 }}
             />
             <div className="stat-description" style={{ marginTop: '12px' }}>
-              <Text type="secondary">
-                <TeamOutlined /> Security & Distribution Groups
+              <Text style={{ color: '#374151', fontSize: '13px' }}>
+                <TeamOutlined style={{ color: '#11998e' }} /> Security & Distribution Groups
               </Text>
             </div>
           </Card>
@@ -396,12 +414,12 @@ const Dashboard = () => {
             <Statistic
               title="Organizational Units"
               value={stats.totalOUs}
-              prefix={<FolderOutlined />}
-              valueStyle={{ color: '#f59e0b', fontSize: '28px', fontWeight: '600' }}
+              prefix={<FolderOutlined style={{ fontSize: '28px' }} />}
+              valueStyle={{ fontSize: '32px', fontWeight: 700 }}
             />
             <div className="stat-description" style={{ marginTop: '12px' }}>
-              <Text type="secondary">
-                <FolderOutlined /> Units in Structure
+              <Text style={{ color: '#374151', fontSize: '13px' }}>
+                <FolderOutlined style={{ color: '#f093fb' }} /> Units in Structure
               </Text>
             </div>
           </Card>
@@ -412,12 +430,12 @@ const Dashboard = () => {
             <Statistic
               title="Total Departments"
               value={stats.totalDepartments}
-              prefix={<BarChartOutlined />}
-              valueStyle={{ color: '#06b6d4', fontSize: '28px', fontWeight: '600' }}
+              prefix={<BarChartOutlined style={{ fontSize: '28px' }} />}
+              valueStyle={{ fontSize: '32px', fontWeight: 700 }}
             />
             <div className="stat-description" style={{ marginTop: '12px' }}>
-              <Text type="secondary">
-                <BankOutlined /> Active Departments
+              <Text style={{ color: '#374151', fontSize: '13px' }}>
+                <BankOutlined style={{ color: '#fa709a' }} /> Active Departments
               </Text>
             </div>
           </Card>

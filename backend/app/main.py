@@ -15,6 +15,7 @@ from app.routers import groups as groups_router
 from app.routers import ous as ous_router
 from app.routers import activity_logs as activity_logs_router
 from app.routers import api_docs as api_docs_router
+from app.routers import api_keys as api_keys_router
 from app.core.rate_limit_middleware import RateLimitMiddleware
 from app.core.api_logging_middleware import APILoggingMiddleware
 from app.core.response_headers_middleware import ResponseHeadersMiddleware
@@ -177,6 +178,7 @@ app.include_router(groups_router.router, prefix="/api/groups", tags=["groups"])
 app.include_router(ous_router.router, prefix="/api/ous", tags=["ous"])
 app.include_router(activity_logs_router.router, prefix="/api/activity-logs", tags=["activity-logs"])
 app.include_router(api_docs_router.router, prefix="/api/docs", tags=["api-docs"])
+app.include_router(api_keys_router.router, prefix="/api/api-keys", tags=["api-keys"])
 
 # Note: API versioning removed - using non-versioned endpoints only
 # If versioning is needed in the future, create separate routers for each version

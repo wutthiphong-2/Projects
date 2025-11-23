@@ -33,7 +33,7 @@ def format_ou_data(entry: tuple) -> Dict[str, Any]:
 
 # Routes
 @router.get(
-    "/",
+    "",
     response_model=Union[PaginatedResponse[OUResponse], List[OUResponse]],
     summary="Get all OUs",
     description="Retrieve a paginated list of Organizational Units from Active Directory with search capabilities",
@@ -286,7 +286,7 @@ async def get_ou(dn: str, token_data = Depends(verify_token)):
         logger.error(f"Error getting OU {dn}: {e}")
         raise InternalServerError("Failed to retrieve OU")
 
-@router.post("/", response_model=OUCreateResponse, status_code=status.HTTP_201_CREATED)
+@router.post("", response_model=OUCreateResponse, status_code=status.HTTP_201_CREATED)
 async def create_ou(ou_data: OUCreate, request: Request, token_data = Depends(verify_token)):
     """Create new Organizational Unit in Active Directory"""
     ldap_conn = get_ldap_connection()

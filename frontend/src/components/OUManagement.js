@@ -152,7 +152,8 @@ const OUManagement = () => {
         
         const response = await axios.get(url, {
           params: { page, page_size: pageSize },
-          headers: getAuthHeaders()
+          headers: getAuthHeaders(),
+          timeout: 0 // No timeout
         });
         
         console.log(`   ✅ Page ${page}: Got ${response.data?.results?.length || response.data?.length || 0} items`);
@@ -192,9 +193,9 @@ const OUManagement = () => {
       // Fetch ข้อมูล
       console.log('📥 Step 1: Fetching data from APIs...');
       const [ous, users, groups] = await Promise.all([
-        fetchAllData('/api/ous/'),
+        fetchAllData('/api/ous'),
         fetchAllData('/api/users/'),
-        fetchAllData('/api/groups/')
+        fetchAllData('/api/groups')
       ]);
       
       console.log('');

@@ -161,7 +161,16 @@ class APIKeyManager:
             now = datetime.now(timezone.utc).isoformat()
             expires_at_str = expires_at.isoformat() if expires_at else None
             
-            permissions_json = json.dumps(permissions or [])
+            # Validate and clean permissions - filter out invalid values
+            clean_permissions = []
+            if permissions:
+                for p in permissions:
+                    if isinstance(p, str) and ':' in p and len(p) > 3:
+                        clean_permissions.append(p)
+                    else:
+                        logger.warning(f"Invalid permission format ignored: {p}")
+            
+            permissions_json = json.dumps(clean_permissions)
             ip_whitelist_json = json.dumps(ip_whitelist or [])
             
             conn = sqlite3.connect(str(self.db_path))
@@ -190,7 +199,7 @@ class APIKeyManager:
                 "created_by": created_by,
                 "created_at": now,
                 "expires_at": expires_at_str,
-                "permissions": permissions or [],
+                "permissions": clean_permissions,
                 "rate_limit": rate_limit,
                 "ip_whitelist": ip_whitelist or [],
                 "description": description
@@ -280,8 +289,17 @@ class APIKeyManager:
             for row in rows:
                 # Parse JSON fields safely
                 try:
-                    permissions = json.loads(row[6] or "[]") if row[6] else []
-                except:
+                    if row[6]:
+                        parsed = json.loads(row[6])
+                        # Ensure it's a list and filter out invalid values
+                        if isinstance(parsed, list):
+                            permissions = [p for p in parsed if isinstance(p, str) and ':' in p and len(p) > 3]
+                        else:
+                            permissions = []
+                    else:
+                        permissions = []
+                except Exception as e:
+                    logger.warning(f"Failed to parse permissions: {e}")
                     permissions = []
                 
                 try:
@@ -332,7 +350,15 @@ class APIKeyManager:
             
             # Parse JSON fields safely
             try:
-                permissions = json.loads(row[6] or "[]") if row[6] else []
+                if row[6]:
+                    parsed = json.loads(row[6])
+                    # Ensure it's a list and filter out invalid values
+                    if isinstance(parsed, list):
+                        permissions = [p for p in parsed if isinstance(p, str) and ':' in p and len(p) > 3]
+                    else:
+                        permissions = []
+                else:
+                    permissions = []
             except Exception as e:
                 logger.warning(f"Failed to parse permissions for key {key_id}: {e}")
                 permissions = []
@@ -364,6 +390,33 @@ class APIKeyManager:
         except Exception as e:
             logger.error(f"❌ Error getting API key: {e}")
             return None
+    
+    def regenerate_api_key(self, key_id: str) -> tuple[str, str]:
+        """
+        Regenerate API key for existing key_id
+        Returns: (api_key, key_hash)
+        """
+        api_key, key_hash = self.generate_api_key()
+        key_prefix = api_key[:12]  # tbkk_xxxxx for display
+        
+        try:
+            conn = sqlite3.connect(str(self.db_path))
+            cursor = conn.cursor()
+            
+            cursor.execute("""
+                UPDATE api_keys
+                SET key_hash = ?, key_prefix = ?
+                WHERE id = ?
+            """, (key_hash, key_prefix, key_id))
+            
+            conn.commit()
+            conn.close()
+            
+            logger.info(f"✅ API Key regenerated: {key_id}")
+            return api_key, key_hash
+        except Exception as e:
+            logger.error(f"❌ Error regenerating API key: {e}")
+            raise
     
     def update_api_key(
         self,
