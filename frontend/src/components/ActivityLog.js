@@ -82,14 +82,14 @@ const ActivityLog = () => {
   const ACTION_CONFIG = {
     // Web-based actions (สีเขียว/น้ำเงิน/แดง)
     user_create: { icon: <UserAddOutlined />, color: '#10b981', label: 'สร้างผู้ใช้ (Web)' },
-    user_update: { icon: <EditOutlined />, color: '#3b82f6', label: 'แก้ไขผู้ใช้ (Web)' },
+    user_update: { icon: <EditOutlined />, color: '#64748b', label: 'แก้ไขผู้ใช้ (Web)' },
     user_delete: { icon: <DeleteOutlined />, color: '#ef4444', label: 'ลบผู้ใช้ (Web)' },
     password_reset: { icon: <KeyOutlined />, color: '#f59e0b', label: 'รีเซ็ตรหัสผ่าน (Web)' },
     user_status_change: { icon: <SwapOutlined />, color: '#8b5cf6', label: 'เปลี่ยนสถานะ (Web)' },
     group_member_add: { icon: <UsergroupAddOutlined />, color: '#10b981', label: 'เพิ่มสมาชิก (Web)' },
     group_member_remove: { icon: <UsergroupDeleteOutlined />, color: '#ef4444', label: 'ลบสมาชิก (Web)' },
     ou_create: { icon: <FolderAddOutlined />, color: '#10b981', label: 'สร้าง OU (Web)' },
-    ou_update: { icon: <EditOutlined />, color: '#3b82f6', label: 'แก้ไข OU (Web)' },
+    ou_update: { icon: <EditOutlined />, color: '#64748b', label: 'แก้ไข OU (Web)' },
     ou_delete: { icon: <FolderOutlined />, color: '#ef4444', label: 'ลบ OU (Web)' },
   };
 
@@ -343,13 +343,13 @@ const ActivityLog = () => {
             <Space direction="vertical" size={4} style={{ width: '100%' }}>
               {details.changes.map((change, idx) => (
                 <div key={idx} style={{ 
-                  background: '#f0f9ff', 
+                  background: '#f1f5f9', 
                   padding: '8px 12px', 
                   borderRadius: 6,
-                  border: '1px solid #bfdbfe'
+                  border: '1px solid #cbd5e1'
                 }}>
                   <Space direction="vertical" size={2} style={{ width: '100%' }}>
-                    <Text strong style={{ fontSize: 12, color: '#1e40af' }}>
+                    <Text strong style={{ fontSize: 12, color: '#475569' }}>
                       {getFieldLabel(change.field)}
                     </Text>
                     <div style={{ fontSize: 11 }}>
@@ -399,7 +399,7 @@ const ActivityLog = () => {
   return (
     <div className="activity-log-container">
       {/* Header Section */}
-      <header style={{ padding: '0', marginBottom: '24px' }}>
+      <header style={{ padding: '0', marginBottom: '24px', background: 'transparent' }}>
         <Row gutter={[24, 16]} align="middle" style={{ marginBottom: '24px' }}>
             <Col xs={24} md={12}>
               <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
@@ -409,20 +409,27 @@ const ActivityLog = () => {
                 padding: '16px',
                   backdropFilter: 'blur(10px)'
                 }}>
-                <BarChartOutlined style={{ fontSize: 44, color: '#ffffff' }} />
+                <BarChartOutlined style={{ fontSize: 44, color: '#ffffff', filter: 'drop-shadow(0 2px 4px rgba(0, 0, 0, 0.2))' }} />
               </div>
               <div>
-                <div style={{ 
-                  color: '#ffffff',
+                <Title level={1} style={{ 
                   margin: 0, 
                   marginBottom: 4, 
-                  fontWeight: 700, 
                   fontSize: 32,
-                  letterSpacing: '-0.8px'
+                  letterSpacing: '-0.8px',
+                  background: 'linear-gradient(135deg, #ffffff 0%, #e2e8f0 100%)',
+                  WebkitBackgroundClip: 'text',
+                  WebkitTextFillColor: 'transparent',
+                  backgroundClip: 'text'
                 }}>
                   Activity Log
-                </div>
-                <Text style={{ color: 'rgba(255, 255, 255, 0.9)', fontSize: 15, fontWeight: 500 }}>
+                </Title>
+                <Text style={{ 
+                  color: '#ffffff', 
+                  fontSize: 15, 
+                  fontWeight: 500,
+                  textShadow: '0 2px 4px rgba(0, 0, 0, 0.2)'
+                }}>
                     ติดตามและตรวจสอบกิจกรรมทั้งหมดในระบบ
                   </Text>
                 </div>
@@ -440,7 +447,7 @@ const ActivityLog = () => {
                 padding: '24px',
                 textAlign: 'center',
                 border: 'none',
-                borderLeft: '4px solid #2563eb',
+                borderLeft: '4px solid #64748b',
                 boxShadow: '0 8px 32px rgba(0, 0, 0, 0.12)',
                 transition: 'all 0.3s cubic-bezier(0.4, 0, 0.2, 1)'
               }}
@@ -461,12 +468,12 @@ const ActivityLog = () => {
                   marginBottom: 12,
                   fontWeight: 600
                     }}>
-                  <ClockCircleOutlined style={{ marginRight: 6, color: '#2563eb' }} /> กิจกรรมทั้งหมด
+                  <ClockCircleOutlined style={{ marginRight: 6, color: '#64748b' }} /> กิจกรรมทั้งหมด
                       </div>
                 <div style={{ 
                   fontSize: 32, 
                   fontWeight: 700, 
-                  color: '#2563eb'
+                  color: '#64748b'
                 }}>
                         {stats.total_actions}
                       </div>
@@ -532,7 +539,7 @@ const ActivityLog = () => {
           <div style={{ marginBottom: 16 }}>
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12 }}>
             <Space size={8}>
-                <FilterOutlined style={{ color: '#2563eb', fontSize: 16 }} />
+                <FilterOutlined style={{ color: '#64748b', fontSize: 16 }} />
               <Text strong style={{ fontSize: 14 }}>กรองและค้นหาข้อมูล</Text>
             </Space>
             <Space size={8}>

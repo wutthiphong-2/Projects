@@ -8,7 +8,7 @@
   min-height: calc(100vh - 64px);
   padding: 24px;
   margin: 0;
-  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+  font-family: var(--font-family-primary);
   max-width: 100%;
   overflow-x: hidden;
   box-sizing: border-box;
@@ -55,9 +55,9 @@
   background-clip: text;
   -webkit-text-fill-color: transparent;
   margin-bottom: 8px;
-  font-size: 32px;
-  font-weight: 700;
-  letter-spacing: -0.8px;
+  font-size: var(--font-size-3xl);
+  font-weight: var(--font-weight-bold);
+  letter-spacing: var(--letter-spacing-tight);
   display: flex;
   align-items: center;
   gap: 12px;
@@ -66,14 +66,14 @@
 
 .dashboard-title .anticon {
   color: rgba(255, 255, 255, 0.9);
-  font-size: 36px;
+  font-size: var(--font-size-4xl);
 }
 
 .dashboard-subtitle {
   color: rgba(255, 255, 255, 0.9);
-  font-size: 15px;
-  font-weight: 500;
-  letter-spacing: -0.2px;
+  font-size: var(--font-size-base);
+  font-weight: var(--font-weight-medium);
+  letter-spacing: var(--letter-spacing-normal);
 }
 
 /* Stats Grid */
@@ -139,8 +139,8 @@
 }
 
 .stat-card .ant-statistic-content {
-  font-size: 36px;
-  font-weight: 700;
+  font-size: var(--font-size-4xl);
+  font-weight: var(--font-weight-bold);
   letter-spacing: -1px;
 }
 
@@ -173,7 +173,7 @@
 
 .stat-card .ant-statistic-content-prefix {
   margin-right: 8px;
-  font-size: 28px;
+  font-size: var(--font-size-3xl);
 }
 
 .stat-card-primary .ant-statistic-content-prefix {
@@ -263,8 +263,8 @@
 
 .dashboard-container .ant-card-head-title {
   color: #2d3748;
-  font-size: 16px;
-  font-weight: 700;
+  font-size: var(--font-size-base);
+  font-weight: var(--font-weight-bold);
   letter-spacing: -0.3px;
 }
 
@@ -320,7 +320,7 @@
 }
 
 .activity-timestamp {
-  font-size: 12px !important;
+  font-size: var(--font-size-xs) !important;
   color: #6b7280 !important;
 }
 
@@ -398,7 +398,7 @@
 .icon-orange,
 .icon-red,
 .icon-cyan {
-  font-size: 20px;
+  font-size: var(--font-size-xl);
 }
 
 .icon-green { color: #10b981 !important; }
@@ -468,7 +468,7 @@
   }
   
   .stat-card .ant-statistic-content {
-    font-size: 32px !important;
+    font-size: var(--font-size-3xl) !important;
   }
 }
 
@@ -478,7 +478,7 @@
   }
   
   .dashboard-title {
-    font-size: 26px !important;
+    font-size: var(--font-size-2xl) !important;
   }
   
   .recent-activities-card,

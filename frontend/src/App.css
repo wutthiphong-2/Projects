@@ -11,10 +11,6 @@
 }
 
 body {
-  font-family: -apple-system, BlinkMacSystemFont, 'Inter', 'Segoe UI', Roboto, 
-    'Helvetica Neue', Arial, sans-serif;
-  -webkit-font-smoothing: antialiased;
-  -moz-osx-font-smoothing: grayscale;
   background: linear-gradient(to bottom, #f8fafc, #ffffff);
   color: #1f2937;
 }
@@ -464,19 +460,10 @@ body.sidebar-collapsed .app-main-layout {
   background: linear-gradient(135deg, #3b82f6, #2563eb);
 }
 
-/* Typography */
+/* Typography - Using CSS Variables from typography.css */
 h1, h2, h3, h4, h5, h6 {
   color: #1f2937;
-  font-weight: 600;
-  letter-spacing: -0.5px;
 }
-
-h1 { font-size: 36px; line-height: 1.2; }
-h2 { font-size: 28px; line-height: 1.3; }
-h3 { font-size: 22px; line-height: 1.3; }
-h4 { font-size: 18px; line-height: 1.4; }
-h5 { font-size: 16px; line-height: 1.4; }
-h6 { font-size: 14px; line-height: 1.5; }
 
 /* Progress */
 .ant-progress-bg {
@@ -648,10 +635,6 @@ h6 { font-size: 14px; line-height: 1.5; }
   .app-content-inner {
     padding: 0;
   }
-
-  h1 { font-size: 28px; }
-  h2 { font-size: 22px; }
-  h3 { font-size: 18px; }
 }
 
 /* Print */

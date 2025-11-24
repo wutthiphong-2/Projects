@@ -2,9 +2,10 @@
 .activity-log-container {
   min-height: calc(100vh - 64px);
   padding: 24px;
-  background: linear-gradient(135deg, #1e40af 0%, #2563eb 100%);
+  background: linear-gradient(135deg, #475569 0%, #64748b 100%);
   position: relative;
   overflow: hidden;
+  font-family: var(--font-family-primary);
 }
 
 .activity-log-container::before {
@@ -15,7 +16,7 @@
   right: 0;
   bottom: 0;
   background: 
-    radial-gradient(circle at 20% 50%, rgba(30, 64, 175, 0.3) 0%, transparent 50%),
+    radial-gradient(circle at 20% 50%, rgba(71, 85, 105, 0.3) 0%, transparent 50%),
     radial-gradient(circle at 80% 80%, rgba(255, 255, 255, 0.1) 0%, transparent 50%);
   pointer-events: none;
   z-index: 0;
@@ -27,13 +28,17 @@
 }
 
 .activity-log-container .ant-card {
-  border-radius: 12px;
-  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.08);
+  border-radius: 16px;
+  box-shadow: 0 8px 32px rgba(71, 85, 105, 0.1);
   transition: all 0.3s ease;
+  background: rgba(255, 255, 255, 0.95);
+  backdrop-filter: blur(10px);
+  border: 1px solid rgba(255, 255, 255, 0.2);
 }
 
 .activity-log-container .ant-card:hover {
-  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.12);
+  box-shadow: 0 12px 48px rgba(71, 85, 105, 0.2);
+  transform: translateY(-4px);
 }
 
 .activity-log-container .ant-table {
@@ -41,12 +46,12 @@
 }
 
 .activity-log-container .ant-table-thead > tr > th {
-  background: linear-gradient(135deg, #1e40af 0%, #2563eb 100%);
+  background: linear-gradient(135deg, #475569 0%, #64748b 100%);
   color: #ffffff !important;
-  font-weight: 700;
+  font-weight: var(--font-weight-bold);
   border-bottom: none !important;
   text-transform: uppercase;
-  font-size: 12px;
+  font-size: var(--font-size-xs);
   letter-spacing: 0.5px;
 }
 
@@ -59,7 +64,7 @@
 }
 
 .activity-log-container .ant-table-tbody > tr:hover {
-  background: rgba(30, 64, 175, 0.05) !important;
+  background: rgba(71, 85, 105, 0.05) !important;
   transform: translateY(-1px);
   box-shadow: 0 2px 8px rgba(0, 0, 0, 0.06);
 }
@@ -70,24 +75,24 @@
 
 .activity-log-container .ant-tag {
   border-radius: 6px;
-  font-weight: 600;
+  font-weight: var(--font-weight-semibold);
 }
 
 .activity-log-container .ant-btn {
   border-radius: 6px;
-  font-weight: 600;
+  font-weight: var(--font-weight-semibold);
   transition: all 0.3s ease;
 }
 
 .activity-log-container .ant-btn-primary {
-  background: linear-gradient(135deg, #1e40af 0%, #2563eb 100%);
+  background: linear-gradient(135deg, #64748b 0%, #475569 100%);
   border: none;
-  box-shadow: 0 4px 12px rgba(30, 64, 175, 0.3);
+  box-shadow: 0 4px 12px rgba(71, 85, 105, 0.3);
 }
 
 .activity-log-container .ant-btn-primary:hover {
-  background: linear-gradient(135deg, #764ba2 0%, #667eea 100%);
-  box-shadow: 0 6px 16px rgba(30, 64, 175, 0.4);
+  background: linear-gradient(135deg, #475569 0%, #334155 100%);
+  box-shadow: 0 6px 16px rgba(71, 85, 105, 0.4);
   transform: translateY(-2px);
 }
 
@@ -99,18 +104,18 @@
 
 .activity-log-container .ant-input:focus,
 .activity-log-container .ant-select-focused .ant-select-selector {
-  border-color: #667eea;
-  box-shadow: 0 0 0 2px rgba(30, 64, 175, 0.1);
+  border-color: #64748b;
+  box-shadow: 0 0 0 2px rgba(71, 85, 105, 0.1);
 }
 
 .activity-log-container .ant-statistic-title {
-  font-size: 12px;
+  font-size: var(--font-size-xs);
   text-transform: uppercase;
   letter-spacing: 0.5px;
 }
 
 .activity-log-container .ant-statistic-content {
-  font-weight: 700;
+  font-weight: var(--font-weight-bold);
 }
 
 /* Hide Quick Jumper - Force Hide */
@@ -132,7 +137,7 @@
   }
   
   .activity-log-container .ant-table {
-    font-size: 12px;
+    font-size: var(--font-size-xs);
   }
 }
 

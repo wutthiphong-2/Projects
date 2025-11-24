@@ -654,9 +654,9 @@ const GroupManagement = () => {
                 <Descriptions.Item label="Group Type">
                   <Tag
                     style={{
-                      background: selectedGroup.groupType === 'Security' ? '#fef2f2' : '#eff6ff',
-                      color: selectedGroup.groupType === 'Security' ? '#991b1b' : '#1e40af',
-                      border: `2px solid ${selectedGroup.groupType === 'Security' ? '#fca5a5' : '#bfdbfe'}`,
+                      background: selectedGroup.groupType === 'Security' ? '#fef2f2' : '#f1f5f9',
+                      color: selectedGroup.groupType === 'Security' ? '#991b1b' : '#475569',
+                      border: `2px solid ${selectedGroup.groupType === 'Security' ? '#fca5a5' : '#cbd5e1'}`,
                       padding: '6px 14px',
                       fontSize: 13,
                       fontWeight: 700
@@ -668,9 +668,9 @@ const GroupManagement = () => {
                 <Descriptions.Item label="Group Scope">
                   <Tag
                     style={{
-                      background: '#eff6ff',
-                      color: '#1e40af',
-                      border: '2px solid #bfdbfe',
+                      background: '#f1f5f9',
+                      color: '#475569',
+                      border: '2px solid #cbd5e1',
                       padding: '6px 14px',
                       fontSize: 13,
                       fontWeight: 700
@@ -681,7 +681,7 @@ const GroupManagement = () => {
                 </Descriptions.Item>
                 <Descriptions.Item label="Location (OU)">
                   <Text style={{ fontSize: 13 }}>
-                    <FolderOutlined style={{ marginRight: 6, color: '#3b82f6' }} />
+                    <FolderOutlined style={{ marginRight: 6, color: '#64748b' }} />
                     {selectedGroup.parentOU || 'Root'}
                   </Text>
                 </Descriptions.Item>
@@ -730,7 +730,7 @@ const GroupManagement = () => {
                 size="large"
                 style={{
                   width: '100%',
-                  background: 'linear-gradient(135deg, #3b82f6, #2563eb)',
+                  background: 'linear-gradient(135deg, #64748b, #475569)',
                   border: 'none',
                   fontWeight: 600,
                   borderRadius: 8,
@@ -853,9 +853,9 @@ const GroupManagement = () => {
                               style={{
                                 fontSize: 11,
                                 marginTop: 4,
-                                background: '#eff6ff',
-                                color: '#1e40af',
-                                border: '1px solid #bfdbfe'
+                                background: '#f1f5f9',
+                                color: '#475569',
+                                border: '1px solid #cbd5e1'
                               }}
                             >
                               {member.department}
@@ -964,9 +964,9 @@ const GroupManagement = () => {
       render: (type) => (
         <Tag
           style={{
-            background: type === 'Security' ? '#fef2f2' : '#eff6ff',
-            color: type === 'Security' ? '#991b1b' : '#1e40af',
-            border: `1px solid ${type === 'Security' ? '#fca5a5' : '#bfdbfe'}`,
+            background: type === 'Security' ? '#fef2f2' : '#f1f5f9',
+            color: type === 'Security' ? '#991b1b' : '#475569',
+            border: `1px solid ${type === 'Security' ? '#fca5a5' : '#cbd5e1'}`,
             padding: '4px 12px',
             fontSize: 12,
             fontWeight: 600
@@ -995,7 +995,7 @@ const GroupManagement = () => {
       render: (scope) => {
         const colors = {
           'Global': '#10b981',
-          'Domain Local': '#3b82f6',
+          'Domain Local': '#64748b',
           'Universal': '#8b5cf6'
         };
         return (
@@ -1104,7 +1104,7 @@ const GroupManagement = () => {
   return (
     <div className="group-management-container" style={{ padding: '0', margin: '0', minHeight: '100vh', width: '100%' }}>
       {/* Header Section */}
-      <header style={{ padding: '24px', marginBottom: '24px' }}>
+      <header style={{ padding: '24px', marginBottom: '24px', background: 'transparent' }}>
         <Row justify="space-between" align="middle" style={{ marginBottom: 24 }}>
           <Col>
             <Space size="large" align="center">
@@ -1114,19 +1114,21 @@ const GroupManagement = () => {
                 padding: '16px',
                 backdropFilter: 'blur(10px)'
               }}>
-                <TeamOutlined style={{ fontSize: 44, color: '#fff' }} />
+                <TeamOutlined style={{ fontSize: 44, color: '#ffffff', filter: 'drop-shadow(0 2px 4px rgba(0, 0, 0, 0.2))' }} />
               </div>
               <div>
-                <div style={{ 
-                  color: '#ffffff', 
+                <Title level={1} style={{ 
                   margin: 0, 
                   marginBottom: 4, 
-                  fontWeight: 700, 
                   fontSize: 32,
-                  letterSpacing: '-0.8px'
+                  letterSpacing: '-0.8px',
+                  background: 'linear-gradient(135deg, #ffffff 0%, #e2e8f0 100%)',
+                  WebkitBackgroundClip: 'text',
+                  WebkitTextFillColor: 'transparent',
+                  backgroundClip: 'text'
                 }}>
                   Group Management
-                </div>
+                </Title>
                 <Space size="middle">
                   <Tag
                     style={{
@@ -1176,7 +1178,7 @@ const GroupManagement = () => {
                   </Tag>
                   <Tag
                     style={{
-                      background: 'linear-gradient(135deg, #3b82f6 0%, #2563eb 100%)',
+                      background: 'linear-gradient(135deg, #64748b 0%, #475569 100%)',
                       backdropFilter: 'blur(8px)',
                       border: '2px solid rgba(255, 255, 255, 0.5)',
                       color: '#ffffff',
@@ -1228,13 +1230,14 @@ const GroupManagement = () => {
                   e.currentTarget.style.background = 'rgba(255, 255, 255, 0.15)';
                 }}
                 >
-                  <ClockCircleOutlined style={{ color: '#fff', fontSize: 16 }} />
+                  <ClockCircleOutlined style={{ color: '#ffffff', fontSize: 16, filter: 'drop-shadow(0 1px 2px rgba(0, 0, 0, 0.2))' }} />
                   <div>
                     <div style={{ 
-                      color: 'rgba(255, 255, 255, 0.7)', 
+                      color: '#ffffff', 
                       fontSize: 11,
                       fontWeight: 600,
-                      textTransform: 'uppercase'
+                      textTransform: 'uppercase',
+                      textShadow: '0 1px 2px rgba(0, 0, 0, 0.2)'
                     }}>
                       Auto-Refresh
                     </div>
@@ -1247,7 +1250,12 @@ const GroupManagement = () => {
                     />
                   </div>
                   <Divider type="vertical" style={{ height: 36, background: 'rgba(255, 255, 255, 0.3)' }} />
-                  <div style={{ fontSize: 11, color: 'rgba(255, 255, 255, 0.85)', fontWeight: 500 }}>
+                  <div style={{ 
+                    fontSize: 11, 
+                    color: '#ffffff', 
+                    fontWeight: 500,
+                    textShadow: '0 1px 2px rgba(0, 0, 0, 0.2)'
+                  }}>
                     Last: {lastRefreshTime.toLocaleTimeString('en-US', { 
                       hour: '2-digit', 
                       minute: '2-digit',
@@ -1267,12 +1275,13 @@ const GroupManagement = () => {
                 style={{
                   background: 'rgba(255, 255, 255, 0.15)',
                   border: '1px solid rgba(255, 255, 255, 0.3)',
-                  color: '#fff',
+                  color: '#ffffff',
                   fontWeight: 600,
                   height: 44,
                   padding: '0 24px',
                   borderRadius: 8,
-                  backdropFilter: 'blur(10px)'
+                  backdropFilter: 'blur(10px)',
+                  textShadow: '0 1px 2px rgba(0, 0, 0, 0.2)'
                 }}
               >
                 Refresh Now
@@ -1283,7 +1292,7 @@ const GroupManagement = () => {
                 onClick={handleCreateGroup}
                 size="large"
                 style={{
-                  background: 'linear-gradient(135deg, #ffffff 0%, #f0f9ff 100%)',
+                  background: 'linear-gradient(135deg, #ffffff 0%, #f8fafc 100%)',
                   border: '2px solid rgba(255, 255, 255, 0.5)',
                   color: '#d97706',
                   fontWeight: 700,
@@ -1446,7 +1455,7 @@ const GroupManagement = () => {
               padding: '24px',
               textAlign: 'center',
               border: 'none',
-              borderLeft: '4px solid #3b82f6',
+              borderLeft: '4px solid #64748b',
               boxShadow: '0 8px 32px rgba(0, 0, 0, 0.12)',
               transition: 'all 0.3s cubic-bezier(0.4, 0, 0.2, 1)'
             }}
@@ -1467,12 +1476,12 @@ const GroupManagement = () => {
                 marginBottom: 12,
                 fontWeight: 600
               }}>
-                <GlobalOutlined style={{ marginRight: 6, color: '#3b82f6' }} /> Distribution
+                <GlobalOutlined style={{ marginRight: 6, color: '#64748b' }} /> Distribution
               </div>
               <div style={{ 
                 fontSize: 32, 
                 fontWeight: 700, 
-                color: '#3b82f6'
+                color: '#64748b'
               }}>
                 {stats.distribution}
               </div>
@@ -1524,7 +1533,7 @@ const GroupManagement = () => {
               padding: '24px',
               textAlign: 'center',
               border: 'none',
-              borderLeft: '4px solid #3b82f6',
+              borderLeft: '4px solid #64748b',
               boxShadow: '0 8px 32px rgba(0, 0, 0, 0.12)',
               transition: 'all 0.3s cubic-bezier(0.4, 0, 0.2, 1)'
             }}
@@ -1545,12 +1554,12 @@ const GroupManagement = () => {
                 marginBottom: 12,
                 fontWeight: 600
               }}>
-                <GlobalOutlined style={{ marginRight: 6, color: '#3b82f6' }} /> Domain Local
+                <GlobalOutlined style={{ marginRight: 6, color: '#64748b' }} /> Domain Local
               </div>
               <div style={{ 
                 fontSize: 32, 
                 fontWeight: 700, 
-                color: '#3b82f6'
+                color: '#64748b'
               }}>
                 {stats.domainLocal}
               </div>
@@ -1812,14 +1821,14 @@ const GroupManagement = () => {
           }}>
             <Space size="middle" align="center">
               <div style={{
-                background: '#eff6ff',
+                background: '#f1f5f9',
                 borderRadius: 8,
                 padding: 10,
                 display: 'flex',
                 alignItems: 'center',
                 justifyContent: 'center'
               }}>
-                <EditOutlined style={{ fontSize: 22, color: '#3b82f6' }} />
+                <EditOutlined style={{ fontSize: 22, color: '#64748b' }} />
               </div>
               <div>
                 <div style={{ fontSize: 17, fontWeight: 700, color: '#1f2937', marginBottom: 2 }}>
@@ -1844,7 +1853,7 @@ const GroupManagement = () => {
         cancelText="Cancel"
         okButtonProps={{
           style: {
-            background: 'linear-gradient(135deg, #3b82f6, #2563eb)',
+            background: 'linear-gradient(135deg, #64748b, #475569)',
             border: 'none',
             fontWeight: 600,
             borderRadius: 8

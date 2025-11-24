@@ -39,7 +39,8 @@ import {
   Collapse,
   Checkbox,
   Radio,
-  Spin
+  Spin,
+  Transfer
 } from 'antd';
 import {
   EditOutlined,
@@ -205,6 +206,8 @@ const UserManagement = () => {
   const [userOriginalGroups, setUserOriginalGroups] = useState([]);
   const [userSelectedGroups, setUserSelectedGroups] = useState([]);
   const [suggestedGroupsData, setSuggestedGroupsData] = useState(null);
+  const [allGroupsForTransfer, setAllGroupsForTransfer] = useState([]);
+  const [loadingGroups, setLoadingGroups] = useState(false);
   
   // Enhanced group display states
   const [groupSearchText, setGroupSearchText] = useState('');
@@ -907,31 +910,135 @@ const UserManagement = () => {
   // Handler functions for user groups management
   const handleManageGroups = useCallback(async (user) => {
     setManagingUser(user);
+    setLoadingGroups(true);
     
-    // Get current groups DNs
-    const currentGroupDNs = userGroups.map(g => g.dn);
-    setUserOriginalGroups(currentGroupDNs);
-    setUserSelectedGroups(currentGroupDNs);
-    
-    // Fetch suggested groups based on user's OU for recommendations
-    if (user.dn) {
-      // Extract OU from user DN
-      const dnParts = user.dn.split(',');
-      const ouParts = dnParts.slice(1); // Skip CN part
-      const userOUDN = ouParts.join(',');
-      
-      // Fetch suggestions
+    try {
+      // Fetch all groups first
+      // Backend returns array directly when page_size >= 1000
+      let allGroupsResponse;
       try {
-        const data = await ouService.getSuggestedGroups(userOUDN);
-        setSuggestedGroupsData(data);
+        const response = await groupService.getGroups({ page_size: 10000 });
+        console.log('🔍 Raw groups response:', response);
+        console.log('🔍 Response type:', typeof response);
+        console.log('🔍 Is array?', Array.isArray(response));
+        
+        // groupService.getGroups returns response.data
+        // If backend returns array (page_size >= 1000), response.data is array
+        // If backend returns PaginatedResponse, response.data is { items: [...], ... }
+        allGroupsResponse = response;
       } catch (error) {
-        // Silently fail - suggestions are optional
-        setSuggestedGroupsData(null);
+        console.error('❌ Error fetching all groups:', error);
+        message.error('ไม่สามารถโหลด groups ได้: ' + (error.message || 'Unknown error'));
+        allGroupsResponse = [];
       }
+      
+      // Fetch user's current groups with better error handling
+      let userGroupsResponse = [];
+      try {
+        const response = await userService.getUserGroups(user.dn);
+        // Handle different response formats
+        if (Array.isArray(response)) {
+          userGroupsResponse = response;
+        } else if (response?.data) {
+          userGroupsResponse = Array.isArray(response.data) ? response.data : [];
+        } else if (response?.groups) {
+          userGroupsResponse = Array.isArray(response.groups) ? response.groups : [];
+        }
+      } catch (error) {
+        console.warn('Error fetching user groups:', error);
+        // If it's a network/content length error, try to continue with empty groups
+        if (error.message?.includes('ERR_CONTENT_LENGTH_MISMATCH') || 
+            error.message?.includes('Network Error')) {
+          message.warning('ไม่สามารถโหลด groups ปัจจุบันของ user ได้ แต่สามารถเลือก groups ใหม่ได้');
+        } else {
+          message.warning('ไม่สามารถโหลด groups ปัจจุบันของ user ได้');
+        }
+        userGroupsResponse = [];
+      }
+      
+      // Format groups for Transfer component
+      // Backend returns array directly when page_size >= 1000
+      // groupService.getGroups returns response.data (which is the array)
+      let allGroups = [];
+      
+      // Handle different response formats
+      if (Array.isArray(allGroupsResponse)) {
+        // Response is directly an array (when page_size >= 1000)
+        allGroups = allGroupsResponse;
+      } else if (allGroupsResponse?.items && Array.isArray(allGroupsResponse.items)) {
+        // PaginatedResponse format: { items: [...], total: ..., page: ..., page_size: ... }
+        allGroups = allGroupsResponse.items;
+      } else if (allGroupsResponse?.data) {
+        // Nested data property
+        if (Array.isArray(allGroupsResponse.data)) {
+          allGroups = allGroupsResponse.data;
+        } else if (Array.isArray(allGroupsResponse.data.items)) {
+          allGroups = allGroupsResponse.data.items;
+        } else if (Array.isArray(allGroupsResponse.data.results)) {
+          allGroups = allGroupsResponse.data.results;
+        }
+      }
+      
+      console.log('✅ Extracted groups:', allGroups.length);
+      if (allGroups.length > 0) {
+        console.log('📋 Sample group:', allGroups[0]);
+      } else {
+        console.warn('⚠️ No groups found in response!');
+        console.warn('⚠️ Response structure:', allGroupsResponse);
+      }
+      
+      const formattedGroups = allGroups
+        .filter(group => group && (group.dn || group.id || group.cn || group.name))
+        .map(group => ({
+          key: group.dn || group.id || `${group.cn || group.name}`,
+          title: group.cn || group.name || group.dn || group.id || 'Unknown Group',
+          description: group.description || group.dn || group.ouPath || group.ou_path || ''
+        }));
+      
+      console.log('✅ Formatted groups for Transfer:', formattedGroups.length);
+      
+      if (formattedGroups.length === 0 && allGroupsResponse && !Array.isArray(allGroupsResponse)) {
+        message.warning('ไม่พบ groups ในระบบ กรุณาตรวจสอบการเชื่อมต่อ LDAP หรือลอง refresh หน้า');
+      }
+      
+      setAllGroupsForTransfer(formattedGroups);
+      
+      // Get current groups DNs
+      const currentGroupDNs = userGroupsResponse
+        .map(g => {
+          if (typeof g === 'string') return g;
+          return g.dn || g.id || null;
+        })
+        .filter(Boolean);
+      
+      setUserOriginalGroups(currentGroupDNs);
+      setUserSelectedGroups(currentGroupDNs);
+      
+      // Fetch suggested groups based on user's OU for recommendations
+      if (user.dn) {
+        // Extract OU from user DN
+        const dnParts = user.dn.split(',');
+        const ouParts = dnParts.slice(1); // Skip CN part
+        const userOUDN = ouParts.join(',');
+        
+        // Fetch suggestions
+        try {
+          const data = await ouService.getSuggestedGroups(userOUDN);
+          setSuggestedGroupsData(data);
+        } catch (error) {
+          // Silently fail - suggestions are optional
+          setSuggestedGroupsData(null);
+        }
+      }
+    } catch (error) {
+      console.error('Error loading groups:', error);
+      message.error('ไม่สามารถโหลดข้อมูล groups ได้: ' + (error.message || 'Unknown error'));
+    } finally {
+      setLoadingGroups(false);
     }
     
     setIsManageGroupsModalVisible(true);
-  }, [userGroups]);
+  }, [message]);
 
   const handleSaveGroupChanges = useCallback(async () => {
     if (!managingUser?.dn) {
@@ -986,12 +1093,18 @@ const UserManagement = () => {
       
       // Close modal and refresh
       setIsManageGroupsModalVisible(false);
+      setManagingUser(null);
+      setUserOriginalGroups([]);
+      setUserSelectedGroups([]);
+      
+      // Refresh user details and users list
       await fetchUserDetails(managingUser.dn);
+      await fetchUsers(true); // Force refresh users list
       
     } catch (error) {
       notifyError('Failed to update group membership', error?.response?.data?.detail || error?.message || 'An error occurred');
     }
-  }, [managingUser, userOriginalGroups, userSelectedGroups, message, fetchUserDetails, notifyError]);
+  }, [managingUser, userOriginalGroups, userSelectedGroups, message, fetchUserDetails, fetchUsers, notifyError]);
 
   const handleRemoveFromGroup = useCallback(async (groupDn, groupName) => {
     if (!selectedUser) return;
@@ -1040,7 +1153,7 @@ const UserManagement = () => {
   // UserDetailsDrawer component now handles tabs internally
   // Removed userDetailsTabsItems useMemo - moved to UserDetailsDrawer component
 
-  // Manage Groups Modal tabs items - simplified version
+  // Manage Groups Modal tabs items - Groups only
   const manageGroupsTabsItems = useMemo(() => {
     if (!managingUser) return [];
     
@@ -1049,55 +1162,110 @@ const UserManagement = () => {
         key: '1',
         label: (
           <span>
-            <IdcardOutlined />
-            Basic Info
+            <TeamOutlined />
+            Groups
           </span>
         ),
         children: (
-            <Card
-              size="small"
-              style={{
-                marginBottom: 16,
-                background: '#ffffff',
-                border: '1px solid #e5e7eb',
-                borderRadius: 8
-              }}
-              styles={{ body: { padding: 0 } }}
-            >
-              <Descriptions
-                column={1}
-                bordered
-                size="middle"
-                styles={{
-                  label: {
-                    background: '#f8fafc',
-                    color: '#374151',
-                    fontWeight: 600,
-                    fontSize: 13,
-                    width: '35%'
-                  },
-                  content: {
-                    background: '#ffffff',
-                    color: '#1f2937'
+          <Spin spinning={loadingGroups}>
+            <div style={{ padding: '16px 0' }}>
+              <Alert
+                message="เลือก Groups"
+                description={`เลือก groups ที่ต้องการให้ ${managingUser.displayName || managingUser.sAMAccountName} เป็นสมาชิก`}
+                type="info"
+                showIcon
+                style={{ marginBottom: 16 }}
+              />
+              {allGroupsForTransfer.length === 0 && !loadingGroups ? (
+                <Alert
+                  message="ไม่พบ Groups"
+                  description="ไม่สามารถโหลด groups จากระบบได้ กรุณาตรวจสอบการเชื่อมต่อ LDAP หรือลอง refresh หน้า"
+                  type="warning"
+                  showIcon
+                  style={{ marginBottom: 16 }}
+                  action={
+                    <Button 
+                      size="small" 
+                      onClick={async () => {
+                        setLoadingGroups(true);
+                        try {
+                          const response = await groupService.getGroups({ page_size: 10000 });
+                          console.log('🔄 Retry - Raw groups response:', response);
+                          
+                          let allGroups = [];
+                          if (Array.isArray(response)) {
+                            allGroups = response;
+                          } else if (response?.items) {
+                            allGroups = response.items;
+                          } else if (response?.data) {
+                            allGroups = Array.isArray(response.data) ? response.data : (response.data?.items || []);
+                          }
+                          
+                          const formattedGroups = allGroups
+                            .filter(group => group && (group.dn || group.id || group.cn || group.name))
+                            .map(group => ({
+                              key: group.dn || group.id || `${group.cn || group.name}`,
+                              title: group.cn || group.name || group.dn || group.id || 'Unknown Group',
+                              description: group.description || group.dn || group.ouPath || group.ou_path || ''
+                            }));
+                          
+                          setAllGroupsForTransfer(formattedGroups);
+                          if (formattedGroups.length > 0) {
+                            message.success(`โหลด groups สำเร็จ: ${formattedGroups.length} groups`);
+                          }
+                        } catch (error) {
+                          console.error('Retry failed:', error);
+                          message.error('ไม่สามารถโหลด groups ได้: ' + (error.message || 'Unknown error'));
+                        } finally {
+                          setLoadingGroups(false);
+                        }
+                      }}
+                    >
+                      Retry
+                    </Button>
                   }
-                }}
-              >
-                <Descriptions.Item label="Display Name">
-                  <Text strong style={{ fontSize: 14 }}>
-                  {managingUser.displayName || managingUser.cn || 'N/A'}
-                  </Text>
-                </Descriptions.Item>
-                <Descriptions.Item label="Username">
-                  <Text copyable code style={{ background: '#f3f4f6', padding: '4px 8px', borderRadius: 4 }}>
-                  {managingUser.sAMAccountName}
-                  </Text>
-                </Descriptions.Item>
-              </Descriptions>
-            </Card>
+                />
+              ) : (
+                <Transfer
+                  dataSource={allGroupsForTransfer}
+                  titles={['Available Groups', 'Selected Groups']}
+                  targetKeys={userSelectedGroups}
+                  onChange={(nextTargetKeys) => {
+                    setUserSelectedGroups(nextTargetKeys);
+                  }}
+                  render={(item) => item.title}
+                  listStyle={{
+                    width: '100%',
+                    height: 400,
+                  }}
+                  operations={['Add', 'Remove']}
+                  showSearch
+                  filterOption={(inputValue, item) =>
+                    item.title.toLowerCase().indexOf(inputValue.toLowerCase()) !== -1 ||
+                    (item.description && item.description.toLowerCase().indexOf(inputValue.toLowerCase()) !== -1)
+                  }
+                  locale={{
+                    itemUnit: 'group',
+                    itemsUnit: 'groups',
+                    searchPlaceholder: 'Search groups...',
+                    notFoundContent: 'No groups found',
+                  }}
+                />
+              )}
+              <div style={{ marginTop: 16, padding: '12px', background: '#f8fafc', borderRadius: 8 }}>
+                <Text type="secondary" style={{ fontSize: 12 }}>
+                  <InfoCircleOutlined /> Selected: <strong>{userSelectedGroups.length}</strong> groups
+                  {allGroupsForTransfer.length > 0 && (
+                    <> | Available: <strong>{allGroupsForTransfer.length}</strong> groups</>
+                  )}
+                </Text>
+              </div>
+            </div>
+          </Spin>
         )
       }
     ];
-  }, [managingUser]);
+  }, [managingUser, allGroupsForTransfer, userSelectedGroups, loadingGroups]);
 
   // ==================== DATA PROCESSING ====================
   
@@ -1300,7 +1468,7 @@ const UserManagement = () => {
       label: 'ผู้ใช้ทั้งหมด',
       value: formatCount(directoryCounts.total),
       hint: 'ข้อมูลจาก AD',
-      accent: '#2563eb',
+      accent: '#64748b',
       onClick: () => handleMetricClick('total')
     },
     {
@@ -1803,8 +1971,29 @@ const UserManagement = () => {
           
           {/* Title Section */}
           <div className="umx-title-section">
-            <h1 className="umx-page-title">User Management</h1>
-            <p className="umx-page-subtitle">Manage and organize user accounts in your Active Directory</p>
+            <Title level={3} className="umx-page-title" style={{ 
+              marginBottom: 8,
+              background: 'linear-gradient(135deg, #ffffff 0%, #f0f0f0 100%)',
+              WebkitBackgroundClip: 'text',
+              backgroundClip: 'text',
+              WebkitTextFillColor: 'transparent',
+              fontWeight: 700,
+              fontSize: '32px',
+              display: 'flex',
+              alignItems: 'center',
+              gap: '12px'
+            }}>
+              <UserOutlined style={{ color: '#ffffff', fontSize: 36, filter: 'drop-shadow(0 2px 4px rgba(0, 0, 0, 0.2))' }} />
+              User Management
+            </Title>
+            <Text className="umx-page-subtitle" style={{ 
+              fontSize: '15px', 
+              fontWeight: 500,
+              color: '#ffffff',
+              textShadow: '0 2px 4px rgba(0, 0, 0, 0.2)'
+            }}>
+              Manage and organize user accounts in your Active Directory
+            </Text>
           </div>
           
           {/* Statistics Cards - Match Image */}
@@ -2121,7 +2310,7 @@ const UserManagement = () => {
           }
         }}
       >
-        <Tabs defaultActiveKey="1" items={manageGroupsTabsItems} />
+        <Tabs defaultActiveKey="1" items={manageGroupsTabsItems} style={{ minHeight: 500 }} />
       </Modal>
       
       {/* OU Selection Modal - Enhanced Version */}
@@ -2670,7 +2859,12 @@ const UserManagement = () => {
       />
       
       {/* Hidden Forms to suppress useForm warnings - used programmatically */}
-      <Form form={filterForm} style={{ display: 'none' }}>
+      {/* These forms are always rendered to prevent React warnings about unconnected form instances */}
+      <Form 
+        form={filterForm} 
+        style={{ display: 'none' }}
+        preserve={false}
+      >
         <Form.Item name="department">
           <Input style={{ display: 'none' }} />
         </Form.Item>
@@ -2686,7 +2880,11 @@ const UserManagement = () => {
       </Form>
       
       {/* Hidden Form for editForm - always connected to suppress warning */}
-      <Form form={editForm} style={{ display: 'none' }}>
+      <Form 
+        form={editForm} 
+        style={{ display: 'none' }}
+        preserve={false}
+      >
         <Form.Item name="cn">
           <Input style={{ display: 'none' }} />
         </Form.Item>
@@ -2702,7 +2900,11 @@ const UserManagement = () => {
       </Form>
       
       {/* Hidden Form for passwordForm - always connected to suppress warning */}
-      <Form form={passwordForm} style={{ display: 'none' }}>
+      <Form 
+        form={passwordForm} 
+        style={{ display: 'none' }}
+        preserve={false}
+      >
         <Form.Item name="password">
           <Input.Password style={{ display: 'none' }} />
         </Form.Item>

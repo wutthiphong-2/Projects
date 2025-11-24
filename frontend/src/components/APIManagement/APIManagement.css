@@ -1,8 +1,99 @@
-/* API Management Styles */
+/* API Management Styles - Matching Dashboard Design */
 
+.api-management-container {
+  background: linear-gradient(135deg, #475569 0%, #64748b 100%);
+  min-height: calc(100vh - 64px);
+  padding: 24px;
+  margin: 0;
+  font-family: var(--font-family-primary);
+  max-width: 100%;
+  overflow-x: hidden;
+  box-sizing: border-box;
+  position: relative;
+  overflow: hidden;
+}
+
+.api-management-container::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: 
+    radial-gradient(circle at 20% 50%, rgba(71, 85, 105, 0.3) 0%, transparent 50%),
+    radial-gradient(circle at 80% 80%, rgba(255, 255, 255, 0.1) 0%, transparent 50%);
+  pointer-events: none;
+  z-index: 0;
+}
+
+.api-management-container > * {
+  position: relative;
+  z-index: 1;
+}
+
+/* Global Override for API Management */
+.api-management-container,
+.api-management-container * {
+  box-sizing: border-box !important;
+}
+
+/* Header */
+.api-management-header {
+  margin-bottom: 32px !important;
+  padding: 0 !important;
+  background: transparent !important;
+  border: none !important;
+}
+
+.api-management-title {
+  background: linear-gradient(135deg, #ffffff 0%, #f0f0f0 100%);
+  -webkit-background-clip: text;
+  background-clip: text;
+  -webkit-text-fill-color: transparent;
+  margin-bottom: 8px;
+  font-size: var(--font-size-3xl);
+  font-weight: var(--font-weight-bold);
+  letter-spacing: -0.8px;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  text-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+}
+
+.api-management-title .anticon {
+  color: #ffffff;
+  font-size: var(--font-size-4xl);
+  filter: drop-shadow(0 2px 4px rgba(0, 0, 0, 0.2));
+}
+
+.api-management-subtitle {
+  color: #ffffff;
+  font-size: var(--font-size-base);
+  font-weight: var(--font-weight-medium);
+  letter-spacing: -0.2px;
+  text-shadow: 0 2px 4px rgba(0, 0, 0, 0.2);
+}
+
+/* Main Card */
+.api-management-main-card {
+  background: #ffffff;
+  border-radius: 16px;
+  border: none;
+  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.12);
+  overflow: hidden;
+}
+
+.api-management-main-card:hover {
+  transform: translateY(-4px);
+  box-shadow: 0 12px 40px rgba(0, 0, 0, 0.16);
+}
+
+/* Legacy support */
 .api-management {
   padding: 24px;
-  background: linear-gradient(135deg, #1e40af 0%, #2563eb 100%);
+  background: linear-gradient(135deg, #475569 0%, #64748b 100%);
   min-height: calc(100vh - 64px);
   position: relative;
   overflow: hidden;
@@ -16,7 +107,7 @@
   right: 0;
   bottom: 0;
   background: 
-    radial-gradient(circle at 20% 50%, rgba(30, 64, 175, 0.3) 0%, transparent 50%),
+    radial-gradient(circle at 20% 50%, rgba(71, 85, 105, 0.3) 0%, transparent 50%),
     radial-gradient(circle at 80% 80%, rgba(255, 255, 255, 0.1) 0%, transparent 50%);
   pointer-events: none;
   z-index: 0;
@@ -31,28 +122,50 @@
   padding: 0;
 }
 
+/* Cards - Matching Dashboard Style */
+.api-management-container .ant-card,
 .api-key-manager .ant-card {
-  border-radius: 16px;
-  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.12);
-  border: none;
   background: #ffffff;
+  border-radius: 16px;
+  border: none;
   transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.12);
   overflow: hidden;
 }
 
+.api-management-container .ant-card:hover,
 .api-key-manager .ant-card:hover {
   transform: translateY(-4px);
   box-shadow: 0 12px 40px rgba(0, 0, 0, 0.16);
 }
 
+.api-management-container .ant-card-head {
+  border-bottom: 2px solid #e2e8f0;
+  background: linear-gradient(135deg, #f5f7fa 0%, #c3cfe2 100%);
+  padding: 20px 24px;
+  border-radius: 16px 16px 0 0;
+}
+
+.api-management-container .ant-card-head-title {
+  color: #2d3748;
+  font-size: var(--font-size-base);
+  font-weight: var(--font-weight-bold);
+  letter-spacing: -0.3px;
+}
+
+.api-management-container .ant-card-body {
+  padding: 24px;
+  background: #ffffff;
+}
+
 .api-key-manager .ant-statistic-title {
-  font-size: 14px;
+  font-size: var(--font-size-sm);
   color: #666;
 }
 
 .api-key-manager .ant-statistic-content {
-  font-size: 24px;
-  font-weight: 600;
+  font-size: var(--font-size-2xl);
+  font-weight: var(--font-weight-semibold);
 }
 
 .api-documentation {
@@ -80,7 +193,7 @@
   color: #d4d4d4;
   border-radius: 8px;
   overflow-x: auto;
-  font-size: 13px;
+  font-size: var(--font-size-sm);
   font-family: 'Consolas', 'Monaco', 'Courier New', monospace;
   line-height: 1.6;
   border: 1px solid #2d2d2d;
@@ -89,7 +202,7 @@
 
 .api-documentation code {
   font-family: 'Consolas', 'Monaco', 'Courier New', monospace;
-  font-size: 13px;
+  font-size: var(--font-size-sm);
 }
 
 .api-documentation .ant-collapse {
@@ -112,7 +225,7 @@
 .api-documentation .ant-collapse-header {
   padding: 16px 20px;
   background: linear-gradient(135deg, #f8f9fa 0%, #ffffff 100%);
-  font-weight: 600;
+  font-weight: var(--font-weight-semibold);
   transition: all 0.3s ease;
 }
 
@@ -133,8 +246,8 @@
 
 .api-key-manager .ant-table-thead > tr > th {
   background: linear-gradient(135deg, #f5f7fa 0%, #c3cfe2 100%);
-  font-weight: 600;
-  font-size: 13px;
+  font-weight: var(--font-weight-semibold);
+  font-size: var(--font-size-sm);
   color: #2d3748;
   text-transform: uppercase;
   letter-spacing: 0.5px;
@@ -143,7 +256,7 @@
 }
 
 .api-key-manager .ant-table-tbody > tr > td {
-  font-size: 13px;
+  font-size: var(--font-size-sm);
   padding: 16px;
   border-bottom: 1px solid #f1f5f9;
   transition: all 0.2s ease;
@@ -154,9 +267,38 @@
 }
 
 .api-key-manager .ant-table-tbody > tr:hover > td {
-  background: linear-gradient(90deg, rgba(30, 64, 175, 0.05) 0%, rgba(37, 99, 235, 0.05) 100%);
+  background: linear-gradient(90deg, rgba(71, 85, 105, 0.05) 0%, rgba(100, 116, 139, 0.05) 100%);
   transform: scale(1.01);
   box-shadow: 0 2px 8px rgba(0, 0, 0, 0.04);
+}
+
+/* Tabs Styles - Matching Dashboard */
+.api-management-container .ant-tabs {
+  background: #ffffff;
+}
+
+.api-management-container .ant-tabs-tab {
+  font-weight: var(--font-weight-semibold);
+  color: #6b7280;
+  padding: 12px 16px;
+  transition: all 0.3s ease;
+}
+
+.api-management-container .ant-tabs-tab:hover {
+  color: #475569;
+}
+
+.api-management-container .ant-tabs-tab-active {
+  color: #475569 !important;
+}
+
+.api-management-container .ant-tabs-ink-bar {
+  background: #475569;
+  height: 3px;
+}
+
+.api-management-container .ant-tabs-content-holder {
+  padding: 24px;
 }
 
 /* Modal Styles */
@@ -179,8 +321,8 @@
 
 .api-key-manager .ant-modal-title {
   color: white;
-  font-weight: 600;
-  font-size: 20px;
+  font-weight: var(--font-weight-semibold);
+  font-size: var(--font-size-xl);
 }
 
 .api-key-manager .ant-modal-close {
@@ -207,8 +349,8 @@
 
 /* Form Styles */
 .api-key-manager .ant-form-item-label > label {
-  font-weight: 600;
-  font-size: 14px;
+  font-weight: var(--font-weight-semibold);
+  font-size: var(--font-size-sm);
   color: #2d3748;
 }
 
@@ -241,7 +383,7 @@
   border-radius: 6px;
   padding: 4px 12px;
   font-size: 12px;
-  font-weight: 600;
+  font-weight: var(--font-weight-semibold);
   border: none;
   box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
   transition: all 0.2s ease;
@@ -269,7 +411,7 @@
   background: linear-gradient(135deg, #1e40af 0%, #2563eb 100%);
   border: none;
   color: white;
-  font-weight: 600;
+  font-weight: var(--font-weight-semibold);
 }
 
 .api-key-manager .ant-btn-primary:hover {
@@ -309,7 +451,7 @@
 
 .api-key-manager .ant-alert-success .ant-alert-message {
   color: #52c41a;
-  font-weight: 600;
+  font-weight: var(--font-weight-semibold);
   font-size: 16px;
 }
 
@@ -349,7 +491,7 @@
 .api-key-manager .ant-statistic-title {
   margin-bottom: 8px;
   color: rgba(255, 255, 255, 0.9);
-  font-size: 13px;
+  font-size: var(--font-size-sm);
   font-weight: 500;
   text-transform: uppercase;
   letter-spacing: 0.5px;
@@ -387,7 +529,7 @@
   color: #d4d4d4;
   border-radius: 8px;
   overflow-x: auto;
-  font-size: 13px;
+  font-size: var(--font-size-sm);
   font-family: 'Consolas', 'Monaco', 'Courier New', monospace;
   line-height: 1.6;
   border: 1px solid #2d2d2d;
@@ -400,12 +542,12 @@
 
 .api-tester code {
   font-family: 'Consolas', 'Monaco', 'Courier New', monospace;
-  font-size: 13px;
+  font-size: var(--font-size-sm);
 }
 
 .api-tester .ant-form-item-label > label {
   font-weight: 500;
-  font-size: 14px;
+  font-size: var(--font-size-sm);
 }
 
 .api-tester .ant-input,
@@ -434,8 +576,8 @@
   background: linear-gradient(135deg, #1e40af 0%, #2563eb 100%);
   border: none;
   height: 40px;
-  font-size: 14px;
-  font-weight: 600;
+  font-size: var(--font-size-sm);
+  font-weight: var(--font-weight-semibold);
   border-radius: 8px;
   box-shadow: 0 4px 12px rgba(30, 64, 175, 0.3);
   transition: all 0.3s ease;
@@ -465,14 +607,14 @@
 }
 
 .analytics-dashboard .ant-statistic-title {
-  font-size: 14px;
+  font-size: var(--font-size-sm);
   color: #666;
   margin-bottom: 8px;
 }
 
 .analytics-dashboard .ant-statistic-content {
-  font-size: 24px;
-  font-weight: 600;
+  font-size: var(--font-size-2xl);
+  font-weight: var(--font-weight-semibold);
 }
 
 .analytics-dashboard .ant-progress {
@@ -487,8 +629,8 @@
 
 .analytics-dashboard .ant-table-thead > tr > th {
   background: linear-gradient(135deg, #f5f7fa 0%, #c3cfe2 100%);
-  font-weight: 600;
-  font-size: 13px;
+  font-weight: var(--font-weight-semibold);
+  font-size: var(--font-size-sm);
   color: #2d3748;
   text-transform: uppercase;
   letter-spacing: 0.5px;
@@ -497,7 +639,7 @@
 }
 
 .analytics-dashboard .ant-table-tbody > tr > td {
-  font-size: 13px;
+  font-size: var(--font-size-sm);
   padding: 16px;
   border-bottom: 1px solid #f1f5f9;
   transition: all 0.2s ease;
@@ -612,7 +754,7 @@
   }
 
   .api-key-manager .ant-statistic-content {
-    font-size: 24px;
+    font-size: var(--font-size-2xl);
   }
 }
 
@@ -666,8 +808,8 @@
 
 .api-management .ant-tabs-tab {
   padding: 16px 24px;
-  font-weight: 600;
-  font-size: 14px;
+  font-weight: var(--font-weight-semibold);
+  font-size: var(--font-size-sm);
   color: #64748b;
   transition: all 0.3s ease;
   border-radius: 8px 8px 0 0;
@@ -706,7 +848,7 @@
 
 .api-key-manager .ant-empty-description {
   color: #8c8c8c;
-  font-size: 14px;
+  font-size: var(--font-size-sm);
 }
 
 /* Search Input */
@@ -756,7 +898,7 @@
 .api-key-manager .ant-collapse-header {
   padding: 16px 20px;
   background: linear-gradient(135deg, #f8f9fa 0%, #ffffff 100%);
-  font-weight: 600;
+  font-weight: var(--font-weight-semibold);
   transition: all 0.3s ease;
 }
 
@@ -825,8 +967,8 @@
 
 .usage-alerts .ant-table-thead > tr > th {
   background: linear-gradient(135deg, #f5f7fa 0%, #c3cfe2 100%);
-  font-weight: 600;
-  font-size: 13px;
+  font-weight: var(--font-weight-semibold);
+  font-size: var(--font-size-sm);
   color: #2d3748;
   text-transform: uppercase;
   letter-spacing: 0.5px;
@@ -835,7 +977,7 @@
 }
 
 .usage-alerts .ant-table-tbody > tr > td {
-  font-size: 13px;
+  font-size: var(--font-size-sm);
   padding: 16px;
   border-bottom: 1px solid #f1f5f9;
   transition: all 0.2s ease;
@@ -850,14 +992,14 @@
 }
 
 .usage-alerts .ant-statistic-title {
-  font-size: 14px;
+  font-size: var(--font-size-sm);
   color: #666;
   margin-bottom: 8px;
 }
 
 .usage-alerts .ant-statistic-content {
-  font-size: 24px;
-  font-weight: 600;
+  font-size: var(--font-size-2xl);
+  font-weight: var(--font-weight-semibold);
 }
 
 /* Rate Limit Manager Styles */
@@ -904,8 +1046,8 @@
 
 .api-logs-viewer .ant-table-thead > tr > th {
   background: linear-gradient(135deg, #f5f7fa 0%, #c3cfe2 100%);
-  font-weight: 600;
-  font-size: 13px;
+  font-weight: var(--font-weight-semibold);
+  font-size: var(--font-size-sm);
   color: #2d3748;
   text-transform: uppercase;
   letter-spacing: 0.5px;
@@ -914,7 +1056,7 @@
 }
 
 .api-logs-viewer .ant-table-tbody > tr > td {
-  font-size: 13px;
+  font-size: var(--font-size-sm);
   padding: 16px;
   border-bottom: 1px solid #f1f5f9;
   transition: all 0.2s ease;
@@ -993,7 +1135,7 @@
   background: linear-gradient(135deg, #1e40af 0%, #2563eb 100%);
   border: none;
   color: white;
-  font-weight: 600;
+  font-weight: var(--font-weight-semibold);
   border-radius: 8px;
   box-shadow: 0 4px 12px rgba(30, 64, 175, 0.3);
   transition: all 0.3s ease;

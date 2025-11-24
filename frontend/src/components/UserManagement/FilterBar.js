@@ -186,8 +186,8 @@ const FilterBar = ({
                           padding: '6px 14px',
                           borderRadius: 20,
                           border: 'none',
-                          background: '#eff6ff',
-                          color: '#1e40af',
+                          background: '#f1f5f9',
+                          color: '#475569',
                           fontWeight: 500
                         }}
                       >

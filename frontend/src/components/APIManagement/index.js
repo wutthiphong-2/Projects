@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { Tabs, Card } from 'antd';
+import { Tabs, Card, Typography, Space } from 'antd';
 import {
   KeyOutlined,
   BookOutlined,
@@ -20,6 +20,8 @@ import RateLimitManager from './RateLimitManager';
 import UsageAlerts from './UsageAlerts';
 import PermissionsManager from './PermissionsManager';
 import './APIManagement.css';
+
+const { Title, Text } = Typography;
 
 const APIManagement = () => {
   const [activeTab, setActiveTab] = useState('keys');
@@ -100,34 +102,33 @@ const APIManagement = () => {
   ];
 
   return (
-    <div className="api-management">
-      <div style={{ 
-        marginBottom: 24,
-        padding: '16px 0',
-        color: 'white'
-      }}>
-        <h1 style={{ 
-          fontSize: '32px', 
-          fontWeight: 700, 
+    <div className="api-management-container">
+      {/* Header */}
+      <div className="api-management-header">
+        <Title level={3} className="api-management-title" style={{ 
           marginBottom: 8,
           background: 'linear-gradient(135deg, #ffffff 0%, #f0f0f0 100%)',
           WebkitBackgroundClip: 'text',
+          backgroundClip: 'text',
           WebkitTextFillColor: 'transparent',
-          textShadow: '0 2px 4px rgba(0, 0, 0, 0.1)'
+          fontWeight: 700,
+          fontSize: '32px'
         }}>
-          🔑 API Management
-        </h1>
-        <p style={{ 
-          color: 'rgba(255, 255, 255, 0.9)', 
-          fontSize: '15px',
+          <KeyOutlined style={{ marginRight: 12, color: '#ffffff', filter: 'drop-shadow(0 2px 4px rgba(0, 0, 0, 0.2))' }} />
+          API Management
+        </Title>
+        <Text className="api-management-subtitle" style={{ 
+          fontSize: '15px', 
           fontWeight: 500,
-          margin: 0
+          color: '#ffffff',
+          textShadow: '0 2px 4px rgba(0, 0, 0, 0.2)'
         }}>
           จัดการ API Keys, ดูเอกสาร, และทดสอบ API
-        </p>
+        </Text>
       </div>
 
       <Card 
+        className="api-management-main-card"
         style={{
           borderRadius: '16px',
           boxShadow: '0 8px 32px rgba(0, 0, 0, 0.12)',
@@ -136,12 +137,12 @@ const APIManagement = () => {
         }}
         styles={{ body: { padding: 0 } }}
       >
-      <Tabs
-        activeKey={activeTab}
-        onChange={setActiveTab}
-        items={tabItems}
-        size="large"
-      />
+        <Tabs
+          activeKey={activeTab}
+          onChange={setActiveTab}
+          items={tabItems}
+          size="large"
+        />
       </Card>
     </div>
   );
